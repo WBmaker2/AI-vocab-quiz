@@ -4,9 +4,10 @@ import { ListeningQuiz } from "./components/ListeningQuiz.jsx";
 import { ModeSelector } from "./components/ModeSelector.jsx";
 import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
 import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
-import { useLocalVocabulary } from "./hooks/useLocalVocabulary.js";
+import { GRADE_OPTIONS } from "./constants/vocabulary.js";
 import { isSpeechRecognitionSupported } from "./hooks/useSpeechRecognition.js";
 import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis.js";
+import { useVocabularyLibrary } from "./hooks/useVocabularyLibrary.js";
 
 const APP_VIEWS = {
   HOME: "home",
@@ -18,21 +19,14 @@ const APP_VIEWS = {
 function App() {
   const [view, setView] = useState(APP_VIEWS.HOME);
   const speechSynthesis = useSpeechSynthesis();
-  const {
-    vocabularyItems,
-    addVocabularyItem,
-    updateVocabularyItem,
-    removeVocabularyItem,
-    clearVocabularyItems,
-    replaceVocabularyItems,
-  } = useLocalVocabulary();
+  const library = useVocabularyLibrary();
 
   const support = {
     tts: speechSynthesis.supported,
     stt: isSpeechRecognitionSupported(),
   };
 
-  const hasVocabulary = vocabularyItems.length > 0;
+  const hasStudentVocabulary = library.student.items.length > 0;
 
   function navigateTo(nextView) {
     speechSynthesis.cancel();
@@ -55,7 +49,7 @@ function App() {
           <div className="hero-badges" aria-label="핵심 기능">
             <span>TTS 듣기 퀴즈</span>
             <span>STT 말하기 연습</span>
-            <span>localStorage 저장</span>
+            <span>Firebase 공유 저장</span>
           </div>
         </header>
 
@@ -63,7 +57,29 @@ function App() {
 
         {view === APP_VIEWS.HOME ? (
           <ModeSelector
-            hasVocabulary={hasVocabulary}
+            gradeOptions={GRADE_OPTIONS}
+            remoteConfigured={library.remoteConfigured}
+            auth={library.auth}
+            schoolQuery={library.student.schoolQuery}
+            schoolResults={library.student.schoolResults}
+            schoolSearchLoading={library.student.schoolSearchLoading}
+            selectedSchool={library.student.selectedSchool}
+            teachers={library.student.teachers}
+            teachersLoading={library.student.teachersLoading}
+            selectedTeacher={library.student.selectedTeacher}
+            selection={library.student.selection}
+            units={library.student.units}
+            unitsLoading={library.student.unitsLoading}
+            status={library.student.status}
+            error={library.student.error}
+            hasVocabulary={hasStudentVocabulary}
+            currentItemCount={library.student.items.length}
+            onSchoolQueryChange={library.student.updateSchoolQuery}
+            onSearchSchools={library.student.searchSchools}
+            onChooseSchool={library.student.chooseSchool}
+            onChooseTeacher={library.student.chooseTeacher}
+            onSelectionChange={library.student.updateSelection}
+            onLoadSet={library.student.loadSet}
             onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
             onOpenListening={() => navigateTo(APP_VIEWS.LISTENING)}
             onOpenSpeaking={() => navigateTo(APP_VIEWS.SPEAKING)}
@@ -72,22 +88,44 @@ function App() {
 
         {view === APP_VIEWS.TEACHER ? (
           <TeacherWorkspace
-            items={vocabularyItems}
+            gradeOptions={GRADE_OPTIONS}
+            remoteConfigured={library.remoteConfigured}
+            auth={library.auth}
+            profile={library.teacher.profile}
+            profileLoading={library.teacher.profileLoading}
+            profileError={library.teacher.profileError}
+            requiresOnboarding={library.teacher.requiresOnboarding}
+            onboarding={library.teacher.onboarding}
+            selection={library.teacher.selection}
+            units={library.teacher.units}
+            published={library.teacher.published}
+            catalogEntry={library.teacher.catalogEntry}
+            status={library.teacher.status}
+            error={library.teacher.error}
+            loading={library.teacher.loading}
+            saving={library.teacher.saving}
+            importing={library.teacher.importing}
+            dirty={library.teacher.dirty}
+            items={library.teacher.items}
             speech={speechSynthesis}
-            onAddItem={addVocabularyItem}
-            onUpdateItem={updateVocabularyItem}
-            onRemoveItem={removeVocabularyItem}
-            onClearItems={clearVocabularyItems}
-            onReplaceItems={replaceVocabularyItems}
+            onSelectionChange={library.teacher.updateSelection}
+            onPublishedChange={library.teacher.setPublished}
+            onLoadSet={library.teacher.loadSet}
+            onSaveSet={library.teacher.saveSet}
+            onDeleteSet={library.teacher.deleteSet}
+            onImportWorkbook={library.teacher.importWorkbook}
+            onAddItem={library.teacher.addItem}
+            onUpdateItem={library.teacher.updateItem}
+            onRemoveItem={library.teacher.removeItem}
+            onClearItems={library.teacher.clearItems}
+            onLoadSample={library.teacher.loadSampleItems}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
-            onStartListening={() => navigateTo(APP_VIEWS.LISTENING)}
-            onStartSpeaking={() => navigateTo(APP_VIEWS.SPEAKING)}
           />
         ) : null}
 
         {view === APP_VIEWS.LISTENING ? (
           <ListeningQuiz
-            items={vocabularyItems}
+            items={library.student.items}
             speech={speechSynthesis}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
             onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
@@ -96,7 +134,7 @@ function App() {
 
         {view === APP_VIEWS.SPEAKING ? (
           <SpeakingQuiz
-            items={vocabularyItems}
+            items={library.student.items}
             speech={speechSynthesis}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
             onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}

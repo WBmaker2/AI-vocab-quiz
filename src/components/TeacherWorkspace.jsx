@@ -9,41 +9,43 @@ const EMPTY_FORM = {
   exampleSentence: "",
 };
 
-const SAMPLE_ITEMS = [
-  {
-    word: "apple",
-    meaning: "사과",
-    imageHint: "red fruit",
-    exampleSentence: "I eat an apple.",
-  },
-  {
-    word: "banana",
-    meaning: "바나나",
-    imageHint: "yellow fruit",
-    exampleSentence: "Monkeys like bananas.",
-  },
-  {
-    word: "school",
-    meaning: "학교",
-    imageHint: "classroom building",
-    exampleSentence: "We go to school every day.",
-  },
-];
-
 export function TeacherWorkspace({
+  gradeOptions,
+  remoteConfigured,
+  auth,
+  profile,
+  profileLoading,
+  profileError,
+  requiresOnboarding,
+  onboarding,
+  selection,
+  units,
+  published,
+  catalogEntry,
+  status,
+  error,
+  loading,
+  saving,
+  importing,
+  dirty,
   items,
   speech,
+  onSelectionChange,
+  onPublishedChange,
+  onLoadSet,
+  onSaveSet,
+  onDeleteSet,
+  onImportWorkbook,
   onAddItem,
   onUpdateItem,
   onRemoveItem,
   onClearItems,
-  onReplaceItems,
+  onLoadSample,
   onBack,
-  onStartListening,
-  onStartSpeaking,
 }) {
   const [formValues, setFormValues] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState("");
+  const [importFile, setImportFile] = useState(null);
 
   const isEditing = Boolean(editingId);
   const hasItems = items.length > 0;
@@ -99,10 +101,6 @@ export function TeacherWorkspace({
     });
   }
 
-  function handleLoadSample() {
-    onReplaceItems(SAMPLE_ITEMS);
-  }
-
   function previewWord(word) {
     if (!speech.supported || !word) {
       return;
@@ -114,16 +112,213 @@ export function TeacherWorkspace({
     });
   }
 
+  async function handleImportWorkbook() {
+    await onImportWorkbook(importFile, selection.grade);
+    setImportFile(null);
+  }
+
+  if (!remoteConfigured) {
+    return (
+      <section className="workspace-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Teacher Mode</p>
+            <h2>선생님 모드 설정 필요</h2>
+          </div>
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+        </div>
+
+        <article className="empty-card">
+          <h3>Firebase 환경 변수가 필요합니다</h3>
+          <p>
+            Google 로그인과 교사별 단어 저장을 사용하려면 Firebase 웹 앱 설정값을
+            먼저 입력하세요.
+          </p>
+        </article>
+      </section>
+    );
+  }
+
+  if (auth.loading || profileLoading) {
+    return (
+      <section className="workspace-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Teacher Mode</p>
+            <h2>선생님 정보를 확인하는 중입니다</h2>
+          </div>
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+        </div>
+
+        <article className="empty-card">
+          <h3>잠시만 기다리세요</h3>
+          <p>로그인 상태와 선생님 프로필을 확인하고 있습니다.</p>
+        </article>
+      </section>
+    );
+  }
+
+  if (!auth.signedIn) {
+    return (
+      <section className="workspace-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Teacher Mode</p>
+            <h2>Google 로그인 후 시작</h2>
+          </div>
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+        </div>
+
+        <article className="form-card">
+          <p className="inline-hint">
+            선생님 모드는 Google 로그인 후 사용할 수 있습니다. 로그인하면 내
+            학교와 단어 세트만 관리할 수 있습니다.
+          </p>
+          {auth.error ? (
+            <p className="inline-hint warning-hint">{auth.error}</p>
+          ) : null}
+          <div className="toolbar-row">
+            <button className="primary-button" onClick={auth.signInWithGoogle}>
+              Google로 로그인
+            </button>
+          </div>
+        </article>
+      </section>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <section className="workspace-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Teacher Mode</p>
+            <h2>선생님 정보를 불러오지 못했습니다</h2>
+          </div>
+          <button className="ghost-button" onClick={auth.signOut}>
+            로그아웃
+          </button>
+        </div>
+
+        <article className="empty-card">
+          <h3>프로필 오류</h3>
+          <p>{profileError}</p>
+        </article>
+      </section>
+    );
+  }
+
+  if (requiresOnboarding) {
+    return (
+      <section className="workspace-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Teacher Onboarding</p>
+            <h2>선생님 정보 등록</h2>
+          </div>
+          <div className="toolbar-row">
+            <button className="ghost-button" onClick={onBack}>
+              홈으로
+            </button>
+            <button className="ghost-button" onClick={auth.signOut}>
+              로그아웃
+            </button>
+          </div>
+        </div>
+
+        <article className="form-card">
+          <p className="inline-hint">
+            처음 한 번만 학교 이름과 선생님 이름을 등록하면, 이후에는 내 단어
+            세트만 관리할 수 있습니다.
+          </p>
+
+          <div className="form-grid compact-grid">
+            <label className="field field-wide">
+              <span>학교 이름</span>
+              <input
+                value={onboarding.schoolName}
+                onChange={(event) =>
+                  onboarding.updateField("schoolName", event.target.value)
+                }
+                placeholder="예: 서울초등학교"
+              />
+            </label>
+
+            <label className="field field-wide">
+              <span>선생님 이름</span>
+              <input
+                value={onboarding.teacherName}
+                onChange={(event) =>
+                  onboarding.updateField("teacherName", event.target.value)
+                }
+                placeholder="예: 김영어"
+              />
+            </label>
+          </div>
+
+          {onboarding.searching ? (
+            <p className="inline-hint">비슷한 학교를 찾는 중입니다...</p>
+          ) : null}
+
+          {onboarding.suggestions.length > 0 ? (
+            <div className="selection-chip-group" aria-label="학교 추천">
+              {onboarding.suggestions.map((school) => (
+                <button
+                  key={school.id}
+                  className="choice-chip"
+                  onClick={() => onboarding.chooseSchool(school)}
+                >
+                  {school.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {onboarding.error ? (
+            <p className="inline-hint warning-hint">{onboarding.error}</p>
+          ) : null}
+          {onboarding.status ? (
+            <p className="inline-hint success-hint">{onboarding.status}</p>
+          ) : null}
+
+          <div className="toolbar-row">
+            <button
+              className="primary-button"
+              onClick={onboarding.save}
+              disabled={onboarding.saving}
+            >
+              {onboarding.saving ? "저장 중..." : "선생님 정보 저장"}
+            </button>
+          </div>
+        </article>
+      </section>
+    );
+  }
+
   return (
     <section className="workspace-panel">
       <div className="section-heading">
         <div>
           <p className="mode-label">Teacher Mode</p>
-          <h2>오늘의 단어 세트 관리</h2>
+          <h2>내 단어 세트 관리</h2>
+          <p className="inline-hint">
+            {profile.schoolName} · {profile.teacherName}
+          </p>
         </div>
-        <button className="ghost-button" onClick={onBack}>
-          홈으로
-        </button>
+        <div className="toolbar-row">
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+          <button className="ghost-button" onClick={auth.signOut}>
+            로그아웃
+          </button>
+        </div>
       </div>
 
       <div className="teacher-summary">
@@ -135,7 +330,143 @@ export function TeacherWorkspace({
           <span>예문 포함</span>
           <strong>{stats.withExamples}</strong>
         </div>
+        <div className="summary-card">
+          <span>공개 상태</span>
+          <strong>{published ? "ON" : "OFF"}</strong>
+        </div>
       </div>
+
+      <article className="form-card">
+        <div className="section-heading compact">
+          <div>
+            <p className="mode-label">My Set</p>
+            <h3>학년과 단원 선택</h3>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onLoadSet}
+            disabled={!selection.unit || loading}
+          >
+            {loading ? "불러오는 중..." : "내 단어 세트 불러오기"}
+          </button>
+        </div>
+
+        <div className="form-grid compact-grid">
+          <label className="field">
+            <span>학년</span>
+            <select
+              value={selection.grade}
+              onChange={(event) =>
+                onSelectionChange("grade", event.target.value)
+              }
+            >
+              {gradeOptions.map((grade) => (
+                <option key={grade.value} value={grade.value}>
+                  {grade.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
+            <span>단원</span>
+            <input
+              list="teacher-unit-options"
+              value={selection.unit}
+              onChange={(event) => onSelectionChange("unit", event.target.value)}
+              placeholder="예: 1"
+            />
+            <datalist id="teacher-unit-options">
+              {units.map((unit) => (
+                <option key={unit} value={unit} />
+              ))}
+            </datalist>
+          </label>
+        </div>
+
+        <label className="toggle-field">
+          <input
+            type="checkbox"
+            checked={published}
+            onChange={(event) => onPublishedChange(event.target.checked)}
+          />
+          <span>학생 공개</span>
+        </label>
+        <p className="inline-hint">
+          공개를 켜고 저장해야 학생들이 학교와 선생님 이름으로 이 단원을 찾을
+          수 있습니다.
+        </p>
+
+        {catalogEntry ? (
+          <p className="inline-hint">
+            현재 저장본: {catalogEntry.published ? "공개됨" : "비공개"} 상태
+          </p>
+        ) : null}
+        {error ? <p className="inline-hint warning-hint">{error}</p> : null}
+        {status ? <p className="inline-hint success-hint">{status}</p> : null}
+        {dirty ? (
+          <p className="inline-hint warning-hint">
+            저장되지 않은 변경사항이 있습니다.
+          </p>
+        ) : null}
+
+        <div className="toolbar-row">
+          <button
+            className="primary-button"
+            type="button"
+            onClick={onSaveSet}
+            disabled={saving || !selection.unit}
+          >
+            {saving ? "저장 중..." : "현재 단원 저장"}
+          </button>
+          <button
+            className="ghost-button danger-button"
+            type="button"
+            onClick={onDeleteSet}
+            disabled={saving || !selection.unit}
+          >
+            현재 단원 삭제
+          </button>
+          <button className="ghost-button" type="button" onClick={onLoadSample}>
+            예시 단어 불러오기
+          </button>
+        </div>
+      </article>
+
+      <article className="form-card">
+        <div className="section-heading compact">
+          <div>
+            <p className="mode-label">Excel Upload</p>
+            <h3>엑셀로 단원 일괄 등록</h3>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={handleImportWorkbook}
+            disabled={!importFile || importing}
+          >
+            {importing ? "업로드 중..." : "엑셀 가져오기"}
+          </button>
+        </div>
+        <p className="inline-hint">
+          `Lesson / English / Korean` 열을 가진 파일을 업로드하면, 현재 선생님의
+          선택 학년에 맞춰 Lesson별 단원 세트가 저장됩니다.
+        </p>
+        <div className="form-grid compact-grid">
+          <label className="field field-wide">
+            <span>업로드 파일</span>
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
+        </div>
+        {importFile ? (
+          <p className="inline-hint">선택한 파일: {importFile.name}</p>
+        ) : null}
+      </article>
 
       <VocabularyForm
         values={formValues}
@@ -148,9 +479,6 @@ export function TeacherWorkspace({
       />
 
       <div className="toolbar-row">
-        <button className="secondary-button" onClick={handleLoadSample}>
-          예시 단어 불러오기
-        </button>
         <button
           className="ghost-button danger-button"
           onClick={onClearItems}
@@ -170,26 +498,16 @@ export function TeacherWorkspace({
 
       <div className="launch-card">
         <div>
-          <p className="mode-label">Ready For Class</p>
-          <h3>학생 활동으로 이동</h3>
+          <p className="mode-label">Student Access</p>
+          <h3>학생 공개 확인</h3>
           <p>
-            현재 저장된 단어 세트를 바탕으로 학생 모드를 시작합니다.
+            학생은 홈 화면에서 학교, 선생님, 학년, 단원을 순서대로 선택한 뒤
+            공개된 단어 세트를 불러와 활동을 시작합니다.
           </p>
         </div>
         <div className="stack-actions">
-          <button
-            className="primary-button"
-            onClick={onStartListening}
-            disabled={!hasItems}
-          >
-            듣기 퀴즈 시작
-          </button>
-          <button
-            className="secondary-button"
-            onClick={onStartSpeaking}
-            disabled={!hasItems}
-          >
-            말하기 연습 시작
+          <button className="primary-button" onClick={onBack}>
+            홈으로 돌아가기
           </button>
         </div>
       </div>

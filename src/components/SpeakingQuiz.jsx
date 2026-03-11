@@ -200,17 +200,17 @@ export function SpeakingQuiz({
         </div>
 
         <article className="empty-card">
-          <h3>먼저 단어를 저장하세요</h3>
+          <h3>먼저 단어 세트를 불러오세요</h3>
           <p>
-            말하기 연습을 시작하려면 Teacher Mode에서 단어 세트를 한 개 이상
-            저장해야 합니다.
+            말하기 연습을 시작하려면 홈 화면에서 학년과 단원을 선택한 뒤
+            학생용 단어 세트를 먼저 불러와야 합니다.
           </p>
           <div className="toolbar-row">
-            <button className="primary-button" onClick={onOpenTeacher}>
-              Teacher Mode 열기
-            </button>
             <button className="ghost-button" onClick={onBack}>
               홈으로
+            </button>
+            <button className="secondary-button" onClick={onOpenTeacher}>
+              Teacher Mode 열기
             </button>
           </div>
         </article>
