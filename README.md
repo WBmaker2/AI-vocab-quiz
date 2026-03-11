@@ -1,4 +1,4 @@
-# talking-vacab-quiz
+# AI-vocab-quiz
 
 ## Development
 
