@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { ResultSummary } from "./ResultSummary.jsx";
 import { ScoreBoard } from "./ScoreBoard.jsx";
@@ -29,6 +29,7 @@ export function ListeningQuiz({
   const [score, setScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState("");
   const [status, setStatus] = useState("idle");
+  const announcedQuestionIdRef = useRef("");
 
   useEffect(() => {
     setQuestions(createListeningQuestions(items));
@@ -36,6 +37,7 @@ export function ListeningQuiz({
     setScore(0);
     setSelectedAnswer("");
     setStatus("idle");
+    announcedQuestionIdRef.current = "";
   }, [items]);
 
   const totalQuestions = questions.length;
@@ -59,6 +61,11 @@ export function ListeningQuiz({
       return;
     }
 
+    if (announcedQuestionIdRef.current === question.id) {
+      return;
+    }
+
+    announcedQuestionIdRef.current = question.id;
     announceQuestion();
   }, [announceQuestion, isComplete, question?.id]);
 
@@ -90,6 +97,7 @@ export function ListeningQuiz({
     setQuestionIndex((current) => current + 1);
     setSelectedAnswer("");
     setStatus("idle");
+    announcedQuestionIdRef.current = "";
   }
 
   function handleRetry() {
@@ -98,6 +106,7 @@ export function ListeningQuiz({
     setScore(0);
     setSelectedAnswer("");
     setStatus("idle");
+    announcedQuestionIdRef.current = "";
   }
 
   if (items.length === 0) {

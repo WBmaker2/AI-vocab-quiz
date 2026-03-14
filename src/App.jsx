@@ -4,6 +4,7 @@ import { ListeningQuiz } from "./components/ListeningQuiz.jsx";
 import { ModeSelector } from "./components/ModeSelector.jsx";
 import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
 import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
+import { APP_VERSION } from "./constants/app.js";
 import { GRADE_OPTIONS } from "./constants/vocabulary.js";
 import { isSpeechRecognitionSupported } from "./hooks/useSpeechRecognition.js";
 import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis.js";
@@ -40,7 +41,10 @@ function App() {
 
       <main className="app-frame">
         <header className="hero-card">
-          <p className="eyebrow">Elementary English Classroom App</p>
+          <div className="hero-meta">
+            <p className="eyebrow">Elementary English Classroom App</p>
+            <span className="app-version">{APP_VERSION}</span>
+          </div>
           <h1 className="hero-title">AI 원어민 단어 퀴즈 쇼</h1>
           <p className="hero-subtitle">
             선생님이 오늘의 단어만 입력하면, 듣기와 말하기 활동으로

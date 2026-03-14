@@ -105,6 +105,20 @@ button {
   text-transform: uppercase;
 }
 
+.hero-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.app-version {
+  color: #8e99a6;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .hero-title,
 .workspace-panel h2,
 .mode-card h2,
@@ -754,6 +768,10 @@ button:disabled {
   .mode-label {
     letter-spacing: 0.06em;
     font-size: 0.76rem;
+  }
+
+  .app-version {
+    font-size: 0.72rem;
   }
 
   .speaking-word {

@@ -507,7 +507,7 @@ export function useVocabularyLibrary() {
     }
   }
 
-  async function importWorkbook(file, grade) {
+  async function importWorkbook(file, grade, publishOverride = null) {
     if (!isFirebaseConfigured || !teacherProfile || !userId) {
       setTeacherError("Google 로그인과 선생님 정보 등록이 필요합니다.");
       return;
@@ -529,7 +529,8 @@ export function useVocabularyLibrary() {
 
     try {
       const groupedSets = await parseVocabularyWorkbook(file);
-      const publishImportedSets = teacherPublished;
+      const publishImportedSets =
+        publishOverride === null ? teacherPublished : publishOverride;
 
       for (const groupedSet of groupedSets) {
         await saveTeacherVocabularySet({
