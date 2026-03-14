@@ -529,12 +529,9 @@ export function useVocabularyLibrary() {
 
     try {
       const groupedSets = await parseVocabularyWorkbook(file);
+      const publishImportedSets = teacherPublished;
 
       for (const groupedSet of groupedSets) {
-        const existingSet = teacherCatalog.find(
-          (entry) => entry.grade === grade && entry.unit === groupedSet.unit,
-        );
-
         await saveTeacherVocabularySet({
           userId,
           schoolId: teacherProfile.schoolId,
@@ -542,7 +539,7 @@ export function useVocabularyLibrary() {
           teacherName: teacherProfile.teacherName,
           selection: { grade, unit: groupedSet.unit },
           items: normalizeDraftVocabulary(groupedSet.items),
-          published: existingSet?.published ?? false,
+          published: publishImportedSets,
           sourceType: "xlsx",
         });
       }
@@ -556,16 +553,15 @@ export function useVocabularyLibrary() {
       );
 
       if (matchedSet) {
-        const existingSet = teacherCatalog.find(
-          (entry) => entry.grade === grade && entry.unit === matchedSet.unit,
-        );
         setTeacherItems(normalizeDraftVocabulary(matchedSet.items));
-        setTeacherPublished(existingSet?.published ?? false);
+        setTeacherPublished(publishImportedSets);
         setTeacherDirty(false);
       }
 
       setTeacherStatus(
-        `${grade}학년 엑셀 업로드를 완료했습니다. ${groupedSets.length}개 단원을 저장했습니다.`,
+        publishImportedSets
+          ? `${grade}학년 엑셀 업로드를 완료했습니다. ${groupedSets.length}개 단원을 저장하고 모두 학생 공개로 설정했습니다.`
+          : `${grade}학년 엑셀 업로드를 완료했습니다. ${groupedSets.length}개 단원을 한꺼번에 저장했습니다.`,
       );
     } catch (error) {
       setTeacherError(

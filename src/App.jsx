@@ -41,7 +41,7 @@ function App() {
       <main className="app-frame">
         <header className="hero-card">
           <p className="eyebrow">Elementary English Classroom App</p>
-          <h1>AI 원어민 단어 퀴즈 쇼</h1>
+          <h1 className="hero-title">AI 원어민 단어 퀴즈 쇼</h1>
           <p className="hero-subtitle">
             선생님이 오늘의 단어만 입력하면, 듣기와 말하기 활동으로
             이어지는 수업용 단어 게임입니다.

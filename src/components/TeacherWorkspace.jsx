@@ -394,8 +394,8 @@ export function TeacherWorkspace({
           <span>학생 공개</span>
         </label>
         <p className="inline-hint">
-          공개를 켜고 저장해야 학생들이 학교와 선생님 이름으로 이 단원을 찾을
-          수 있습니다.
+          공개를 켜고 저장하면 현재 단원 저장과 엑셀 일괄 저장 모두 같은 공개
+          상태가 적용됩니다.
         </p>
 
         {catalogEntry ? (
@@ -451,7 +451,8 @@ export function TeacherWorkspace({
         </div>
         <p className="inline-hint">
           `Lesson / English / Korean` 열을 가진 파일을 업로드하면, 현재 선생님의
-          선택 학년에 맞춰 Lesson별 단원 세트가 저장됩니다.
+          선택 학년의 모든 Lesson 단원이 한꺼번에 저장됩니다. 위의 `학생 공개`
+          체크 상태도 모든 단원에 함께 적용됩니다.
         </p>
         <div className="form-grid compact-grid">
           <label className="field field-wide">
