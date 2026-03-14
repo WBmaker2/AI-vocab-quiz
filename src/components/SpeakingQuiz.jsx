@@ -96,6 +96,7 @@ function getStatusMessage({
 export function SpeakingQuiz({
   items,
   speech,
+  celebration,
   onBack,
   onOpenTeacher,
 }) {
@@ -107,6 +108,8 @@ export function SpeakingQuiz({
   const [score, setScore] = useState(0);
   const [status, setStatus] = useState("idle");
   const [attemptTranscript, setAttemptTranscript] = useState("");
+  const [celebratedQuestionId, setCelebratedQuestionId] = useState("");
+  const [completionCelebrated, setCompletionCelebrated] = useState(false);
 
   useEffect(() => {
     setQuestions(createSpeakingSequence(items));
@@ -114,6 +117,8 @@ export function SpeakingQuiz({
     setScore(0);
     setStatus("idle");
     setAttemptTranscript("");
+    setCelebratedQuestionId("");
+    setCompletionCelebrated(false);
     recognition.reset();
   }, [items]);
 
@@ -168,6 +173,28 @@ export function SpeakingQuiz({
     setStatus("incorrect");
   }, [question?.id, recognition.error]);
 
+  useEffect(() => {
+    if (status !== "correct" || !question) {
+      return;
+    }
+
+    if (celebratedQuestionId === question.id) {
+      return;
+    }
+
+    setCelebratedQuestionId(question.id);
+    void celebration?.playSuccess?.();
+  }, [celebratedQuestionId, celebration, question, status]);
+
+  useEffect(() => {
+    if (!isComplete || completionCelebrated) {
+      return;
+    }
+
+    setCompletionCelebrated(true);
+    void celebration?.playCompletion?.();
+  }, [celebration, completionCelebrated, isComplete]);
+
   function handleStartListening() {
     if (!recognition.supported || isLockedAfterCorrect) {
       return;
@@ -198,6 +225,7 @@ export function SpeakingQuiz({
     setQuestionIndex((current) => current + 1);
     setStatus("idle");
     setAttemptTranscript("");
+    setCelebratedQuestionId("");
   }
 
   function handleRetry() {
@@ -206,6 +234,8 @@ export function SpeakingQuiz({
     setScore(0);
     setStatus("idle");
     setAttemptTranscript("");
+    setCelebratedQuestionId("");
+    setCompletionCelebrated(false);
     recognition.stop();
     recognition.reset();
   }

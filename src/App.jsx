@@ -6,6 +6,7 @@ import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
 import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
 import { APP_VERSION } from "./constants/app.js";
 import { GRADE_OPTIONS } from "./constants/vocabulary.js";
+import { useCelebrationAudio } from "./hooks/useCelebrationAudio.js";
 import { isSpeechRecognitionSupported } from "./hooks/useSpeechRecognition.js";
 import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis.js";
 import { useVocabularyLibrary } from "./hooks/useVocabularyLibrary.js";
@@ -20,6 +21,7 @@ const APP_VIEWS = {
 function App() {
   const [view, setView] = useState(APP_VIEWS.HOME);
   const speechSynthesis = useSpeechSynthesis();
+  const celebrationAudio = useCelebrationAudio();
   const library = useVocabularyLibrary();
 
   const support = {
@@ -131,6 +133,7 @@ function App() {
           <ListeningQuiz
             items={library.student.items}
             speech={speechSynthesis}
+            celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
             onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
           />
@@ -140,6 +143,7 @@ function App() {
           <SpeakingQuiz
             items={library.student.items}
             speech={speechSynthesis}
+            celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
             onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
           />

@@ -19,6 +19,7 @@ function getFeedbackMessage(question, selectedAnswer, status) {
 export function ListeningQuiz({
   items,
   speech,
+  celebration,
   onBack,
   onOpenTeacher,
 }) {
@@ -30,6 +31,8 @@ export function ListeningQuiz({
   const [selectedAnswer, setSelectedAnswer] = useState("");
   const [status, setStatus] = useState("idle");
   const announcedQuestionIdRef = useRef("");
+  const celebratedQuestionIdRef = useRef("");
+  const completionCelebratedRef = useRef(false);
 
   useEffect(() => {
     setQuestions(createListeningQuestions(items));
@@ -38,6 +41,8 @@ export function ListeningQuiz({
     setSelectedAnswer("");
     setStatus("idle");
     announcedQuestionIdRef.current = "";
+    celebratedQuestionIdRef.current = "";
+    completionCelebratedRef.current = false;
   }, [items]);
 
   const totalQuestions = questions.length;
@@ -69,6 +74,28 @@ export function ListeningQuiz({
     announceQuestion();
   }, [announceQuestion, isComplete, question?.id]);
 
+  useEffect(() => {
+    if (status !== "correct" || !question) {
+      return;
+    }
+
+    if (celebratedQuestionIdRef.current === question.id) {
+      return;
+    }
+
+    celebratedQuestionIdRef.current = question.id;
+    void celebration?.playSuccess?.();
+  }, [celebration, question, status]);
+
+  useEffect(() => {
+    if (!isComplete || completionCelebratedRef.current) {
+      return;
+    }
+
+    completionCelebratedRef.current = true;
+    void celebration?.playCompletion?.();
+  }, [celebration, isComplete]);
+
   function handleSelectChoice(choice) {
     if (!question || hasAnswered) {
       return;
@@ -98,6 +125,7 @@ export function ListeningQuiz({
     setSelectedAnswer("");
     setStatus("idle");
     announcedQuestionIdRef.current = "";
+    celebratedQuestionIdRef.current = "";
   }
 
   function handleRetry() {
@@ -107,6 +135,8 @@ export function ListeningQuiz({
     setSelectedAnswer("");
     setStatus("idle");
     announcedQuestionIdRef.current = "";
+    celebratedQuestionIdRef.current = "";
+    completionCelebratedRef.current = false;
   }
 
   if (items.length === 0) {
