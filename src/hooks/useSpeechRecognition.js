@@ -8,20 +8,151 @@ function getRecognitionConstructor() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
+function detectBrowserName() {
+  if (typeof navigator === "undefined") {
+    return "unknown";
+  }
+
+  const userAgent = navigator.userAgent;
+
+  if (/Edg\//.test(userAgent)) {
+    return "edge";
+  }
+
+  if (/Chrome\//.test(userAgent) || /CriOS\//.test(userAgent)) {
+    return "chrome";
+  }
+
+  if (/Safari\//.test(userAgent) && !/Chrome\//.test(userAgent) && !/CriOS\//.test(userAgent)) {
+    return "safari";
+  }
+
+  if (/Firefox\//.test(userAgent)) {
+    return "firefox";
+  }
+
+  return "unknown";
+}
+
+async function probeMicrophoneState() {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    return { status: "unknown" };
+  }
+
+  let stream = null;
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    if (navigator.mediaDevices.enumerateDevices) {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasAudioInput = devices.some((device) => device.kind === "audioinput");
+
+      if (!hasAudioInput) {
+        return {
+          status: "missing",
+          error: "microphone-device-missing",
+        };
+      }
+    }
+
+    return { status: "granted" };
+  } catch (error) {
+    if (error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError") {
+      return {
+        status: "denied",
+        error: "microphone-permission-denied",
+      };
+    }
+
+    if (
+      error?.name === "NotFoundError"
+      || error?.name === "DevicesNotFoundError"
+      || error?.name === "OverconstrainedError"
+    ) {
+      return {
+        status: "missing",
+        error: "microphone-device-missing",
+      };
+    }
+
+    if (error?.name === "NotReadableError" || error?.name === "TrackStartError") {
+      return {
+        status: "busy",
+        error: "microphone-device-busy",
+      };
+    }
+
+    return {
+      status: "error",
+      error: "microphone-access-failed",
+    };
+  } finally {
+    stream?.getTracks().forEach((track) => track.stop());
+  }
+}
+
 export function isSpeechRecognitionSupported() {
   return Boolean(getRecognitionConstructor());
 }
 
 export function useSpeechRecognition(config = {}) {
   const recognitionRef = useRef(null);
+  const browserNameRef = useRef(detectBrowserName());
+  const microphoneStateRef = useRef("unknown");
   const [supported, setSupported] = useState(isSpeechRecognitionSupported());
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState("");
+  const [browserName, setBrowserName] = useState(browserNameRef.current);
+  const [microphoneState, setMicrophoneState] = useState("unknown");
+
+  async function resolveRecognitionError(rawError) {
+    if (rawError === "not-allowed" || rawError === "service-not-allowed") {
+      const probe = await probeMicrophoneState();
+      microphoneStateRef.current = probe.status;
+      setMicrophoneState(probe.status);
+
+      if (probe.error) {
+        setError(probe.error);
+        return;
+      }
+
+      if (browserNameRef.current === "safari") {
+        setError("speech-recognition-safari-limited");
+        return;
+      }
+
+      setError("speech-recognition-service-unavailable");
+      return;
+    }
+
+    if (rawError === "audio-capture" || rawError === "not-found") {
+      microphoneStateRef.current = "missing";
+      setMicrophoneState("missing");
+      setError("microphone-device-missing");
+      return;
+    }
+
+    if (rawError === "network") {
+      setError(
+        browserNameRef.current === "safari"
+          ? "speech-recognition-safari-limited"
+          : "speech-recognition-network-error",
+      );
+      return;
+    }
+
+    setError(rawError ?? "speech-recognition-error");
+  }
 
   useEffect(() => {
     const Recognition = getRecognitionConstructor();
+    const nextBrowserName = detectBrowserName();
+
     setSupported(Boolean(Recognition));
+    browserNameRef.current = nextBrowserName;
+    setBrowserName(nextBrowserName);
 
     if (!Recognition) {
       recognitionRef.current = null;
@@ -45,7 +176,7 @@ export function useSpeechRecognition(config = {}) {
 
     recognition.onerror = (event) => {
       setListening(false);
-      setError(event.error ?? "speech-recognition-error");
+      void resolveRecognitionError(event.error);
     };
 
     recognition.onresult = (event) => {
@@ -84,6 +215,8 @@ export function useSpeechRecognition(config = {}) {
     }
 
     try {
+      microphoneStateRef.current = "unknown";
+      setMicrophoneState("unknown");
       setTranscript("");
       setError("");
       recognitionRef.current.start();
@@ -103,11 +236,15 @@ export function useSpeechRecognition(config = {}) {
   }
 
   function reset() {
+    microphoneStateRef.current = "unknown";
+    setMicrophoneState("unknown");
     setTranscript("");
     setError("");
   }
 
   return {
+    browserName,
+    microphoneState,
     supported,
     listening,
     transcript,

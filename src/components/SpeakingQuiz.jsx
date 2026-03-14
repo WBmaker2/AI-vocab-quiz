@@ -6,29 +6,54 @@ import { useSpeechRecognition } from "../hooks/useSpeechRecognition.js";
 import { createSpeakingSequence } from "../utils/quiz.js";
 import { isSpeechMatch } from "../utils/normalize.js";
 
+const CONFIGURATION_ERRORS = new Set([
+  "microphone-permission-denied",
+  "microphone-device-missing",
+  "microphone-device-busy",
+  "microphone-access-failed",
+  "speech-recognition-safari-limited",
+  "speech-recognition-service-unavailable",
+  "speech-recognition-network-error",
+  "speech-recognition-start-failed",
+]);
+
 function getGuidance(error) {
-  if (error === "not-allowed" || error === "service-not-allowed") {
+  if (error === "microphone-permission-denied") {
     return {
       title: "마이크 권한이 필요합니다",
       body: "브라우저 주소창의 사이트 권한에서 마이크를 허용한 뒤 다시 시도하세요.",
     };
   }
 
-  if (error === "audio-capture") {
+  if (error === "microphone-device-missing") {
     return {
       title: "마이크를 찾을 수 없습니다",
       body: "기기에 연결된 입력 마이크가 있는지 확인하고 다른 앱이 마이크를 사용 중인지 점검하세요.",
     };
   }
 
-  if (error === "not-found") {
+  if (error === "microphone-device-busy") {
     return {
-      title: "입력 장치가 없습니다",
-      body: "이 기기에서는 사용할 수 있는 마이크 입력 장치가 감지되지 않았습니다.",
+      title: "마이크가 다른 앱에서 사용 중입니다",
+      body: "다른 앱의 녹음이나 화상회의를 종료한 뒤 다시 시도하세요.",
     };
   }
 
-  if (error === "speech-recognition-start-failed") {
+  if (error === "speech-recognition-safari-limited") {
+    return {
+      title: "Safari 말하기 인식이 제한되었습니다",
+      body: "마이크 권한이 허용되어 있어도 Safari에서는 브라우저 음성 인식이 시작되지 않을 수 있습니다. 새로고침 후 다시 시도하거나 Chrome 또는 Edge에서 여는 것이 더 안정적입니다.",
+    };
+  }
+
+  if (error === "speech-recognition-service-unavailable" || error === "speech-recognition-network-error") {
+    return {
+      title: "브라우저 음성 인식을 시작하지 못했습니다",
+      body: "마이크 권한과 입력 장치는 정상일 수 있지만, 현재 브라우저의 STT 서비스가 시작되지 않았습니다. 새로고침 후 다시 시도하거나 Chrome 또는 Edge에서 확인하세요.",
+    };
+  }
+
+  if (error === "microphone-access-failed" || error === "speech-recognition-start-failed") {
     return {
       title: "말하기 인식을 시작하지 못했습니다",
       body: "브라우저를 새로고침하고 다시 시도하거나 Chrome 또는 Edge에서 확인하세요.",
@@ -132,6 +157,11 @@ export function SpeakingQuiz({
 
     if (recognition.error === "no-speech") {
       setStatus("empty");
+      return;
+    }
+
+    if (CONFIGURATION_ERRORS.has(recognition.error)) {
+      setStatus("idle");
       return;
     }
 
@@ -355,6 +385,9 @@ export function SpeakingQuiz({
                 ) : null}
                 {recognition.error ? (
                   <span>인식 상태: {recognition.error}</span>
+                ) : null}
+                {recognition.microphoneState !== "unknown" ? (
+                  <span>마이크 상태: {recognition.microphoneState}</span>
                 ) : null}
               </div>
             </div>
