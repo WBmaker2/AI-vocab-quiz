@@ -11,14 +11,14 @@ function MatchingSummary({
   elapsedSeconds,
   finalScore,
   onRetry,
+  onChooseUnits,
   onBack,
-  onOpenTeacher,
 }) {
   return (
     <article className="result-card">
       <p className="mode-label">Matching Result</p>
       <h3>단어 짝 맞추기 완료</h3>
-      <p className="result-score">{finalScore}</p>
+      <p className="result-score">{finalScore}점</p>
       <div className="matching-result-grid">
         <div className="summary-card">
           <span>맞춘 문제 수</span>
@@ -36,8 +36,8 @@ function MatchingSummary({
         <button className="primary-button" onClick={onRetry}>
           다시 하기
         </button>
-        <button className="secondary-button" onClick={onOpenTeacher}>
-          단어 세트 수정
+        <button className="secondary-button" onClick={onChooseUnits}>
+          게임 단원 선택
         </button>
         <button className="ghost-button" onClick={onBack}>
           홈으로
@@ -53,7 +53,7 @@ export function WordMatchingGame({
   speech,
   celebration,
   onBack,
-  onOpenTeacher,
+  onChooseUnits,
 }) {
   const [gameState, setGameState] = useState(() => createMatchingGameState(items));
   const [selectedMeaningIndex, setSelectedMeaningIndex] = useState(-1);
@@ -268,8 +268,8 @@ export function WordMatchingGame({
           elapsedSeconds={elapsedSeconds}
           finalScore={finalScore}
           onRetry={handleRetry}
+          onChooseUnits={onChooseUnits}
           onBack={onBack}
-          onOpenTeacher={onOpenTeacher}
         />
       </section>
     );

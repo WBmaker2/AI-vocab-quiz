@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function ModeSelector({
   gradeOptions,
@@ -15,6 +15,7 @@ export function ModeSelector({
   units,
   matchingUnits,
   matchingLoading,
+  initialMatchingPanelOpen,
   unitsLoading,
   status,
   error,
@@ -34,6 +35,12 @@ export function ModeSelector({
   onOpenMatching,
 }) {
   const [matchingPanelOpen, setMatchingPanelOpen] = useState(false);
+
+  useEffect(() => {
+    if (initialMatchingPanelOpen) {
+      setMatchingPanelOpen(true);
+    }
+  }, [initialMatchingPanelOpen]);
 
   async function handleStartMatching() {
     const loaded = await onLoadMatchingSet();

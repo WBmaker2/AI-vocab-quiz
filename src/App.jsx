@@ -22,6 +22,7 @@ const APP_VIEWS = {
 
 function App() {
   const [view, setView] = useState(APP_VIEWS.HOME);
+  const [homeMatchingPanelOpen, setHomeMatchingPanelOpen] = useState(false);
   const speechSynthesis = useSpeechSynthesis();
   const celebrationAudio = useCelebrationAudio();
   const library = useVocabularyLibrary();
@@ -33,8 +34,13 @@ function App() {
 
   const hasStudentVocabulary = library.student.items.length > 0;
 
-  function navigateTo(nextView) {
+  function navigateTo(nextView, options = {}) {
     speechSynthesis.cancel();
+    if (nextView === APP_VIEWS.HOME) {
+      setHomeMatchingPanelOpen(Boolean(options.openMatchingPanel));
+    } else {
+      setHomeMatchingPanelOpen(false);
+    }
     setView(nextView);
   }
 
@@ -79,6 +85,7 @@ function App() {
             units={library.student.units}
             matchingUnits={library.student.matchingUnits}
             matchingLoading={library.student.loading}
+            initialMatchingPanelOpen={homeMatchingPanelOpen}
             unitsLoading={library.student.unitsLoading}
             status={library.student.status}
             error={library.student.error}
@@ -163,7 +170,7 @@ function App() {
             speech={speechSynthesis}
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
-            onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
+            onChooseUnits={() => navigateTo(APP_VIEWS.HOME, { openMatchingPanel: true })}
           />
         ) : null}
       </main>
