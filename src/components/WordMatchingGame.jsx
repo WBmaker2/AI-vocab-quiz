@@ -56,27 +56,86 @@ export function WordMatchingGame({
   onChooseUnits,
 }) {
   const [gameState, setGameState] = useState(() => createMatchingGameState(items));
-  const [selectedMeaningIndex, setSelectedMeaningIndex] = useState(-1);
-  const [selectedWordIndex, setSelectedWordIndex] = useState(-1);
+  const [selectedMeaningSlotId, setSelectedMeaningSlotId] = useState("");
+  const [selectedWordSlotId, setSelectedWordSlotId] = useState("");
   const [mismatchPair, setMismatchPair] = useState(null);
-  const [matchedPair, setMatchedPair] = useState(null);
+  const [matchedPairs, setMatchedPairs] = useState([]);
   const [solvedPairs, setSolvedPairs] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isComplete, setIsComplete] = useState(items.length > 0 && createMatchingGameState(items).totalPairs === 0);
   const completionCelebratedRef = useRef(false);
+  const matchTimeoutsRef = useRef(new Map());
+
+  function clearPendingMatchTimeouts() {
+    matchTimeoutsRef.current.forEach((timeoutId) => {
+      window.clearTimeout(timeoutId);
+    });
+    matchTimeoutsRef.current.clear();
+  }
+
+  function scheduleMatchedPairRemoval(matchEntry) {
+    const timeoutId = window.setTimeout(() => {
+      let shouldComplete = false;
+
+      setGameState((current) => {
+        const leftIndex = current.leftCards.findIndex(
+          (card) => card.slotId === matchEntry.leftSlotId,
+        );
+        const rightIndex = current.rightCards.findIndex(
+          (card) => card.slotId === matchEntry.rightSlotId,
+        );
+
+        if (leftIndex === -1 || rightIndex === -1) {
+          return current;
+        }
+
+        const nextState = advanceMatchingBoard({
+          leftCards: current.leftCards,
+          rightCards: current.rightCards,
+          remainingPairs: current.remainingPairs,
+          leftIndex,
+          rightIndex,
+        });
+
+        shouldComplete =
+          nextState.leftCards.length === 0 && nextState.remainingPairs.length === 0;
+
+        return nextState;
+      });
+
+      setMatchedPairs((current) =>
+        current.filter((entry) => entry.id !== matchEntry.id),
+      );
+
+      if (shouldComplete) {
+        setIsComplete(true);
+      }
+
+      matchTimeoutsRef.current.delete(matchEntry.id);
+    }, 2000);
+
+    matchTimeoutsRef.current.set(matchEntry.id, timeoutId);
+  }
 
   useEffect(() => {
+    clearPendingMatchTimeouts();
     const nextState = createMatchingGameState(items);
     setGameState(nextState);
-    setSelectedMeaningIndex(-1);
-    setSelectedWordIndex(-1);
+    setSelectedMeaningSlotId("");
+    setSelectedWordSlotId("");
     setMismatchPair(null);
-    setMatchedPair(null);
+    setMatchedPairs([]);
     setSolvedPairs(0);
     setElapsedSeconds(0);
     setIsComplete(nextState.totalPairs === 0);
     completionCelebratedRef.current = false;
   }, [items]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingMatchTimeouts();
+    };
+  }, []);
 
   useEffect(() => {
     if (isComplete || gameState.totalPairs === 0) {
@@ -102,33 +161,43 @@ export function WordMatchingGame({
   }, [celebration, isComplete]);
 
   useEffect(() => {
-    if (selectedMeaningIndex === -1 || selectedWordIndex === -1 || mismatchPair || matchedPair) {
+    if (!selectedMeaningSlotId || !selectedWordSlotId || mismatchPair) {
       return undefined;
     }
 
-    const meaningCard = gameState.leftCards[selectedMeaningIndex];
-    const wordCard = gameState.rightCards[selectedWordIndex];
+    const meaningCard = gameState.leftCards.find(
+      (card) => card.slotId === selectedMeaningSlotId,
+    );
+    const wordCard = gameState.rightCards.find(
+      (card) => card.slotId === selectedWordSlotId,
+    );
 
     if (!meaningCard || !wordCard) {
+      setSelectedMeaningSlotId("");
+      setSelectedWordSlotId("");
       return undefined;
     }
 
     if (meaningCard.pairId === wordCard.pairId) {
-      setMatchedPair({
-        leftIndex: selectedMeaningIndex,
-        rightIndex: selectedWordIndex,
+      const matchEntry = {
+        id: crypto.randomUUID(),
         leftSlotId: meaningCard.slotId,
         rightSlotId: wordCard.slotId,
-      });
+      };
+
+      setMatchedPairs((current) => [...current, matchEntry]);
       setSolvedPairs((current) => current + 1);
+      setSelectedMeaningSlotId("");
+      setSelectedWordSlotId("");
       void celebration?.playSuccess?.();
+      scheduleMatchedPairRemoval(matchEntry);
 
       return undefined;
     }
 
     setMismatchPair({
-      leftIndex: selectedMeaningIndex,
-      rightIndex: selectedWordIndex,
+      leftSlotId: meaningCard.slotId,
+      rightSlotId: wordCard.slotId,
     });
     return undefined;
   }, [
@@ -136,10 +205,9 @@ export function WordMatchingGame({
     gameState.leftCards,
     gameState.remainingPairs,
     gameState.rightCards,
-    matchedPair,
     mismatchPair,
-    selectedMeaningIndex,
-    selectedWordIndex,
+    selectedMeaningSlotId,
+    selectedWordSlotId,
   ]);
 
   useEffect(() => {
@@ -148,8 +216,8 @@ export function WordMatchingGame({
     }
 
     const timeoutId = window.setTimeout(() => {
-      setSelectedMeaningIndex(-1);
-      setSelectedWordIndex(-1);
+      setSelectedMeaningSlotId("");
+      setSelectedWordSlotId("");
       setMismatchPair(null);
     }, 360);
 
@@ -157,35 +225,6 @@ export function WordMatchingGame({
       window.clearTimeout(timeoutId);
     };
   }, [mismatchPair]);
-
-  useEffect(() => {
-    if (!matchedPair) {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      const nextState = advanceMatchingBoard({
-        leftCards: gameState.leftCards,
-        rightCards: gameState.rightCards,
-        remainingPairs: gameState.remainingPairs,
-        leftIndex: matchedPair.leftIndex,
-        rightIndex: matchedPair.rightIndex,
-      });
-
-      setGameState(nextState);
-      setSelectedMeaningIndex(-1);
-      setSelectedWordIndex(-1);
-      setMatchedPair(null);
-
-      if (nextState.leftCards.length === 0 && nextState.remainingPairs.length === 0) {
-        setIsComplete(true);
-      }
-    }, 1000);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [gameState.leftCards, gameState.remainingPairs, gameState.rightCards, matchedPair]);
 
   const activePairCount = gameState.leftCards.length;
   const finalScore = useMemo(
@@ -196,16 +235,24 @@ export function WordMatchingGame({
     ? `${selectedUnits.join(", ")}단원`
     : "선택 단원 없음";
 
-  function handleSelectMeaning(index) {
-    if (isComplete || mismatchPair || matchedPair) {
+  function isMatchedSlot(slotId) {
+    return matchedPairs.some(
+      (entry) => entry.leftSlotId === slotId || entry.rightSlotId === slotId,
+    );
+  }
+
+  function handleSelectMeaning(card) {
+    if (isComplete || mismatchPair || isMatchedSlot(card.slotId)) {
       return;
     }
 
-    setSelectedMeaningIndex((current) => (current === index ? -1 : index));
+    setSelectedMeaningSlotId((current) =>
+      current === card.slotId ? "" : card.slotId,
+    );
   }
 
-  function handleSelectWord(index, card) {
-    if (isComplete || mismatchPair || matchedPair) {
+  function handleSelectWord(card) {
+    if (isComplete || mismatchPair || isMatchedSlot(card.slotId)) {
       return;
     }
 
@@ -213,16 +260,19 @@ export function WordMatchingGame({
       lang: "en-US",
       rate: 0.9,
     });
-    setSelectedWordIndex((current) => (current === index ? -1 : index));
+    setSelectedWordSlotId((current) =>
+      current === card.slotId ? "" : card.slotId,
+    );
   }
 
   function handleRetry() {
+    clearPendingMatchTimeouts();
     const nextState = createMatchingGameState(items);
     setGameState(nextState);
-    setSelectedMeaningIndex(-1);
-    setSelectedWordIndex(-1);
+    setSelectedMeaningSlotId("");
+    setSelectedWordSlotId("");
     setMismatchPair(null);
-    setMatchedPair(null);
+    setMatchedPairs([]);
     setSolvedPairs(0);
     setElapsedSeconds(0);
     setIsComplete(nextState.totalPairs === 0);
@@ -342,10 +392,10 @@ export function WordMatchingGame({
 
             <div className="matching-columns">
               <div className="matching-column">
-                {gameState.leftCards.map((card, index) => {
-                  const isSelected = selectedMeaningIndex === index;
-                  const isMismatched = mismatchPair?.leftIndex === index;
-                  const isMatched = matchedPair?.leftSlotId === card.slotId;
+                {gameState.leftCards.map((card) => {
+                  const isSelected = selectedMeaningSlotId === card.slotId;
+                  const isMismatched = mismatchPair?.leftSlotId === card.slotId;
+                  const isMatched = isMatchedSlot(card.slotId);
 
                   return (
                     <button
@@ -356,7 +406,7 @@ export function WordMatchingGame({
                         isMatched,
                         side: "meaning",
                       })}
-                      onClick={() => handleSelectMeaning(index)}
+                      onClick={() => handleSelectMeaning(card)}
                     >
                       {card.label}
                     </button>
@@ -365,10 +415,10 @@ export function WordMatchingGame({
               </div>
 
               <div className="matching-column">
-                {gameState.rightCards.map((card, index) => {
-                  const isSelected = selectedWordIndex === index;
-                  const isMismatched = mismatchPair?.rightIndex === index;
-                  const isMatched = matchedPair?.rightSlotId === card.slotId;
+                {gameState.rightCards.map((card) => {
+                  const isSelected = selectedWordSlotId === card.slotId;
+                  const isMismatched = mismatchPair?.rightSlotId === card.slotId;
+                  const isMatched = isMatchedSlot(card.slotId);
 
                   return (
                     <button
@@ -379,7 +429,7 @@ export function WordMatchingGame({
                         isMatched,
                         side: "word",
                       })}
-                      onClick={() => handleSelectWord(index, card)}
+                      onClick={() => handleSelectWord(card)}
                     >
                       {card.label}
                     </button>

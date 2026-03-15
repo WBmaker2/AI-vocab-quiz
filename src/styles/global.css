@@ -758,7 +758,7 @@ button:disabled {
 }
 
 .matching-card-matched {
-  animation: matching-card-fade-out 1000ms ease forwards;
+  animation: matching-card-fade-out 2000ms ease forwards;
   pointer-events: none;
 }
 
