@@ -98,6 +98,7 @@ function App() {
             onSelectionChange={library.student.updateSelection}
             onLoadSet={library.student.loadSet}
             onToggleMatchingUnit={library.student.toggleMatchingUnit}
+            onSeedMatchingUnits={library.student.seedMatchingUnits}
             onLoadMatchingSet={library.student.loadMatchingSet}
             onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
             onOpenListening={() => navigateTo(APP_VIEWS.LISTENING)}

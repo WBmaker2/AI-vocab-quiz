@@ -6,6 +6,8 @@ import {
   formatElapsedSeconds,
 } from "../utils/quiz.js";
 
+const MATCH_FADE_DURATION_MS = 3000;
+
 function MatchingSummary({
   solvedPairs,
   elapsedSeconds,
@@ -103,7 +105,7 @@ export function WordMatchingGame({
       );
 
       matchTimeoutsRef.current.delete(matchEntry.id);
-    }, 2000);
+    }, MATCH_FADE_DURATION_MS);
 
     matchTimeoutsRef.current.set(matchEntry.id, timeoutId);
   }
@@ -303,7 +305,10 @@ export function WordMatchingGame({
 
   if (items.length === 0 || gameState.totalPairs === 0) {
     return (
-      <section className="workspace-panel">
+      <section
+        className="workspace-panel"
+        style={{ "--matching-card-fade-duration": `${MATCH_FADE_DURATION_MS}ms` }}
+      >
         <div className="section-heading">
           <div>
             <p className="mode-label">Word Matching Game</p>
@@ -335,7 +340,10 @@ export function WordMatchingGame({
 
   if (isComplete) {
     return (
-      <section className="workspace-panel">
+      <section
+        className="workspace-panel"
+        style={{ "--matching-card-fade-duration": `${MATCH_FADE_DURATION_MS}ms` }}
+      >
         <div className="section-heading">
           <div>
             <p className="mode-label">Word Matching Game</p>
@@ -359,7 +367,10 @@ export function WordMatchingGame({
   }
 
   return (
-    <section className="workspace-panel">
+    <section
+      className="workspace-panel"
+      style={{ "--matching-card-fade-duration": `${MATCH_FADE_DURATION_MS}ms` }}
+    >
       <div className="section-heading">
         <div>
           <p className="mode-label">Word Matching Game</p>

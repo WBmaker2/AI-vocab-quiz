@@ -635,6 +635,15 @@ export function useVocabularyLibrary() {
     setStudentMatchingItems([]);
   }
 
+  function seedStudentMatchingUnits(unit) {
+    if (!unit) {
+      return;
+    }
+
+    setStudentMatchingUnits([unit]);
+    setStudentMatchingItems([]);
+  }
+
   async function searchStudentSchools() {
     if (!isFirebaseConfigured) {
       setStudentError("Firebase 설정이 필요합니다.");
@@ -801,6 +810,8 @@ export function useVocabularyLibrary() {
         unit: studentSelection.unit,
       });
       setStudentItems(items);
+      setStudentMatchingUnits(items.length > 0 ? [studentSelection.unit] : []);
+      setStudentMatchingItems([]);
       setStudentStatus(
         items.length > 0
           ? `${selectedTeacher.teacherName} 선생님의 ${formatSetLabel(studentSelection)} 세트를 불러왔습니다.`
@@ -983,6 +994,7 @@ export function useVocabularyLibrary() {
       updateSelection: updateStudentSelection,
       loadSet: loadStudentSet,
       toggleMatchingUnit: toggleStudentMatchingUnit,
+      seedMatchingUnits: seedStudentMatchingUnits,
       loadMatchingSet: loadStudentMatchingSet,
     },
   };

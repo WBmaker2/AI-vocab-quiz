@@ -28,6 +28,7 @@ export function ModeSelector({
   onSelectionChange,
   onLoadSet,
   onToggleMatchingUnit,
+  onSeedMatchingUnits,
   onLoadMatchingSet,
   onOpenTeacher,
   onOpenListening,
@@ -41,6 +42,25 @@ export function ModeSelector({
       setMatchingPanelOpen(true);
     }
   }, [initialMatchingPanelOpen]);
+
+  useEffect(() => {
+    if (
+      !matchingPanelOpen ||
+      matchingUnits.length > 0 ||
+      !selection.unit ||
+      !units.includes(selection.unit)
+    ) {
+      return;
+    }
+
+    onSeedMatchingUnits(selection.unit);
+  }, [
+    matchingPanelOpen,
+    matchingUnits.length,
+    onSeedMatchingUnits,
+    selection.unit,
+    units,
+  ]);
 
   async function handleStartMatching() {
     const loaded = await onLoadMatchingSet();
