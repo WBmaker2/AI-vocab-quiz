@@ -138,16 +138,7 @@ export function WordMatchingGame({
       leftIndex: selectedMeaningIndex,
       rightIndex: selectedWordIndex,
     });
-
-    const timeoutId = window.setTimeout(() => {
-      setSelectedMeaningIndex(-1);
-      setSelectedWordIndex(-1);
-      setMismatchPair(null);
-    }, 550);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    return undefined;
   }, [
     celebration,
     gameState.leftCards,
@@ -158,6 +149,22 @@ export function WordMatchingGame({
     selectedWordIndex,
     solvedPairs,
   ]);
+
+  useEffect(() => {
+    if (!mismatchPair) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSelectedMeaningIndex(-1);
+      setSelectedWordIndex(-1);
+      setMismatchPair(null);
+    }, 360);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [mismatchPair]);
 
   const activePairCount = gameState.leftCards.length;
   const finalScore = useMemo(
@@ -309,6 +316,12 @@ export function WordMatchingGame({
               영어 카드를 누르면 발음을 들을 수 있습니다. 왼쪽 뜻 카드 1개와
               오른쪽 영어 카드 1개를 선택해 짝을 맞추세요.
             </p>
+
+            {mismatchPair ? (
+              <div className="feedback-card matching-feedback-card" aria-live="polite">
+                <p>짝이 아니에요. 바로 다시 골라보세요.</p>
+              </div>
+            ) : null}
 
             <div className="matching-columns">
               <div className="matching-column">
