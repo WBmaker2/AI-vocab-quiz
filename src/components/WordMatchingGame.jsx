@@ -59,6 +59,7 @@ export function WordMatchingGame({
   const [selectedMeaningIndex, setSelectedMeaningIndex] = useState(-1);
   const [selectedWordIndex, setSelectedWordIndex] = useState(-1);
   const [mismatchPair, setMismatchPair] = useState(null);
+  const [matchedPair, setMatchedPair] = useState(null);
   const [solvedPairs, setSolvedPairs] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isComplete, setIsComplete] = useState(items.length > 0 && createMatchingGameState(items).totalPairs === 0);
@@ -70,6 +71,7 @@ export function WordMatchingGame({
     setSelectedMeaningIndex(-1);
     setSelectedWordIndex(-1);
     setMismatchPair(null);
+    setMatchedPair(null);
     setSolvedPairs(0);
     setElapsedSeconds(0);
     setIsComplete(nextState.totalPairs === 0);
@@ -100,7 +102,7 @@ export function WordMatchingGame({
   }, [celebration, isComplete]);
 
   useEffect(() => {
-    if (selectedMeaningIndex === -1 || selectedWordIndex === -1 || mismatchPair) {
+    if (selectedMeaningIndex === -1 || selectedWordIndex === -1 || mismatchPair || matchedPair) {
       return undefined;
     }
 
@@ -112,24 +114,14 @@ export function WordMatchingGame({
     }
 
     if (meaningCard.pairId === wordCard.pairId) {
-      const nextState = advanceMatchingBoard({
-        leftCards: gameState.leftCards,
-        rightCards: gameState.rightCards,
-        remainingPairs: gameState.remainingPairs,
+      setMatchedPair({
         leftIndex: selectedMeaningIndex,
         rightIndex: selectedWordIndex,
+        leftSlotId: meaningCard.slotId,
+        rightSlotId: wordCard.slotId,
       });
-      const nextSolvedPairs = solvedPairs + 1;
-
-      setSolvedPairs(nextSolvedPairs);
-      setGameState(nextState);
-      setSelectedMeaningIndex(-1);
-      setSelectedWordIndex(-1);
+      setSolvedPairs((current) => current + 1);
       void celebration?.playSuccess?.();
-
-      if (nextState.leftCards.length === 0 && nextState.remainingPairs.length === 0) {
-        setIsComplete(true);
-      }
 
       return undefined;
     }
@@ -144,10 +136,10 @@ export function WordMatchingGame({
     gameState.leftCards,
     gameState.remainingPairs,
     gameState.rightCards,
+    matchedPair,
     mismatchPair,
     selectedMeaningIndex,
     selectedWordIndex,
-    solvedPairs,
   ]);
 
   useEffect(() => {
@@ -166,6 +158,35 @@ export function WordMatchingGame({
     };
   }, [mismatchPair]);
 
+  useEffect(() => {
+    if (!matchedPair) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const nextState = advanceMatchingBoard({
+        leftCards: gameState.leftCards,
+        rightCards: gameState.rightCards,
+        remainingPairs: gameState.remainingPairs,
+        leftIndex: matchedPair.leftIndex,
+        rightIndex: matchedPair.rightIndex,
+      });
+
+      setGameState(nextState);
+      setSelectedMeaningIndex(-1);
+      setSelectedWordIndex(-1);
+      setMatchedPair(null);
+
+      if (nextState.leftCards.length === 0 && nextState.remainingPairs.length === 0) {
+        setIsComplete(true);
+      }
+    }, 1000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [gameState.leftCards, gameState.remainingPairs, gameState.rightCards, matchedPair]);
+
   const activePairCount = gameState.leftCards.length;
   const finalScore = useMemo(
     () => calculateMatchingScore({ solvedPairs, elapsedSeconds }),
@@ -176,7 +197,7 @@ export function WordMatchingGame({
     : "선택 단원 없음";
 
   function handleSelectMeaning(index) {
-    if (isComplete || mismatchPair) {
+    if (isComplete || mismatchPair || matchedPair) {
       return;
     }
 
@@ -184,7 +205,7 @@ export function WordMatchingGame({
   }
 
   function handleSelectWord(index, card) {
-    if (isComplete || mismatchPair) {
+    if (isComplete || mismatchPair || matchedPair) {
       return;
     }
 
@@ -201,18 +222,20 @@ export function WordMatchingGame({
     setSelectedMeaningIndex(-1);
     setSelectedWordIndex(-1);
     setMismatchPair(null);
+    setMatchedPair(null);
     setSolvedPairs(0);
     setElapsedSeconds(0);
     setIsComplete(nextState.totalPairs === 0);
     completionCelebratedRef.current = false;
   }
 
-  function getCardClassName({ isSelected, isMismatched, side }) {
+  function getCardClassName({ isSelected, isMismatched, isMatched, side }) {
     return [
       "matching-card",
       side === "word" ? "matching-card-word" : "matching-card-meaning",
       isSelected ? "matching-card-selected" : "",
       isMismatched ? "matching-card-mismatch" : "",
+      isMatched ? "matching-card-matched" : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -241,8 +264,8 @@ export function WordMatchingGame({
             <button className="ghost-button" onClick={onBack}>
               홈으로
             </button>
-            <button className="secondary-button" onClick={onOpenTeacher}>
-              Teacher Mode 열기
+            <button className="secondary-button" onClick={onChooseUnits}>
+              게임 단원 선택
             </button>
           </div>
         </article>
@@ -317,17 +340,12 @@ export function WordMatchingGame({
               오른쪽 영어 카드 1개를 선택해 짝을 맞추세요.
             </p>
 
-            {mismatchPair ? (
-              <div className="feedback-card matching-feedback-card" aria-live="polite">
-                <p>짝이 아니에요. 바로 다시 골라보세요.</p>
-              </div>
-            ) : null}
-
             <div className="matching-columns">
               <div className="matching-column">
                 {gameState.leftCards.map((card, index) => {
                   const isSelected = selectedMeaningIndex === index;
                   const isMismatched = mismatchPair?.leftIndex === index;
+                  const isMatched = matchedPair?.leftSlotId === card.slotId;
 
                   return (
                     <button
@@ -335,6 +353,7 @@ export function WordMatchingGame({
                       className={getCardClassName({
                         isSelected,
                         isMismatched,
+                        isMatched,
                         side: "meaning",
                       })}
                       onClick={() => handleSelectMeaning(index)}
@@ -349,6 +368,7 @@ export function WordMatchingGame({
                 {gameState.rightCards.map((card, index) => {
                   const isSelected = selectedWordIndex === index;
                   const isMismatched = mismatchPair?.rightIndex === index;
+                  const isMatched = matchedPair?.rightSlotId === card.slotId;
 
                   return (
                     <button
@@ -356,6 +376,7 @@ export function WordMatchingGame({
                       className={getCardClassName({
                         isSelected,
                         isMismatched,
+                        isMatched,
                         side: "word",
                       })}
                       onClick={() => handleSelectWord(index, card)}
