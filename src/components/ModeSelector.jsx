@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 export function ModeSelector({
   gradeOptions,
   remoteConfigured,
@@ -11,6 +13,8 @@ export function ModeSelector({
   selectedTeacher,
   selection,
   units,
+  matchingUnits,
+  matchingLoading,
   unitsLoading,
   status,
   error,
@@ -22,10 +26,23 @@ export function ModeSelector({
   onChooseTeacher,
   onSelectionChange,
   onLoadSet,
+  onToggleMatchingUnit,
+  onLoadMatchingSet,
   onOpenTeacher,
   onOpenListening,
   onOpenSpeaking,
+  onOpenMatching,
 }) {
+  const [matchingPanelOpen, setMatchingPanelOpen] = useState(false);
+
+  async function handleStartMatching() {
+    const loaded = await onLoadMatchingSet();
+
+    if (loaded) {
+      onOpenMatching();
+    }
+  }
+
   return (
     <section className="panel-grid">
       <article className="mode-card mode-card-teacher">
@@ -152,6 +169,60 @@ export function ModeSelector({
           </button>
         </div>
 
+        {matchingPanelOpen ? (
+          <article className="matching-launch-card">
+            <div className="section-heading compact">
+              <div>
+                <p className="mode-label">Word Matching Game</p>
+                <h3>게임에 사용할 단원 선택</h3>
+              </div>
+            </div>
+            <p className="question-copy">
+              같은 선생님과 학년 안에서 여러 단원을 체크하면, 선택한 모든
+              단원의 공개 단어를 모아 짝 맞추기 게임을 시작합니다.
+            </p>
+
+            <div className="matching-unit-grid" role="group" aria-label="짝 맞추기 단원 선택">
+              {units.map((unit) => {
+                const checked = matchingUnits.includes(unit);
+
+                return (
+                  <label key={unit} className="matching-unit-option">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => onToggleMatchingUnit(unit)}
+                    />
+                    <span>{unit}단원</span>
+                  </label>
+                );
+              })}
+            </div>
+
+            {units.length === 0 ? (
+              <p className="inline-hint">
+                먼저 선생님과 학년을 고르면 공개된 단원 목록을 확인할 수 있습니다.
+              </p>
+            ) : null}
+
+            <div className="toolbar-row">
+              <button
+                className="primary-button"
+                onClick={handleStartMatching}
+                disabled={!selectedTeacher || matchingUnits.length === 0 || matchingLoading}
+              >
+                {matchingLoading ? "게임 준비 중..." : "선택한 단원으로 게임 시작"}
+              </button>
+              <button
+                className="ghost-button"
+                onClick={() => setMatchingPanelOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
+          </article>
+        ) : null}
+
         {!remoteConfigured ? (
           <p className="inline-hint warning-hint">
             Firebase 환경 변수가 없어서 학교와 공개 단어세트를 불러올 수 없습니다.
@@ -179,6 +250,13 @@ export function ModeSelector({
             disabled={!hasVocabulary}
           >
             말하기 연습 열기
+          </button>
+          <button
+            className="ghost-button"
+            onClick={() => setMatchingPanelOpen((current) => !current)}
+            disabled={!remoteConfigured || !selectedTeacher || unitsLoading}
+          >
+            단어 짝 맞추기
           </button>
         </div>
 

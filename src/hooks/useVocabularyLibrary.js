@@ -104,6 +104,8 @@ export function useVocabularyLibrary() {
   const [studentUnits, setStudentUnits] = useState([]);
   const [studentUnitsLoading, setStudentUnitsLoading] = useState(false);
   const [studentItems, setStudentItems] = useState([]);
+  const [studentMatchingUnits, setStudentMatchingUnits] = useState([]);
+  const [studentMatchingItems, setStudentMatchingItems] = useState([]);
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentStatus, setStudentStatus] = useState("");
   const [studentError, setStudentError] = useState("");
@@ -628,6 +630,11 @@ export function useVocabularyLibrary() {
     setStudentError("");
   }
 
+  function resetStudentMatchingState() {
+    setStudentMatchingUnits([]);
+    setStudentMatchingItems([]);
+  }
+
   async function searchStudentSchools() {
     if (!isFirebaseConfigured) {
       setStudentError("Firebase 설정이 필요합니다.");
@@ -652,6 +659,7 @@ export function useVocabularyLibrary() {
       setStudentTeachers([]);
       setStudentUnits([]);
       setStudentItems([]);
+      resetStudentMatchingState();
       setStudentSelection(DEFAULT_STUDENT_SELECTION);
       setStudentStatus(
         schools.length > 0
@@ -677,6 +685,7 @@ export function useVocabularyLibrary() {
     setStudentTeachers([]);
     setStudentUnits([]);
     setStudentItems([]);
+    resetStudentMatchingState();
     setStudentSelection(DEFAULT_STUDENT_SELECTION);
     setStudentTeachersLoading(true);
     setStudentStatus("");
@@ -733,6 +742,7 @@ export function useVocabularyLibrary() {
     const teacher = studentTeachers.find((entry) => entry.userId === teacherUserId);
     setSelectedTeacher(teacher ?? null);
     setStudentItems([]);
+    resetStudentMatchingState();
     setStudentUnits([]);
     setStudentSelection((current) => ({
       ...current,
@@ -756,6 +766,7 @@ export function useVocabularyLibrary() {
         unit: "",
       }));
       setStudentUnits([]);
+      resetStudentMatchingState();
       if (selectedTeacher) {
         await refreshStudentUnits(selectedTeacher, value);
       }
@@ -799,6 +810,85 @@ export function useVocabularyLibrary() {
       setStudentError(
         normalizeErrorMessage(error, "학생용 단어 세트를 불러오지 못했습니다."),
       );
+    } finally {
+      setStudentLoading(false);
+    }
+  }
+
+  function toggleStudentMatchingUnit(unit) {
+    setStudentMatchingUnits((current) => {
+      const hasUnit = current.includes(unit);
+      const nextUnits = hasUnit
+        ? current.filter((entry) => entry !== unit)
+        : [...current, unit];
+
+      return nextUnits.sort((left, right) =>
+        String(left).localeCompare(String(right), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
+    });
+    setStudentMatchingItems([]);
+    setStudentStatus("");
+    setStudentError("");
+  }
+
+  async function loadStudentMatchingSet() {
+    if (!isFirebaseConfigured) {
+      setStudentError("Firebase 설정이 필요합니다.");
+      return false;
+    }
+
+    if (!selectedSchool || !selectedTeacher || studentMatchingUnits.length === 0) {
+      setStudentError("학교, 선생님, 학년을 고르고 게임용 단원을 한 개 이상 체크하세요.");
+      return false;
+    }
+
+    setStudentLoading(true);
+    setStudentStatus("");
+    setStudentError("");
+
+    try {
+      const unitItems = await Promise.all(
+        studentMatchingUnits.map((unit) =>
+          fetchPublishedVocabularySet({
+            teacherUserId: selectedTeacher.userId,
+            grade: studentSelection.grade,
+            unit,
+          }),
+        ),
+      );
+
+      const combinedItems = Array.from(
+        new Map(
+          unitItems
+            .flat()
+            .filter(
+              (item) =>
+                String(item.word ?? "").trim() &&
+                String(item.meaning ?? "").trim(),
+            )
+            .map((item) => [`${item.word}__${item.meaning}`, item]),
+        ).values(),
+      );
+
+      setStudentMatchingItems(combinedItems);
+      setStudentStatus(
+        combinedItems.length > 0
+          ? `${selectedTeacher.teacherName} 선생님의 ${studentSelection.grade}학년 ${studentMatchingUnits.length}개 단원에서 ${combinedItems.length}개 단어를 준비했습니다.`
+          : "선택한 단원들에 공개된 단어가 없습니다.",
+      );
+
+      return combinedItems.length > 0;
+    } catch (error) {
+      setStudentError(
+        normalizeErrorMessage(
+          error,
+          "짝 맞추기용 단어 세트를 불러오지 못했습니다.",
+        ),
+      );
+      return false;
     } finally {
       setStudentLoading(false);
     }
@@ -881,6 +971,8 @@ export function useVocabularyLibrary() {
       units: studentUnits,
       unitsLoading: studentUnitsLoading,
       items: studentItems,
+      matchingUnits: studentMatchingUnits,
+      matchingItems: studentMatchingItems,
       loading: studentLoading,
       status: studentStatus,
       error: studentError,
@@ -890,6 +982,8 @@ export function useVocabularyLibrary() {
       chooseTeacher: chooseStudentTeacher,
       updateSelection: updateStudentSelection,
       loadSet: loadStudentSet,
+      toggleMatchingUnit: toggleStudentMatchingUnit,
+      loadMatchingSet: loadStudentMatchingSet,
     },
   };
 }

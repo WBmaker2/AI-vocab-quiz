@@ -4,6 +4,7 @@ import { ListeningQuiz } from "./components/ListeningQuiz.jsx";
 import { ModeSelector } from "./components/ModeSelector.jsx";
 import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
 import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
+import { WordMatchingGame } from "./components/WordMatchingGame.jsx";
 import { APP_VERSION } from "./constants/app.js";
 import { GRADE_OPTIONS } from "./constants/vocabulary.js";
 import { useCelebrationAudio } from "./hooks/useCelebrationAudio.js";
@@ -16,6 +17,7 @@ const APP_VIEWS = {
   TEACHER: "teacher",
   LISTENING: "listening",
   SPEAKING: "speaking",
+  MATCHING: "matching",
 };
 
 function App() {
@@ -75,6 +77,8 @@ function App() {
             selectedTeacher={library.student.selectedTeacher}
             selection={library.student.selection}
             units={library.student.units}
+            matchingUnits={library.student.matchingUnits}
+            matchingLoading={library.student.loading}
             unitsLoading={library.student.unitsLoading}
             status={library.student.status}
             error={library.student.error}
@@ -86,9 +90,12 @@ function App() {
             onChooseTeacher={library.student.chooseTeacher}
             onSelectionChange={library.student.updateSelection}
             onLoadSet={library.student.loadSet}
+            onToggleMatchingUnit={library.student.toggleMatchingUnit}
+            onLoadMatchingSet={library.student.loadMatchingSet}
             onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
             onOpenListening={() => navigateTo(APP_VIEWS.LISTENING)}
             onOpenSpeaking={() => navigateTo(APP_VIEWS.SPEAKING)}
+            onOpenMatching={() => navigateTo(APP_VIEWS.MATCHING)}
           />
         ) : null}
 
@@ -142,6 +149,17 @@ function App() {
         {view === APP_VIEWS.SPEAKING ? (
           <SpeakingQuiz
             items={library.student.items}
+            speech={speechSynthesis}
+            celebration={celebrationAudio}
+            onBack={() => navigateTo(APP_VIEWS.HOME)}
+            onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
+          />
+        ) : null}
+
+        {view === APP_VIEWS.MATCHING ? (
+          <WordMatchingGame
+            items={library.student.matchingItems}
+            selectedUnits={library.student.matchingUnits}
             speech={speechSynthesis}
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
