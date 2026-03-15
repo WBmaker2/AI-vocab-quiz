@@ -75,8 +75,6 @@ export function WordMatchingGame({
 
   function scheduleMatchedPairRemoval(matchEntry) {
     const timeoutId = window.setTimeout(() => {
-      let shouldComplete = false;
-
       setGameState((current) => {
         const leftIndex = current.leftCards.findIndex(
           (card) => card.slotId === matchEntry.leftSlotId,
@@ -97,19 +95,12 @@ export function WordMatchingGame({
           rightIndex,
         });
 
-        shouldComplete =
-          nextState.leftCards.length === 0 && nextState.remainingPairs.length === 0;
-
         return nextState;
       });
 
       setMatchedPairs((current) =>
         current.filter((entry) => entry.id !== matchEntry.id),
       );
-
-      if (shouldComplete) {
-        setIsComplete(true);
-      }
 
       matchTimeoutsRef.current.delete(matchEntry.id);
     }, 2000);
@@ -159,6 +150,25 @@ export function WordMatchingGame({
     completionCelebratedRef.current = true;
     void celebration?.playCompletion?.();
   }, [celebration, isComplete]);
+
+  useEffect(() => {
+    const boardIsEmpty =
+      items.length > 0 &&
+      gameState.leftCards.length === 0 &&
+      gameState.rightCards.length === 0 &&
+      gameState.remainingPairs.length === 0 &&
+      matchedPairs.length === 0;
+
+    if (boardIsEmpty) {
+      setIsComplete(true);
+    }
+  }, [
+    gameState.leftCards.length,
+    gameState.remainingPairs.length,
+    gameState.rightCards.length,
+    items.length,
+    matchedPairs.length,
+  ]);
 
   useEffect(() => {
     if (!selectedMeaningSlotId || !selectedWordSlotId || mismatchPair) {
