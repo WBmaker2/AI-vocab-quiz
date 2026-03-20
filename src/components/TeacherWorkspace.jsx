@@ -35,6 +35,7 @@ export function TeacherWorkspace({
   onLoadSet,
   onSaveSet,
   onDeleteSet,
+  onResetGradeSets,
   onImportWorkbook,
   onAddItem,
   onUpdateItem,
@@ -122,6 +123,19 @@ export function TeacherWorkspace({
       selection.grade,
       shouldForcePublic ? true : null,
     );
+    setImportFile(null);
+  }
+
+  function handleResetGradeSets() {
+    const shouldReset = window.confirm(
+      `${selection.grade}학년의 기존 저장 단어카드를 모두 초기화하시겠습니까?\n이 작업은 현재 학년에 저장된 모든 단원을 삭제하며 되돌릴 수 없습니다.`,
+    );
+
+    if (!shouldReset) {
+      return;
+    }
+
+    onResetGradeSets();
     setImportFile(null);
   }
 
@@ -448,19 +462,30 @@ export function TeacherWorkspace({
             <p className="mode-label">Excel Upload</p>
             <h3>엑셀로 단원 일괄 등록</h3>
           </div>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={handleImportWorkbook}
-            disabled={!importFile || importing}
-          >
-            {importing ? "업로드 중..." : "엑셀 가져오기"}
-          </button>
+          <div className="toolbar-row">
+            <button
+              type="button"
+              className="ghost-button danger-button"
+              onClick={handleResetGradeSets}
+              disabled={importing || saving}
+            >
+              현재 학년 초기화
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleImportWorkbook}
+              disabled={!importFile || importing}
+            >
+              {importing ? "업로드 중..." : "엑셀 가져오기"}
+            </button>
+          </div>
         </div>
         <p className="inline-hint">
           `Lesson / English / Korean` 열을 가진 파일을 업로드하면, 현재 선생님의
-          선택 학년의 모든 Lesson 단원이 한꺼번에 저장됩니다. 위의 `학생 공개`
-          체크 상태도 모든 단원에 함께 적용됩니다.
+          선택 학년의 모든 Lesson 단원이 한꺼번에 저장됩니다. 기존 단원이
+          있으면 새 단어만 안전하게 추가하고, 중복 단어는 건너뜁니다. 위의
+          `학생 공개` 체크 상태도 모든 반영 단원에 함께 적용됩니다.
         </p>
         <div className="form-grid compact-grid">
           <label className="field field-wide">

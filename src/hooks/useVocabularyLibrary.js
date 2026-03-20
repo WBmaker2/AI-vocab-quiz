@@ -8,6 +8,7 @@ import {
   normalizeDraftVocabulary,
 } from "../constants/vocabulary.js";
 import {
+  deleteTeacherVocabularySetsForGrade,
   deleteTeacherVocabularySet,
   fetchPublishedVocabularySet,
   fetchTeacherVocabularySet,
@@ -25,6 +26,7 @@ import {
   subscribeToAuthChanges,
   upsertTeacherProfile,
 } from "../lib/firebase.js";
+import { mergeVocabularyItems } from "../utils/vocabularyMerge.js";
 import { parseVocabularyWorkbook } from "../utils/xlsxImport.js";
 
 const SAMPLE_ITEMS = [
@@ -509,6 +511,47 @@ export function useVocabularyLibrary() {
     }
   }
 
+  async function resetTeacherGradeSets() {
+    if (!isFirebaseConfigured || !userId) {
+      setTeacherError("Google 로그인 후 단어 세트를 초기화할 수 있습니다.");
+      return;
+    }
+
+    if (!teacherSelection.grade) {
+      setTeacherError("초기화할 학년을 먼저 선택하세요.");
+      return;
+    }
+
+    setTeacherSaving(true);
+    setTeacherStatus("");
+    setTeacherError("");
+
+    try {
+      const deletedCount = await deleteTeacherVocabularySetsForGrade(
+        userId,
+        teacherSelection.grade,
+      );
+
+      setTeacherItems([]);
+      setTeacherPublished(false);
+      setTeacherDirty(false);
+
+      setTeacherStatus(
+        deletedCount > 0
+          ? `${teacherSelection.grade}학년의 저장 단원 ${deletedCount}개를 초기화했습니다. 새 엑셀 파일을 다시 업로드할 수 있습니다.`
+          : `${teacherSelection.grade}학년에 초기화할 저장 단원이 없습니다.`,
+      );
+
+      await refreshTeacherCatalog();
+    } catch (error) {
+      setTeacherError(
+        normalizeErrorMessage(error, "학년 단어카드를 초기화하지 못했습니다."),
+      );
+    } finally {
+      setTeacherSaving(false);
+    }
+  }
+
   async function importWorkbook(file, grade, publishOverride = null) {
     if (!isFirebaseConfigured || !teacherProfile || !userId) {
       setTeacherError("Google 로그인과 선생님 정보 등록이 필요합니다.");
@@ -533,18 +576,37 @@ export function useVocabularyLibrary() {
       const groupedSets = await parseVocabularyWorkbook(file);
       const publishImportedSets =
         publishOverride === null ? teacherPublished : publishOverride;
+      let savedUnitCount = 0;
+      let addedVocabularyCount = 0;
+      let duplicateVocabularyCount = 0;
+      const savedItemsByUnit = new Map();
 
       for (const groupedSet of groupedSets) {
+        const existingSet = await fetchTeacherVocabularySet(userId, {
+          grade,
+          unit: groupedSet.unit,
+        });
+        const { mergedItems, addedCount, duplicateCount } = mergeVocabularyItems(
+          existingSet.items ?? [],
+          groupedSet.items,
+        );
+        const normalizedItems = normalizeDraftVocabulary(mergedItems);
+
         await saveTeacherVocabularySet({
           userId,
           schoolId: teacherProfile.schoolId,
           schoolName: teacherProfile.schoolName,
           teacherName: teacherProfile.teacherName,
           selection: { grade, unit: groupedSet.unit },
-          items: normalizeDraftVocabulary(groupedSet.items),
+          items: normalizedItems,
           published: publishImportedSets,
           sourceType: "xlsx",
         });
+
+        savedUnitCount += 1;
+        addedVocabularyCount += addedCount;
+        duplicateVocabularyCount += duplicateCount;
+        savedItemsByUnit.set(groupedSet.unit, normalizedItems);
       }
 
       await refreshTeacherCatalog();
@@ -556,15 +618,15 @@ export function useVocabularyLibrary() {
       );
 
       if (matchedSet) {
-        setTeacherItems(normalizeDraftVocabulary(matchedSet.items));
+        setTeacherItems(savedItemsByUnit.get(matchedSet.unit) ?? []);
         setTeacherPublished(publishImportedSets);
         setTeacherDirty(false);
       }
 
       setTeacherStatus(
         publishImportedSets
-          ? `${grade}학년 엑셀 업로드를 완료했습니다. ${groupedSets.length}개 단원을 저장하고 모두 학생 공개로 설정했습니다.`
-          : `${grade}학년 엑셀 업로드를 완료했습니다. ${groupedSets.length}개 단원을 한꺼번에 저장했습니다.`,
+          ? `${grade}학년 엑셀 업로드를 완료했습니다. ${savedUnitCount}개 단원을 반영했고 새 단어 ${addedVocabularyCount}개를 추가했습니다. 중복 ${duplicateVocabularyCount}개는 건너뛰고 모든 반영 단원을 학생 공개로 설정했습니다.`
+          : `${grade}학년 엑셀 업로드를 완료했습니다. ${savedUnitCount}개 단원을 반영했고 새 단어 ${addedVocabularyCount}개를 추가했습니다. 중복 ${duplicateVocabularyCount}개는 건너뛰었습니다.`,
       );
     } catch (error) {
       setTeacherError(
@@ -963,6 +1025,7 @@ export function useVocabularyLibrary() {
       loadSet: loadTeacherSet,
       saveSet: saveTeacherSet,
       deleteSet: removeTeacherSet,
+      resetGradeSets: resetTeacherGradeSets,
       importWorkbook,
       addItem: addTeacherItem,
       updateItem: updateTeacherItem,

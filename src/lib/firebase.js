@@ -306,6 +306,25 @@ export async function deleteTeacherVocabularySet(userId, selection) {
   await deleteDoc(setRef);
 }
 
+export async function deleteTeacherVocabularySetsForGrade(userId, grade) {
+  const { db: firestore } = ensureFirebase();
+  const cleanGrade = String(grade ?? "").trim();
+
+  if (!cleanGrade) {
+    throw new Error("Grade is required.");
+  }
+
+  const setsQuery = query(
+    collection(firestore, "vocabularySets"),
+    where("ownerUid", "==", userId),
+    where("grade", "==", cleanGrade),
+  );
+  const snapshot = await getDocs(setsQuery);
+
+  await Promise.all(snapshot.docs.map((item) => deleteDoc(item.ref)));
+  return snapshot.docs.length;
+}
+
 export async function listTeachersForSchool(schoolId) {
   const { db: firestore } = ensureFirebase();
   const teachersQuery = query(

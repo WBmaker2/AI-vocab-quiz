@@ -134,6 +134,7 @@ function App() {
             onLoadSet={library.teacher.loadSet}
             onSaveSet={library.teacher.saveSet}
             onDeleteSet={library.teacher.deleteSet}
+            onResetGradeSets={library.teacher.resetGradeSets}
             onImportWorkbook={library.teacher.importWorkbook}
             onAddItem={library.teacher.addItem}
             onUpdateItem={library.teacher.updateItem}
