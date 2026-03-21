@@ -17,6 +17,7 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   startAt,
@@ -131,6 +132,51 @@ export async function searchSchoolsByName(queryText) {
   }));
 }
 
+export async function listPopularSchools(limitCount = 5) {
+  const { db: firestore } = ensureFirebase();
+  const snapshot = await getDocs(
+    query(collection(firestore, "vocabularySets"), where("published", "==", true)),
+  );
+
+  const schoolUsage = new Map();
+
+  snapshot.docs.forEach((item) => {
+    const data = item.data();
+    const schoolId = String(data.schoolId ?? "").trim();
+    const schoolName = String(data.schoolName ?? "").trim();
+
+    if (!schoolId || !schoolName) {
+      return;
+    }
+
+    const existing = schoolUsage.get(schoolId) ?? {
+      id: schoolId,
+      name: schoolName,
+      setCount: 0,
+    };
+
+    schoolUsage.set(schoolId, {
+      ...existing,
+      name: existing.name || schoolName,
+      setCount: existing.setCount + 1,
+    });
+  });
+
+  return Array.from(schoolUsage.values())
+    .sort((left, right) => {
+      const countCompare = right.setCount - left.setCount;
+      if (countCompare !== 0) {
+        return countCompare;
+      }
+
+      return String(left.name).localeCompare(String(right.name), undefined, {
+        sensitivity: "base",
+      });
+    })
+    .slice(0, limitCount)
+    .map(({ id, name }) => ({ id, name }));
+}
+
 export async function findOrCreateSchool(name) {
   const { db: firestore } = ensureFirebase();
   const cleanName = String(name ?? "").trim().replace(/\s+/g, " ");
@@ -153,6 +199,7 @@ export async function findOrCreateSchool(name) {
   await setDoc(schoolRef, {
     name: cleanName,
     normalizedName,
+    teacherCount: 0,
     createdAt: serverTimestamp(),
   });
 
@@ -183,7 +230,7 @@ export async function getTeacherProfile(userId) {
 export async function upsertTeacherProfile({ userId, teacherName, schoolId, schoolName }) {
   const { db: firestore } = ensureFirebase();
   const teacherRef = doc(firestore, "teachers", userId);
-  const teacherSnapshot = await getDoc(teacherRef);
+  const nextSchoolId = String(schoolId ?? "").trim();
 
   const payload = {
     teacherName: teacherName.trim(),
@@ -193,15 +240,80 @@ export async function upsertTeacherProfile({ userId, teacherName, schoolId, scho
     updatedAt: serverTimestamp(),
   };
 
-  if (teacherSnapshot.exists()) {
-    await updateDoc(teacherRef, payload);
-    return;
-  }
+  await runTransaction(firestore, async (transaction) => {
+    const teacherSnapshot = await transaction.get(teacherRef);
+    const previousSchoolId = teacherSnapshot.exists()
+      ? String(teacherSnapshot.data().schoolId ?? "").trim()
+      : "";
 
-  await setDoc(teacherRef, {
-    ...payload,
-    createdAt: serverTimestamp(),
+    if (teacherSnapshot.exists()) {
+      transaction.update(teacherRef, payload);
+    } else {
+      transaction.set(teacherRef, {
+        ...payload,
+        createdAt: serverTimestamp(),
+      });
+    }
+
+    async function adjustSchoolCountInTransaction(targetSchoolId, delta) {
+      const cleanSchoolId = String(targetSchoolId ?? "").trim();
+      if (!cleanSchoolId || !delta) {
+        return;
+      }
+
+      const schoolRef = doc(firestore, "schools", cleanSchoolId);
+      const schoolSnapshot = await transaction.get(schoolRef);
+
+      if (!schoolSnapshot.exists()) {
+        return;
+      }
+
+      const currentCount = Number(schoolSnapshot.data().teacherCount ?? 0);
+      const nextCount = Math.max(0, currentCount + delta);
+
+      transaction.set(
+        schoolRef,
+        {
+          teacherCount: nextCount,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+
+    if (previousSchoolId && previousSchoolId !== nextSchoolId) {
+      await adjustSchoolCountInTransaction(previousSchoolId, -1);
+    }
+
+    if (!teacherSnapshot.exists() || previousSchoolId !== nextSchoolId) {
+      await adjustSchoolCountInTransaction(nextSchoolId, 1);
+    }
   });
+}
+
+export async function syncTeacherVocabularyMetadata({
+  userId,
+  schoolId,
+  schoolName,
+  teacherName,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const setsQuery = query(
+    collection(firestore, "vocabularySets"),
+    where("ownerUid", "==", userId),
+  );
+  const snapshot = await getDocs(setsQuery);
+
+  await Promise.all(
+    snapshot.docs.map((item) =>
+      updateDoc(item.ref, {
+        schoolId,
+        schoolName: schoolName.trim(),
+        teacherName: teacherName.trim(),
+        updatedAt: serverTimestamp(),
+      }),
+    ),
+  );
 }
 
 export async function listTeacherSetCatalog(userId) {

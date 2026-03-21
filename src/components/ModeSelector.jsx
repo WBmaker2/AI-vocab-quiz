@@ -5,6 +5,9 @@ export function ModeSelector({
   remoteConfigured,
   auth,
   schoolQuery,
+  schoolBrowseMode,
+  featuredSchools,
+  featuredSchoolsLoading,
   schoolResults,
   schoolSearchLoading,
   selectedSchool,
@@ -36,6 +39,8 @@ export function ModeSelector({
   onOpenMatching,
 }) {
   const [matchingPanelOpen, setMatchingPanelOpen] = useState(false);
+  const showingSearchResults = schoolBrowseMode === "search";
+  const visibleSchools = showingSearchResults ? schoolResults : featuredSchools;
 
   useEffect(() => {
     if (initialMatchingPanelOpen) {
@@ -111,23 +116,51 @@ export function ModeSelector({
           </button>
         </div>
 
-        {schoolResults.length > 0 ? (
+        {showingSearchResults ? (
           <div className="selection-chip-group" aria-label="학교 검색 결과">
-            {schoolResults.map((school) => (
-              <button
-                key={school.id}
-                className={
-                  selectedSchool?.id === school.id
-                    ? "choice-chip choice-chip-selected"
-                    : "choice-chip"
-                }
-                onClick={() => onChooseSchool(school)}
-              >
-                {school.name}
-              </button>
-            ))}
+            {schoolSearchLoading ? (
+              <p className="inline-hint">검색 중입니다...</p>
+            ) : visibleSchools.length > 0 ? (
+              visibleSchools.map((school) => (
+                <button
+                  key={school.id}
+                  className={
+                    selectedSchool?.id === school.id
+                      ? "choice-chip choice-chip-selected"
+                      : "choice-chip"
+                  }
+                  onClick={() => onChooseSchool(school)}
+                >
+                  {school.name}
+                </button>
+              ))
+            ) : (
+              <p className="inline-hint">검색 결과가 없습니다.</p>
+            )}
           </div>
-        ) : null}
+        ) : (
+          <div className="selection-chip-group" aria-label="인기 학교">
+            {featuredSchoolsLoading ? (
+              <p className="inline-hint">인기 학교를 불러오는 중입니다...</p>
+            ) : visibleSchools.length > 0 ? (
+              visibleSchools.map((school) => (
+                <button
+                  key={school.id}
+                  className={
+                    selectedSchool?.id === school.id
+                      ? "choice-chip choice-chip-selected"
+                      : "choice-chip"
+                  }
+                  onClick={() => onChooseSchool(school)}
+                >
+                  {school.name}
+                </button>
+              ))
+            ) : (
+              <p className="inline-hint">인기 학교를 아직 불러오지 못했습니다.</p>
+            )}
+          </div>
+        )}
 
         <div className="form-grid compact-grid">
           <label className="field">

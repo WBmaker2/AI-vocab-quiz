@@ -17,6 +17,7 @@ import {
   getTeacherProfile,
   isFirebaseConfigured,
   listPublishedUnitsForTeacher,
+  listPopularSchools,
   listTeacherSetCatalog,
   listTeachersForSchool,
   saveTeacherVocabularySet,
@@ -24,31 +25,11 @@ import {
   signInWithGoogle,
   signOutCurrentUser,
   subscribeToAuthChanges,
+  syncTeacherVocabularyMetadata,
   upsertTeacherProfile,
 } from "../lib/firebase.js";
 import { mergeVocabularyItems } from "../utils/vocabularyMerge.js";
 import { parseVocabularyWorkbook } from "../utils/xlsxImport.js";
-
-const SAMPLE_ITEMS = [
-  {
-    word: "apple",
-    meaning: "사과",
-    imageHint: "red fruit",
-    exampleSentence: "I eat an apple.",
-  },
-  {
-    word: "banana",
-    meaning: "바나나",
-    imageHint: "yellow fruit",
-    exampleSentence: "Monkeys like bananas.",
-  },
-  {
-    word: "school",
-    meaning: "학교",
-    imageHint: "classroom building",
-    exampleSentence: "We go to school every day.",
-  },
-];
 
 const EMPTY_ONBOARDING = {
   schoolName: "",
@@ -93,6 +74,11 @@ export function useVocabularyLibrary() {
   const [teacherError, setTeacherError] = useState("");
 
   const [studentSchoolQuery, setStudentSchoolQuery] = useState("");
+  const [studentSchoolBrowseMode, setStudentSchoolBrowseMode] =
+    useState("featured");
+  const [studentFeaturedSchools, setStudentFeaturedSchools] = useState([]);
+  const [studentFeaturedSchoolsLoading, setStudentFeaturedSchoolsLoading] =
+    useState(isFirebaseConfigured);
   const [studentSchoolResults, setStudentSchoolResults] = useState([]);
   const [studentSchoolSearchLoading, setStudentSchoolSearchLoading] =
     useState(false);
@@ -113,6 +99,39 @@ export function useVocabularyLibrary() {
   const [studentError, setStudentError] = useState("");
 
   const userId = session?.user?.uid ?? "";
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadFeaturedSchools() {
+      setStudentFeaturedSchoolsLoading(true);
+
+      try {
+        const schools = await listPopularSchools(5);
+        if (!cancelled) {
+          setStudentFeaturedSchools(schools);
+        }
+      } catch {
+        if (!cancelled) {
+          setStudentFeaturedSchools([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setStudentFeaturedSchoolsLoading(false);
+        }
+      }
+    }
+
+    loadFeaturedSchools();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -225,7 +244,7 @@ export function useVocabularyLibrary() {
   }, [teacherProfile?.userId]);
 
   useEffect(() => {
-    if (!isFirebaseConfigured || teacherProfile || !userId) {
+    if (!isFirebaseConfigured || !userId) {
       return;
     }
 
@@ -267,7 +286,7 @@ export function useVocabularyLibrary() {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [onboarding.schoolName, teacherProfile, userId]);
+  }, [onboarding.schoolName, userId]);
 
   async function refreshTeacherCatalog(nextUserId = userId) {
     if (!isFirebaseConfigured || !nextUserId) {
@@ -333,10 +352,23 @@ export function useVocabularyLibrary() {
     }));
   }
 
+  function resetOnboardingToProfile() {
+    setOnboarding((current) => ({
+      ...current,
+      schoolName: teacherProfile?.schoolName ?? "",
+      teacherName: teacherProfile?.teacherName ?? "",
+      suggestions: [],
+      searching: false,
+      saving: false,
+      status: "",
+      error: "",
+    }));
+  }
+
   async function saveTeacherOnboarding() {
     if (!isFirebaseConfigured) {
       setTeacherProfileError("Firebase 설정이 필요합니다.");
-      return;
+      return false;
     }
 
     const schoolName = onboarding.schoolName.trim();
@@ -347,7 +379,7 @@ export function useVocabularyLibrary() {
         ...current,
         error: "학교 이름과 선생님 이름을 모두 입력하세요.",
       }));
-      return;
+      return false;
     }
 
     setOnboarding((current) => ({
@@ -365,6 +397,13 @@ export function useVocabularyLibrary() {
         schoolId: school.id,
         schoolName: school.name,
       });
+      await syncTeacherVocabularyMetadata({
+        userId,
+        teacherName,
+        schoolId: school.id,
+        schoolName: school.name,
+      });
+      await refreshStudentFeaturedSchools();
 
       const profile = await getTeacherProfile(userId);
       setTeacherProfile(profile);
@@ -375,6 +414,7 @@ export function useVocabularyLibrary() {
         status: "선생님 정보를 저장했습니다.",
         error: "",
       }));
+      return true;
     } catch (error) {
       setOnboarding((current) => ({
         ...current,
@@ -384,6 +424,7 @@ export function useVocabularyLibrary() {
           "선생님 정보를 저장하지 못했습니다.",
         ),
       }));
+      return false;
     }
   }
 
@@ -677,19 +718,34 @@ export function useVocabularyLibrary() {
     setTeacherDirty(true);
   }
 
-  function loadSampleItems() {
-    setTeacherItems(normalizeDraftVocabulary(SAMPLE_ITEMS));
-    setTeacherDirty(true);
-    setTeacherStatus(
-      "예시 단어를 불러왔습니다. 저장하면 내 단어 세트에 반영됩니다.",
-    );
-    setTeacherError("");
-  }
-
   function updateStudentSchoolQuery(value) {
     setStudentSchoolQuery(value);
+    if (!value.trim()) {
+      setStudentSchoolBrowseMode("featured");
+      setStudentSchoolResults([]);
+      setSelectedSchool(null);
+      setSelectedTeacher(null);
+      setStudentTeachers([]);
+      setStudentUnits([]);
+      setStudentItems([]);
+      resetStudentMatchingState();
+      setStudentSelection(DEFAULT_STUDENT_SELECTION);
+    }
     setStudentStatus("");
     setStudentError("");
+  }
+
+  async function refreshStudentFeaturedSchools() {
+    if (!isFirebaseConfigured) {
+      return;
+    }
+
+    try {
+      const schools = await listPopularSchools(5);
+      setStudentFeaturedSchools(schools);
+    } catch {
+      setStudentFeaturedSchools([]);
+    }
   }
 
   function resetStudentMatchingState() {
@@ -714,13 +770,25 @@ export function useVocabularyLibrary() {
 
     const query = studentSchoolQuery.trim();
     if (!query) {
-      setStudentError("학교 이름을 먼저 입력하세요.");
+      setStudentSchoolBrowseMode("featured");
+      setStudentSchoolResults([]);
+      setSelectedSchool(null);
+      setSelectedTeacher(null);
+      setStudentTeachers([]);
+      setStudentUnits([]);
+      setStudentItems([]);
+      resetStudentMatchingState();
+      setStudentSelection(DEFAULT_STUDENT_SELECTION);
+      setStudentStatus("");
+      setStudentError("");
+      await refreshStudentFeaturedSchools();
       return;
     }
 
     setStudentSchoolSearchLoading(true);
     setStudentError("");
     setStudentStatus("");
+    setStudentSchoolBrowseMode("search");
 
     try {
       const schools = await searchSchoolsByName(query);
@@ -765,8 +833,19 @@ export function useVocabularyLibrary() {
     try {
       const teachers = await listTeachersForSchool(school.id);
       setStudentTeachers(teachers);
+
+      if (teachers.length === 1) {
+        const onlyTeacher = teachers[0];
+        setSelectedTeacher(onlyTeacher);
+        await refreshStudentUnits(onlyTeacher, DEFAULT_STUDENT_SELECTION.grade);
+        setStudentStatus(
+          `${school.name}의 선생님 ${onlyTeacher.teacherName}님을 자동 선택했습니다.`,
+        );
+        return;
+      }
+
       setStudentStatus(
-        teachers.length > 0
+        teachers.length > 1
           ? `${school.name}의 선생님 목록을 불러왔습니다.`
           : "이 학교에 등록된 선생님 정보가 아직 없습니다.",
       );
@@ -1007,6 +1086,7 @@ export function useVocabularyLibrary() {
         ...onboarding,
         updateField: updateOnboardingField,
         chooseSchool: chooseOnboardingSchool,
+        resetToProfile: resetOnboardingToProfile,
         save: saveTeacherOnboarding,
       },
       selection: teacherSelection,
@@ -1031,10 +1111,12 @@ export function useVocabularyLibrary() {
       updateItem: updateTeacherItem,
       removeItem: removeTeacherItem,
       clearItems: clearTeacherItems,
-      loadSampleItems,
     },
     student: {
       schoolQuery: studentSchoolQuery,
+      schoolBrowseMode: studentSchoolBrowseMode,
+      featuredSchools: studentFeaturedSchools,
+      featuredSchoolsLoading: studentFeaturedSchoolsLoading,
       schoolResults: studentSchoolResults,
       schoolSearchLoading: studentSchoolSearchLoading,
       selectedSchool,

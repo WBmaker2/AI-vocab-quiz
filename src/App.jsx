@@ -2,10 +2,11 @@ import { useState } from "react";
 import { BrowserSupportNotice } from "./components/BrowserSupportNotice.jsx";
 import { ListeningQuiz } from "./components/ListeningQuiz.jsx";
 import { ModeSelector } from "./components/ModeSelector.jsx";
+import { UpdateHistoryModal } from "./components/UpdateHistoryModal.jsx";
 import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
 import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
 import { WordMatchingGame } from "./components/WordMatchingGame.jsx";
-import { APP_VERSION } from "./constants/app.js";
+import { APP_UPDATES, APP_VERSION } from "./constants/app.js";
 import { GRADE_OPTIONS } from "./constants/vocabulary.js";
 import { useCelebrationAudio } from "./hooks/useCelebrationAudio.js";
 import { isSpeechRecognitionSupported } from "./hooks/useSpeechRecognition.js";
@@ -23,6 +24,7 @@ const APP_VIEWS = {
 function App() {
   const [view, setView] = useState(APP_VIEWS.HOME);
   const [homeMatchingPanelOpen, setHomeMatchingPanelOpen] = useState(false);
+  const [updateHistoryOpen, setUpdateHistoryOpen] = useState(false);
   const speechSynthesis = useSpeechSynthesis();
   const celebrationAudio = useCelebrationAudio();
   const library = useVocabularyLibrary();
@@ -54,6 +56,13 @@ function App() {
           <div className="hero-meta">
             <p className="eyebrow">Elementary English Classroom App</p>
             <span className="app-version">{APP_VERSION}</span>
+            <button
+              type="button"
+              className="update-info-button"
+              onClick={() => setUpdateHistoryOpen(true)}
+            >
+              update info
+            </button>
           </div>
           <h1 className="hero-title">AI 원어민 단어 퀴즈 쇼</h1>
           <p className="hero-subtitle">
@@ -75,6 +84,9 @@ function App() {
             remoteConfigured={library.remoteConfigured}
             auth={library.auth}
             schoolQuery={library.student.schoolQuery}
+            schoolBrowseMode={library.student.schoolBrowseMode}
+            featuredSchools={library.student.featuredSchools}
+            featuredSchoolsLoading={library.student.featuredSchoolsLoading}
             schoolResults={library.student.schoolResults}
             schoolSearchLoading={library.student.schoolSearchLoading}
             selectedSchool={library.student.selectedSchool}
@@ -140,7 +152,6 @@ function App() {
             onUpdateItem={library.teacher.updateItem}
             onRemoveItem={library.teacher.removeItem}
             onClearItems={library.teacher.clearItems}
-            onLoadSample={library.teacher.loadSampleItems}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
           />
         ) : null}
@@ -176,6 +187,13 @@ function App() {
           />
         ) : null}
       </main>
+
+      <UpdateHistoryModal
+        open={updateHistoryOpen}
+        currentVersion={APP_VERSION}
+        updates={APP_UPDATES}
+        onClose={() => setUpdateHistoryOpen(false)}
+      />
     </div>
   );
 }

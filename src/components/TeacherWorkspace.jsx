@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { VocabularyForm } from "./VocabularyForm.jsx";
 import { VocabularyList } from "./VocabularyList.jsx";
 
@@ -41,12 +41,13 @@ export function TeacherWorkspace({
   onUpdateItem,
   onRemoveItem,
   onClearItems,
-  onLoadSample,
   onBack,
 }) {
   const [formValues, setFormValues] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState("");
   const [importFile, setImportFile] = useState(null);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const importInputRef = useRef(null);
 
   const isEditing = Boolean(editingId);
   const hasItems = items.length > 0;
@@ -62,6 +63,13 @@ export function TeacherWorkspace({
   function resetForm() {
     setFormValues(EMPTY_FORM);
     setEditingId("");
+  }
+
+  function clearImportSelection() {
+    setImportFile(null);
+    if (importInputRef.current) {
+      importInputRef.current.value = "";
+    }
   }
 
   function handleSubmit(event) {
@@ -123,7 +131,7 @@ export function TeacherWorkspace({
       selection.grade,
       shouldForcePublic ? true : null,
     );
-    setImportFile(null);
+    clearImportSelection();
   }
 
   function handleResetGradeSets() {
@@ -136,7 +144,24 @@ export function TeacherWorkspace({
     }
 
     onResetGradeSets();
-    setImportFile(null);
+    clearImportSelection();
+  }
+
+  function handleOpenProfileEditor() {
+    onboarding.resetToProfile();
+    setProfileEditorOpen(true);
+  }
+
+  function handleCancelProfileEditor() {
+    onboarding.resetToProfile();
+    setProfileEditorOpen(false);
+  }
+
+  async function handleSaveProfileEditor() {
+    const saved = await onboarding.save();
+    if (saved) {
+      setProfileEditorOpen(false);
+    }
   }
 
   if (!remoteConfigured) {
@@ -343,6 +368,100 @@ export function TeacherWorkspace({
         </div>
       </div>
 
+      <article className="form-card">
+        <div className="section-heading compact">
+          <div>
+            <p className="mode-label">Teacher Profile</p>
+            <h3>학교와 선생님 정보</h3>
+          </div>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={
+              profileEditorOpen ? handleCancelProfileEditor : handleOpenProfileEditor
+            }
+          >
+            {profileEditorOpen ? "수정 닫기" : "정보 수정"}
+          </button>
+        </div>
+
+        <p className="inline-hint">
+          현재 등록 정보: {profile.schoolName} · {profile.teacherName}
+        </p>
+
+        {profileEditorOpen ? (
+          <>
+            <div className="form-grid compact-grid">
+              <label className="field field-wide">
+                <span>학교 이름</span>
+                <input
+                  value={onboarding.schoolName}
+                  onChange={(event) =>
+                    onboarding.updateField("schoolName", event.target.value)
+                  }
+                  placeholder="예: 서울초등학교"
+                />
+              </label>
+
+              <label className="field field-wide">
+                <span>선생님 이름</span>
+                <input
+                  value={onboarding.teacherName}
+                  onChange={(event) =>
+                    onboarding.updateField("teacherName", event.target.value)
+                  }
+                  placeholder="예: 김영어"
+                />
+              </label>
+            </div>
+
+            {onboarding.searching ? (
+              <p className="inline-hint">비슷한 학교를 찾는 중입니다...</p>
+            ) : null}
+
+            {onboarding.suggestions.length > 0 ? (
+              <div className="selection-chip-group" aria-label="학교 추천">
+                {onboarding.suggestions.map((school) => (
+                  <button
+                    key={school.id}
+                    className="choice-chip"
+                    onClick={() => onboarding.chooseSchool(school)}
+                  >
+                    {school.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {onboarding.error ? (
+              <p className="inline-hint warning-hint">{onboarding.error}</p>
+            ) : null}
+            {onboarding.status ? (
+              <p className="inline-hint success-hint">{onboarding.status}</p>
+            ) : null}
+
+            <div className="toolbar-row">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={handleSaveProfileEditor}
+                disabled={onboarding.saving}
+              >
+                {onboarding.saving ? "저장 중..." : "정보 저장"}
+              </button>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={handleCancelProfileEditor}
+                disabled={onboarding.saving}
+              >
+                취소
+              </button>
+            </div>
+          </>
+        ) : null}
+      </article>
+
       <div className="teacher-summary">
         <div className="summary-card">
           <span>등록 단어</span>
@@ -450,9 +569,6 @@ export function TeacherWorkspace({
           >
             현재 단원 삭제
           </button>
-          <button className="ghost-button" type="button" onClick={onLoadSample}>
-            예시 단어 불러오기
-          </button>
         </div>
       </article>
 
@@ -491,6 +607,7 @@ export function TeacherWorkspace({
           <label className="field field-wide">
             <span>업로드 파일</span>
             <input
+              ref={importInputRef}
               type="file"
               accept=".xlsx,.xls"
               onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}

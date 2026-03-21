@@ -1,5 +1,5 @@
 import http from "node:http";
-import { readFileSync, existsSync, createReadStream } from "node:fs";
+import { existsSync, createReadStream } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { chromium } from "playwright";
 
@@ -42,6 +42,10 @@ async function assertVisible(page, text) {
   await page.getByText(text, { exact: false }).waitFor({ state: "visible" });
 }
 
+async function assertHidden(page, text) {
+  await page.getByText(text, { exact: false }).waitFor({ state: "hidden" });
+}
+
 async function run() {
   const browser = await chromium.launch();
   const server = await startStaticServer();
@@ -49,27 +53,40 @@ async function run() {
   const page = await context.newPage();
 
   try {
-    await page.goto(`http://127.0.0.1:${port}`);
+    await page.goto(`http://127.0.0.1:${port}`, { waitUntil: "networkidle" });
+
+    const updateInfoButton = page.getByRole("button", { name: "update info" });
+    const currentVersion = (await page.locator(".app-version").textContent())?.trim();
+
+    if (!currentVersion) {
+      throw new Error("Missing current app version in the header.");
+    }
 
     await assertVisible(page, "AI 원어민 단어 퀴즈 쇼");
-    await page.getByRole("button", { name: "단어 세트 관리" }).click();
-    await page.getByRole("button", { name: "예시 단어 불러오기" }).click();
-    await assertVisible(page, "apple");
-    await page.getByRole("button", { name: "말하기 연습 시작" }).click();
-    await assertVisible(page, "보고 말하기");
+    await updateInfoButton.waitFor({ state: "visible" });
 
-    await page.getByRole("button", { name: "마이크로 말하기" }).click();
-    await assertVisible(page, "인식 상태:");
+    await updateInfoButton.click();
+    await assertVisible(page, "업데이트 기록");
+    const dialog = page.getByRole("dialog");
+    await dialog.getByText(currentVersion, { exact: true }).waitFor({ state: "visible" });
+    await dialog.getByText("v1.0.0", { exact: true }).waitFor({ state: "visible" });
 
-    await page.getByRole("button", { name: "홈으로" }).click();
-    await page.getByRole("button", { name: "말하기 연습 열기" }).click();
-    await assertVisible(page, "보고 말하기");
+    await page.keyboard.press("Escape");
+    await assertHidden(page, "업데이트 기록");
+    await updateInfoButton.waitFor({ state: "visible" });
 
-    await page.getByRole("button", { name: "홈으로" }).click();
-    await page.getByRole("button", { name: "듣기 퀴즈 열기" }).click();
-    await assertVisible(page, "듣고 뜻 고르기");
+    await updateInfoButton.click();
+    await assertVisible(page, "업데이트 기록");
+    await page.locator(".update-modal-backdrop").click({ position: { x: 8, y: 8 } });
+    await assertHidden(page, "업데이트 기록");
+    await updateInfoButton.waitFor({ state: "visible" });
 
-    await page.getByRole("button", { name: "다음 문제" }).isDisabled();
+    await updateInfoButton.click();
+    await assertVisible(page, "업데이트 기록");
+    await page.getByRole("button", { name: "닫기" }).click();
+    await assertHidden(page, "업데이트 기록");
+    await updateInfoButton.waitFor({ state: "visible" });
+
     console.log("playwright smoke: ok");
   } finally {
     await browser.close();
