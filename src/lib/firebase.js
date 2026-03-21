@@ -17,7 +17,6 @@ import {
   limit,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
   startAt,
@@ -199,7 +198,6 @@ export async function findOrCreateSchool(name) {
   await setDoc(schoolRef, {
     name: cleanName,
     normalizedName,
-    teacherCount: 0,
     createdAt: serverTimestamp(),
   });
 
@@ -230,7 +228,6 @@ export async function getTeacherProfile(userId) {
 export async function upsertTeacherProfile({ userId, teacherName, schoolId, schoolName }) {
   const { db: firestore } = ensureFirebase();
   const teacherRef = doc(firestore, "teachers", userId);
-  const nextSchoolId = String(schoolId ?? "").trim();
 
   const payload = {
     teacherName: teacherName.trim(),
@@ -240,54 +237,16 @@ export async function upsertTeacherProfile({ userId, teacherName, schoolId, scho
     updatedAt: serverTimestamp(),
   };
 
-  await runTransaction(firestore, async (transaction) => {
-    const teacherSnapshot = await transaction.get(teacherRef);
-    const previousSchoolId = teacherSnapshot.exists()
-      ? String(teacherSnapshot.data().schoolId ?? "").trim()
-      : "";
+  const teacherSnapshot = await getDoc(teacherRef);
 
-    if (teacherSnapshot.exists()) {
-      transaction.update(teacherRef, payload);
-    } else {
-      transaction.set(teacherRef, {
-        ...payload,
-        createdAt: serverTimestamp(),
-      });
-    }
+  if (teacherSnapshot.exists()) {
+    await updateDoc(teacherRef, payload);
+    return;
+  }
 
-    async function adjustSchoolCountInTransaction(targetSchoolId, delta) {
-      const cleanSchoolId = String(targetSchoolId ?? "").trim();
-      if (!cleanSchoolId || !delta) {
-        return;
-      }
-
-      const schoolRef = doc(firestore, "schools", cleanSchoolId);
-      const schoolSnapshot = await transaction.get(schoolRef);
-
-      if (!schoolSnapshot.exists()) {
-        return;
-      }
-
-      const currentCount = Number(schoolSnapshot.data().teacherCount ?? 0);
-      const nextCount = Math.max(0, currentCount + delta);
-
-      transaction.set(
-        schoolRef,
-        {
-          teacherCount: nextCount,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-    }
-
-    if (previousSchoolId && previousSchoolId !== nextSchoolId) {
-      await adjustSchoolCountInTransaction(previousSchoolId, -1);
-    }
-
-    if (!teacherSnapshot.exists() || previousSchoolId !== nextSchoolId) {
-      await adjustSchoolCountInTransaction(nextSchoolId, 1);
-    }
+  await setDoc(teacherRef, {
+    ...payload,
+    createdAt: serverTimestamp(),
   });
 }
 

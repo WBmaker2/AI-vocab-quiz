@@ -217,6 +217,9 @@ button {
 }
 
 .update-entry-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   flex: 0 0 auto;
   color: #5d6f81;
   font-size: 0.82rem;
@@ -1037,6 +1040,7 @@ button:disabled {
   }
 
   .update-entry-meta {
+    gap: 0.35rem;
     white-space: normal;
   }
 }
