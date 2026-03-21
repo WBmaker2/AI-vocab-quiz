@@ -164,6 +164,38 @@ export function TeacherWorkspace({
     }
   }
 
+  async function handleDeleteTeacherProfile() {
+    const confirmed = window.confirm(
+      "선생님 정보와 현재 선생님의 모든 단어 세트를 정말 삭제할까요?\n삭제 후에는 다시 등록해야 하며 되돌릴 수 없습니다.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const deleted = await onboarding.deleteTeacher();
+    if (deleted) {
+      setProfileEditorOpen(false);
+      resetForm();
+    }
+  }
+
+  async function handleDeleteSchoolProfile() {
+    const confirmed = window.confirm(
+      "학교 정보와 현재 선생님의 모든 단어 세트를 정말 삭제할까요?\n삭제 후에는 학교 이름을 다시 등록해야 하며 되돌릴 수 없습니다.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const deleted = await onboarding.deleteSchool();
+    if (deleted) {
+      setProfileEditorOpen(false);
+      resetForm();
+    }
+  }
+
   if (!remoteConfigured) {
     return (
       <section className="workspace-panel">
@@ -456,6 +488,25 @@ export function TeacherWorkspace({
                 disabled={onboarding.saving}
               >
                 취소
+              </button>
+            </div>
+
+            <div className="toolbar-row">
+              <button
+                className="ghost-button danger-button"
+                type="button"
+                onClick={handleDeleteTeacherProfile}
+                disabled={onboarding.saving}
+              >
+                선생님 정보 삭제
+              </button>
+              <button
+                className="ghost-button danger-button"
+                type="button"
+                onClick={handleDeleteSchoolProfile}
+                disabled={onboarding.saving}
+              >
+                학교 정보 삭제
               </button>
             </div>
           </>

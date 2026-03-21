@@ -275,6 +275,24 @@ export async function syncTeacherVocabularyMetadata({
   );
 }
 
+export async function deleteTeacherAccountData(userId) {
+  const { db: firestore } = ensureFirebase();
+  const cleanUserId = String(userId ?? "").trim();
+
+  if (!cleanUserId) {
+    throw new Error("Teacher user id is required.");
+  }
+
+  const setsQuery = query(
+    collection(firestore, "vocabularySets"),
+    where("ownerUid", "==", cleanUserId),
+  );
+  const snapshot = await getDocs(setsQuery);
+
+  await Promise.all(snapshot.docs.map((item) => deleteDoc(item.ref)));
+  await deleteDoc(doc(firestore, "teachers", cleanUserId));
+}
+
 export async function listTeacherSetCatalog(userId) {
   const { db: firestore } = ensureFirebase();
   const catalogQuery = query(

@@ -38,7 +38,7 @@ service cloud.firestore {
         && request.resource.data.schoolId is string
         && request.resource.data.schoolName is string
         && request.resource.data.isActive is bool;
-      allow delete: if false;
+      allow delete: if isTeacherOwner(teacherId);
     }
 
     match /vocabularySets/{setId} {

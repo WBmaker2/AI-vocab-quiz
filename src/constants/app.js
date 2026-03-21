@@ -40,6 +40,13 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.2.17",
+    date: "2026-03-21",
+    summary: [
+      "선생님 프로필 수정 화면에 삭제 버튼과 확인 경고를 추가했습니다.",
+    ],
+  },
+  {
     version: "v1.2.16",
     date: "2026-03-21",
     summary: [

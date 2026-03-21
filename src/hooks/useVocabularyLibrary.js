@@ -8,6 +8,7 @@ import {
   normalizeDraftVocabulary,
 } from "../constants/vocabulary.js";
 import {
+  deleteTeacherAccountData,
   deleteTeacherVocabularySetsForGrade,
   deleteTeacherVocabularySet,
   fetchPublishedVocabularySet,
@@ -422,6 +423,62 @@ export function useVocabularyLibrary() {
         error: normalizeErrorMessage(
           error,
           "선생님 정보를 저장하지 못했습니다.",
+        ),
+      }));
+      return false;
+    }
+  }
+
+  async function deleteTeacherProfile(mode = "teacher") {
+    if (!isFirebaseConfigured || !userId || !teacherProfile) {
+      setTeacherError("삭제할 선생님 정보가 없습니다.");
+      return false;
+    }
+
+    setOnboarding((current) => ({
+      ...current,
+      saving: true,
+      error: "",
+      status: "",
+    }));
+    setTeacherStatus("");
+    setTeacherError("");
+
+    const preservedTeacherName =
+      mode === "school" ? teacherProfile.teacherName : "";
+
+    try {
+      await deleteTeacherAccountData(userId);
+
+      setTeacherCatalog([]);
+      setTeacherItems([]);
+      setTeacherPublished(false);
+      setTeacherDirty(false);
+      setTeacherSelection(DEFAULT_TEACHER_SELECTION);
+      setTeacherProfile(null);
+      setOnboarding((current) => ({
+        ...current,
+        schoolName: "",
+        teacherName: preservedTeacherName,
+        suggestions: [],
+        searching: false,
+        saving: false,
+        status:
+          mode === "school"
+            ? "학교 정보를 삭제했습니다. 학교 이름을 다시 등록하세요."
+            : "선생님 정보를 삭제했습니다. 다시 등록할 수 있습니다.",
+        error: "",
+      }));
+
+      await refreshStudentFeaturedSchools();
+      return true;
+    } catch (error) {
+      setOnboarding((current) => ({
+        ...current,
+        saving: false,
+        error: normalizeErrorMessage(
+          error,
+          "선생님 정보를 삭제하지 못했습니다.",
         ),
       }));
       return false;
@@ -1088,6 +1145,8 @@ export function useVocabularyLibrary() {
         chooseSchool: chooseOnboardingSchool,
         resetToProfile: resetOnboardingToProfile,
         save: saveTeacherOnboarding,
+        deleteTeacher: () => deleteTeacherProfile("teacher"),
+        deleteSchool: () => deleteTeacherProfile("school"),
       },
       selection: teacherSelection,
       items: teacherItems,
