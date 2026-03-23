@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.3.1",
+    date: "2026-03-23",
+    summary: [
+      "엑셀 일괄 등록 카드에서도 같은 학년 출판사를 바로 선택할 수 있게 했습니다.",
+      "출판사 카드 검색에 우리 학교 결과도 함께 표시해 비교와 점검이 쉬워졌습니다.",
+    ],
+  },
+  {
     version: "v1.3.0",
     date: "2026-03-23",
     summary: [

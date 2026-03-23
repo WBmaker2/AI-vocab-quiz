@@ -467,7 +467,6 @@ export async function listPublishedUnitsForTeacher(userId, grade) {
 export async function searchPublishedPublisherSources({
   grade,
   publisher,
-  excludedSchoolId = "",
 }) {
   const { db: firestore } = ensureFirebase();
   const setsQuery = query(
@@ -478,9 +477,7 @@ export async function searchPublishedPublisherSources({
   );
   const snapshot = await getDocs(setsQuery);
 
-  return snapshot.docs
-    .map((item) => item.data())
-    .filter((entry) => String(entry.schoolId ?? "").trim() !== String(excludedSchoolId ?? "").trim());
+  return snapshot.docs.map((item) => item.data());
 }
 
 export async function fetchPublishedPublisherSourceUnits({

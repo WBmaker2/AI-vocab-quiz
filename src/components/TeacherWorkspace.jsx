@@ -34,7 +34,6 @@ export function TeacherWorkspace({
   dirty,
   items,
   speech,
-  copyPublisher,
   copySources,
   selectedCopySourceId,
   copyStatus,
@@ -47,7 +46,6 @@ export function TeacherWorkspace({
   onDeleteSet,
   onResetGradeSets,
   onImportWorkbook,
-  onCopyPublisherChange,
   onSearchCopySources,
   onSelectCopySource,
   onCopySource,
@@ -575,6 +573,20 @@ export function TeacherWorkspace({
         </p>
         <div className="form-grid compact-grid">
           <label className="field field-wide">
+            <span>출판사</span>
+            <select
+              value={publisher}
+              onChange={(event) => onPublisherChange(event.target.value)}
+            >
+              <option value="">출판사 선택</option>
+              {publisherOptions.map((publisherOption) => (
+                <option key={publisherOption} value={publisherOption}>
+                  {publisherOption}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field field-wide">
             <span>업로드 파일</span>
             <input
               ref={importInputRef}
@@ -598,21 +610,21 @@ export function TeacherWorkspace({
         </div>
         <p className="inline-hint">
           현재 선택한 {selection.grade}학년을 기준으로, 같은 출판사의 공개
-          단어카드를 다른 학교에서 찾아 우리 학교 카드로 병합 복사할 수
-          있습니다.
+          단어카드를 검색해 우리 학교 카드와 비교하고 필요하면 우리 학교
+          카드로 병합 복사할 수 있습니다.
         </p>
 
         <div className="form-grid compact-grid">
           <label className="field">
             <span>검색 출판사</span>
             <select
-              value={copyPublisher}
-              onChange={(event) => onCopyPublisherChange(event.target.value)}
+              value={publisher}
+              onChange={(event) => onPublisherChange(event.target.value)}
             >
               <option value="">출판사 선택</option>
-              {publisherOptions.map((publisher) => (
-                <option key={publisher} value={publisher}>
-                  {publisher}
+              {publisherOptions.map((publisherOption) => (
+                <option key={publisherOption} value={publisherOption}>
+                  {publisherOption}
                 </option>
               ))}
             </select>
@@ -629,7 +641,7 @@ export function TeacherWorkspace({
             type="button"
             className="secondary-button"
             onClick={onSearchCopySources}
-            disabled={copyLoading || !copyPublisher}
+            disabled={copyLoading || !publisher}
           >
             {copyLoading ? "검색 중..." : "출판사 카드 검색"}
           </button>
@@ -660,6 +672,9 @@ export function TeacherWorkspace({
                 <strong>
                   {source.schoolName} · {source.teacherName}
                 </strong>
+                {source.isCurrentSchool ? (
+                  <span className="copy-source-badge">우리 학교</span>
+                ) : null}
                 <span>{source.publisher}</span>
                 <span>
                   {source.grade}학년 · {source.units.join(", ")}단원

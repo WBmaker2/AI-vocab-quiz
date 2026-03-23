@@ -80,7 +80,6 @@ export function useVocabularyLibrary() {
   const [teacherImporting, setTeacherImporting] = useState(false);
   const [teacherStatus, setTeacherStatus] = useState("");
   const [teacherError, setTeacherError] = useState("");
-  const [teacherCopyPublisher, setTeacherCopyPublisher] = useState("");
   const [teacherCopySources, setTeacherCopySources] = useState([]);
   const [teacherSelectedCopySourceId, setTeacherSelectedCopySourceId] =
     useState("");
@@ -205,7 +204,6 @@ export function useVocabularyLibrary() {
       setTeacherDirty(false);
       setTeacherStatus("");
       setTeacherError("");
-      setTeacherCopyPublisher("");
       setTeacherCopySources([]);
       setTeacherSelectedCopySourceId("");
       setTeacherCopyStatus("");
@@ -524,10 +522,6 @@ export function useVocabularyLibrary() {
     setTeacherPublisherDraft(value);
     setTeacherStatus("");
     setTeacherError("");
-  }
-
-  function updateTeacherCopyPublisher(value) {
-    setTeacherCopyPublisher(value);
     setTeacherCopyStatus("");
     setTeacherCopyError("");
     setTeacherCopySources([]);
@@ -601,7 +595,6 @@ export function useVocabularyLibrary() {
       setTeacherItems(result.items);
       setTeacherPublished(result.published);
       setTeacherPublisherDraft(resolvedPublisher);
-      setTeacherCopyPublisher((current) => current || resolvedPublisher);
       setTeacherDirty(false);
       setTeacherStatus(
         result.items.length > 0
@@ -652,7 +645,6 @@ export function useVocabularyLibrary() {
         sourceType: "manual",
       });
       setTeacherPublisherDraft(cleanPublisher);
-      setTeacherCopyPublisher((current) => current || cleanPublisher);
       setTeacherDirty(false);
       setTeacherStatus(
         teacherPublished
@@ -822,7 +814,6 @@ export function useVocabularyLibrary() {
         setTeacherDirty(false);
       }
       setTeacherPublisherDraft(cleanPublisher);
-      setTeacherCopyPublisher((current) => current || cleanPublisher);
 
       setTeacherStatus(
         publishImportedSets
@@ -894,7 +885,7 @@ export function useVocabularyLibrary() {
       return;
     }
 
-    const cleanPublisher = teacherCopyPublisher.trim();
+    const cleanPublisher = teacherPublisherDraft.trim();
     if (!cleanPublisher) {
       setTeacherCopyError("검색할 출판사를 먼저 선택하세요.");
       return;
@@ -910,13 +901,15 @@ export function useVocabularyLibrary() {
       const entries = await searchPublishedPublisherSources({
         grade: teacherSelection.grade,
         publisher: cleanPublisher,
-        excludedSchoolId: teacherProfile.schoolId,
       });
-      const grouped = groupPublisherSourcesByTeacherAndSchool(entries);
+      const grouped = groupPublisherSourcesByTeacherAndSchool(
+        entries,
+        teacherProfile.schoolId,
+      );
       setTeacherCopySources(grouped);
       setTeacherCopyStatus(
         grouped.length > 0
-          ? `${teacherSelection.grade}학년 ${cleanPublisher} 카드 ${grouped.length}건을 찾았습니다.`
+          ? `${teacherSelection.grade}학년 ${cleanPublisher} 공개 카드 ${grouped.length}건을 찾았습니다. 우리 학교 카드도 함께 표시됩니다.`
           : "해당 출판사의 공개 카드가 없습니다.",
       );
     } catch (error) {
@@ -1024,7 +1017,7 @@ export function useVocabularyLibrary() {
         setTeacherDirty(false);
       }
 
-      setTeacherPublisherDraft(publisherToPersist);
+    setTeacherPublisherDraft(publisherToPersist);
       setTeacherCopyStatus(
         summarizePublisherCopyResult({
           savedUnitCount,
@@ -1397,7 +1390,6 @@ export function useVocabularyLibrary() {
       teacherProfile?.gradePublishers?.[teacherSelection.grade] ?? "";
 
     setTeacherPublisherDraft(profilePublisher);
-    setTeacherCopyPublisher(profilePublisher);
     setTeacherCopySources([]);
     setTeacherSelectedCopySourceId("");
     setTeacherCopyStatus("");
@@ -1444,7 +1436,6 @@ export function useVocabularyLibrary() {
       importing: teacherImporting,
       status: teacherStatus,
       error: teacherError,
-      copyPublisher: teacherCopyPublisher,
       copySources: teacherCopySources,
       selectedCopySourceId: teacherSelectedCopySourceId,
       copyLoading: teacherCopyLoading,
@@ -1461,7 +1452,6 @@ export function useVocabularyLibrary() {
       deleteSet: removeTeacherSet,
       resetGradeSets: resetTeacherGradeSets,
       importWorkbook,
-      updateCopyPublisher: updateTeacherCopyPublisher,
       searchCopySources: searchTeacherCopySources,
       selectCopySource: selectTeacherCopySource,
       copySource: copyTeacherPublisherSource,

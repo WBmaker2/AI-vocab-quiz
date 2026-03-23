@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 교사 관리 화면에 학년별 출판사 선택과 다른 학교 공개 카드 복사 기능을 추가하고, 기존 엑셀/단원 저장 흐름을 유지한 채 Firestore 데이터 구조를 안전하게 확장한다.
+**Goal:** 교사 관리 화면에 학년별 출판사 선택을 엑셀/단원 카드에서 함께 쓰도록 정리하고, 다른 학교 공개 카드 복사 기능을 현재 학교 결과까지 포함하는 방식으로 확장한다.
 
-**Architecture:** 출판사는 `teachers.gradePublishers`와 `vocabularySets.publisher`에 함께 저장한다. 교사 UI는 현재 학년 기준 draft 출판사를 유지하고, `현재 단원 저장`, `엑셀 일괄 저장`, `다른 학교 카드 복사` 액션 시에만 확정 저장한다. 복사 기능은 현재 학년 + 출판사 + 공개 세트만 조회해 `word + meaning` 기준 병합 복사한다.
+**Architecture:** 출판사는 `teachers.gradePublishers`와 `vocabularySets.publisher`에 함께 저장한다. 교사 UI는 현재 학년 기준 draft 출판사를 유지하고, `엑셀 일괄 저장`, `현재 단원 저장`, `다른 학교 카드 복사` UI가 모두 같은 값을 공유한다. 복사 기능은 현재 학년 + 출판사 + 공개 세트를 조회해 `word + meaning` 기준 병합 복사하며, 우리 학교 결과도 함께 보여준다.
 
 **Tech Stack:** React, Firebase Auth, Firestore, existing Vite app, existing merge utility
 
@@ -26,7 +26,7 @@
   - 저장/불러오기/엑셀 업로드/복사 흐름에 출판사 연결
 - `src/components/TeacherWorkspace.jsx`
   - 섹션 위치 변경
-  - 출판사 선택 UI 추가
+  - 엑셀 카드와 단원 카드의 출판사 선택 UI 동기화
   - 다른 학교 단어카드 복사 UI 추가
 - `firestore.rules`
   - `gradePublishers`, `publisher` 필드 허용
@@ -125,6 +125,7 @@ git commit -m "feat: add publisher fields to teacher data"
 - 현재 학년 editor용 `teacherPublisherDraft`
 - teacher profile의 `gradePublishers`
 - 학년 변경 시 draft 재계산
+- 같은 draft 값을 `엑셀 카드`, `단원 카드`, `복사 검색`이 함께 쓰도록 연결
 
 - [ ] **Step 2: load precedence 구현**
 
@@ -142,6 +143,7 @@ git commit -m "feat: add publisher fields to teacher data"
 - `saveTeacherSet`
 - `importWorkbook`
 - 이후 추가될 `copyPublisherSourceToTeacher`
+- 드롭다운 변경만으로는 Firestore에 저장하지 않음
 
 - [ ] **Step 4: 오류/상태 메시지 추가**
 
@@ -185,17 +187,18 @@ git commit -m "feat: manage grade-level publisher state"
 
 - [ ] **Step 2: 출판사 드롭다운 UI 추가**
 
-`학년과 단원 선택` 섹션에 아래 필드를 추가한다.
+`엑셀로 단원 일괄 등록`과 `학년과 단원 선택` 섹션 모두에 아래 필드를 추가한다.
 
 - 라벨: `출판사`
 - UI: `<select>` with `PUBLISHER_OPTIONS`
 - 현재 학년 draft 값 바인딩
+- 위/아래 드롭다운은 같은 state를 공유해서 어느 쪽에서 바꿔도 즉시 동기화
 
 - [ ] **Step 3: 현재 단원 저장 섹션 안내 문구 정리**
 
 아래 문구를 반영한다.
 
-- 현재 학년의 출판사를 먼저 고르도록 안내
+- 엑셀 등록 전에도 현재 학년의 출판사를 먼저 고르도록 안내
 - 저장 시 현재 학년 메타데이터와 단원에 함께 저장됨을 설명
 
 - [ ] **Step 4: 스타일 조정**
@@ -210,6 +213,7 @@ git commit -m "feat: manage grade-level publisher state"
 - 현재 학년 출판사 값
 - 출판사 변경 핸들러
 - 복사 섹션 상태와 검색/복사 콜백
+- 엑셀 카드 출판사 표시용 동일 props
 
 Run: `npm run build`  
 Expected: PASS
@@ -237,7 +241,6 @@ git commit -m "feat: add teacher publisher selector"
 searchPublishedPublisherSources({
   grade,
   publisher,
-  excludedSchoolId,
 });
 ```
 
@@ -246,14 +249,15 @@ searchPublishedPublisherSources({
 - `published == true`
 - `grade == current grade`
 - `publisher == selected publisher`
-- 조회 후 `excludedSchoolId`와 같은 학교는 클라이언트에서 제외
+- 현재 학교와 다른 학교를 모두 포함
+- 결과에는 현재 학교 여부를 판별할 수 있는 값도 함께 유지
 
 - [ ] **Step 2: 결과 그룹화 유틸 추가**
 
 `src/utils/publisherCopy.js`에:
 
 - `groupPublisherSourcesByTeacherAndSchool(entries)`
-- source 카드에 `schoolName`, `teacherName`, `units`, `itemCount` 계산
+- source 카드에 `schoolName`, `teacherName`, `units`, `itemCount`, `isCurrentSchool` 계산
 
 - [ ] **Step 3: source 상세 로드 함수 추가**
 
@@ -305,7 +309,7 @@ git commit -m "feat: add publisher source search helpers"
 현재 선택 학년과 선택 출판사 기준으로만 검색한다.
 
 - 출판사 미선택이면 검색 차단
-- 현재 학교는 제외
+- 현재 학교도 포함
 - 결과 없으면 안내 메시지 노출
 
 - [ ] **Step 3: 복사 액션 추가**
@@ -329,6 +333,7 @@ git commit -m "feat: add publisher source search helpers"
 - 검색 결과 카드 리스트
 - 결과 선택 후 `우리 학교 카드로 복사` 버튼
 - 이 카드가 `엑셀로 단원 일괄 등록`과 `학년과 단원 선택` 사이에 놓이도록 `TeacherWorkspace` 구조를 완성
+- 현재 학교 결과에는 `우리 학교` 배지를 붙여 시각적으로 구분
 
 - [ ] **Step 5: 완료 메시지와 실패 메시지 추가**
 
@@ -352,6 +357,7 @@ Expected: PASS
 
 - 검색 결과 카드에서 source 선택이 되는지
 - `우리 학교 카드로 복사` 버튼이 선택 전에는 비활성화되는지
+- 우리 학교 결과와 다른 학교 결과가 함께 보이는지
 - 복사 후 현재 교사의 같은 학년 단원들이 실제로 늘어나는지
 - 중복만 있는 경우에도 실패하지 않고 요약 메시지가 나오는지
 
@@ -415,7 +421,8 @@ git commit -m "chore: update release notes for publisher copy feature"
 ## Notes For Implementers
 
 - 복사 기능은 공개 세트만 읽어야 한다. 비공개 세트를 검색 대상으로 포함하지 않는다.
-- `다른 학교` 조건을 UI 문구와 실제 검색 결과 모두에서 지켜야 한다.
+- 이제 검색 결과에는 우리 학교도 포함한다. 다만 `우리 학교` 배지로만 구분하고, 필터로 제외하지 않는다.
 - 출판사 draft는 즉시 저장하지 않는다. 저장 시점은 `현재 단원 저장`, `엑셀 일괄 저장`, `복사 실행`뿐이다.
+- 엑셀 카드와 단원 카드의 출판사 드롭다운은 항상 같은 학년별 state를 공유해야 한다.
 - legacy fallback에서 `gradePublishers[grade]`와 세트 `publisher`가 다르면 학년 메타데이터를 우선한다.
 - 기존 데이터에 `publisher`가 없는 경우 일반 로드는 허용되지만, 출판사 기반 복사 검색에는 잡히지 않는다.

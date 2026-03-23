@@ -151,14 +151,12 @@ function App() {
             onDeleteSet={library.teacher.deleteSet}
             onResetGradeSets={library.teacher.resetGradeSets}
             onImportWorkbook={library.teacher.importWorkbook}
-            copyPublisher={library.teacher.copyPublisher}
             copySources={library.teacher.copySources}
             selectedCopySourceId={library.teacher.selectedCopySourceId}
             copyLoading={library.teacher.copyLoading}
             copying={library.teacher.copying}
             copyStatus={library.teacher.copyStatus}
             copyError={library.teacher.copyError}
-            onCopyPublisherChange={library.teacher.updateCopyPublisher}
             onSearchCopySources={library.teacher.searchCopySources}
             onSelectCopySource={library.teacher.selectCopySource}
             onCopySource={library.teacher.copySource}

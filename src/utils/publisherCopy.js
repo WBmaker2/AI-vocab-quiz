@@ -7,7 +7,7 @@ function sortUnits(units) {
   );
 }
 
-export function groupPublisherSourcesByTeacherAndSchool(entries) {
+export function groupPublisherSourcesByTeacherAndSchool(entries, currentSchoolId = "") {
   const grouped = new Map();
 
   entries.forEach((entry) => {
@@ -33,6 +33,8 @@ export function groupPublisherSourcesByTeacherAndSchool(entries) {
       teacherName,
       grade,
       publisher,
+      isCurrentSchool:
+        schoolId === String(currentSchoolId ?? "").trim(),
       units: [],
       itemCount: 0,
     };
