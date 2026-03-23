@@ -5,6 +5,19 @@ export const GRADE_OPTIONS = [
   { value: "6", label: "6학년" },
 ];
 
+export const PUBLISHER_OPTIONS = [
+  "동아출판 윤여범",
+  "미래엔 강정진",
+  "아이스크림미디어 박유미",
+  "와이비엠 김혜리",
+  "와이비엠 최희경",
+  "천재교과서 함순애",
+  "천재교과서 김태은",
+  "천재교육 이동환",
+  "동아출판 정은숙",
+  "비상교육 우길주",
+];
+
 export const DEFAULT_TEACHER_SELECTION = {
   grade: "3",
   unit: "1",

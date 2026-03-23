@@ -510,6 +510,48 @@ button:disabled {
   color: #1f63a8;
 }
 
+.copy-grade-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 3.1rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(23, 50, 77, 0.12);
+  border-radius: 16px;
+  background: rgba(240, 248, 255, 0.92);
+  color: #1f63a8;
+  font-weight: 800;
+}
+
+.copy-source-list {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.copy-source-card {
+  display: grid;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(23, 50, 77, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #17324d;
+  text-align: left;
+  box-shadow: 0 10px 24px rgba(23, 50, 77, 0.05);
+}
+
+.copy-source-card span {
+  color: #5d6f81;
+  font-weight: 700;
+}
+
+.copy-source-card-selected {
+  border-color: rgba(29, 143, 255, 0.28);
+  background: linear-gradient(135deg, rgba(238, 246, 255, 0.98), rgba(255, 255, 255, 0.95));
+  box-shadow: 0 14px 28px rgba(29, 143, 255, 0.12);
+}
+
 .warning-hint {
   color: #9f4f00;
 }

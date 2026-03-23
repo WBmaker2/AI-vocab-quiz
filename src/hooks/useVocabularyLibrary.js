@@ -11,6 +11,7 @@ import {
   deleteTeacherAccountData,
   deleteTeacherVocabularySetsForGrade,
   deleteTeacherVocabularySet,
+  fetchPublishedPublisherSourceUnits,
   fetchPublishedVocabularySet,
   fetchTeacherVocabularySet,
   findOrCreateSchool,
@@ -22,6 +23,7 @@ import {
   listTeacherSetCatalog,
   listTeachersForSchool,
   saveTeacherVocabularySet,
+  searchPublishedPublisherSources,
   searchSchoolsByName,
   signInWithGoogle,
   signOutCurrentUser,
@@ -29,6 +31,10 @@ import {
   syncTeacherVocabularyMetadata,
   upsertTeacherProfile,
 } from "../lib/firebase.js";
+import {
+  groupPublisherSourcesByTeacherAndSchool,
+  summarizePublisherCopyResult,
+} from "../utils/publisherCopy.js";
 import { mergeVocabularyItems } from "../utils/vocabularyMerge.js";
 import { parseVocabularyWorkbook } from "../utils/xlsxImport.js";
 
@@ -65,6 +71,7 @@ export function useVocabularyLibrary() {
   const [teacherSelection, setTeacherSelection] = useState(
     DEFAULT_TEACHER_SELECTION,
   );
+  const [teacherPublisherDraft, setTeacherPublisherDraft] = useState("");
   const [teacherItems, setTeacherItems] = useState([]);
   const [teacherPublished, setTeacherPublished] = useState(false);
   const [teacherDirty, setTeacherDirty] = useState(false);
@@ -73,6 +80,14 @@ export function useVocabularyLibrary() {
   const [teacherImporting, setTeacherImporting] = useState(false);
   const [teacherStatus, setTeacherStatus] = useState("");
   const [teacherError, setTeacherError] = useState("");
+  const [teacherCopyPublisher, setTeacherCopyPublisher] = useState("");
+  const [teacherCopySources, setTeacherCopySources] = useState([]);
+  const [teacherSelectedCopySourceId, setTeacherSelectedCopySourceId] =
+    useState("");
+  const [teacherCopyLoading, setTeacherCopyLoading] = useState(false);
+  const [teacherCopying, setTeacherCopying] = useState(false);
+  const [teacherCopyStatus, setTeacherCopyStatus] = useState("");
+  const [teacherCopyError, setTeacherCopyError] = useState("");
 
   const [studentSchoolQuery, setStudentSchoolQuery] = useState("");
   const [studentSchoolBrowseMode, setStudentSchoolBrowseMode] =
@@ -186,9 +201,15 @@ export function useVocabularyLibrary() {
       setTeacherCatalog([]);
       setTeacherItems([]);
       setTeacherPublished(false);
+      setTeacherPublisherDraft("");
       setTeacherDirty(false);
       setTeacherStatus("");
       setTeacherError("");
+      setTeacherCopyPublisher("");
+      setTeacherCopySources([]);
+      setTeacherSelectedCopySourceId("");
+      setTeacherCopyStatus("");
+      setTeacherCopyError("");
       setOnboarding(EMPTY_ONBOARDING);
       return;
     }
@@ -397,6 +418,7 @@ export function useVocabularyLibrary() {
         teacherName,
         schoolId: school.id,
         schoolName: school.name,
+        gradePublishers: teacherProfile?.gradePublishers ?? {},
       });
       await syncTeacherVocabularyMetadata({
         userId,
@@ -492,12 +514,67 @@ export function useVocabularyLibrary() {
     }));
     setTeacherStatus("");
     setTeacherError("");
+    setTeacherCopyStatus("");
+    setTeacherCopyError("");
+    setTeacherCopySources([]);
+    setTeacherSelectedCopySourceId("");
+  }
+
+  function updateTeacherPublisher(value) {
+    setTeacherPublisherDraft(value);
+    setTeacherStatus("");
+    setTeacherError("");
+  }
+
+  function updateTeacherCopyPublisher(value) {
+    setTeacherCopyPublisher(value);
+    setTeacherCopyStatus("");
+    setTeacherCopyError("");
+    setTeacherCopySources([]);
+    setTeacherSelectedCopySourceId("");
   }
 
   function setTeacherPublishState(nextPublished) {
     setTeacherPublished(nextPublished);
     setTeacherDirty(true);
     setTeacherStatus("");
+  }
+
+  async function persistTeacherGradePublisher(grade, publisher) {
+    if (!teacherProfile || !userId) {
+      throw new Error("선생님 정보가 필요합니다.");
+    }
+
+    const cleanGrade = String(grade ?? "").trim();
+    const cleanPublisher = String(publisher ?? "").trim();
+
+    if (!cleanGrade || !cleanPublisher) {
+      throw new Error("출판사를 먼저 선택하세요.");
+    }
+
+    const nextGradePublishers = {
+      ...(teacherProfile.gradePublishers ?? {}),
+      [cleanGrade]: cleanPublisher,
+    };
+
+    await upsertTeacherProfile({
+      userId,
+      teacherName: teacherProfile.teacherName,
+      schoolId: teacherProfile.schoolId,
+      schoolName: teacherProfile.schoolName,
+      gradePublishers: nextGradePublishers,
+    });
+
+    setTeacherProfile((current) =>
+      current
+        ? {
+            ...current,
+            gradePublishers: nextGradePublishers,
+          }
+        : current,
+    );
+
+    return nextGradePublishers;
   }
 
   async function loadTeacherSet() {
@@ -517,8 +594,14 @@ export function useVocabularyLibrary() {
 
     try {
       const result = await fetchTeacherVocabularySet(userId, teacherSelection);
+      const profilePublisher =
+        teacherProfile?.gradePublishers?.[teacherSelection.grade] ?? "";
+      const resolvedPublisher =
+        profilePublisher || String(result.publisher ?? "").trim();
       setTeacherItems(result.items);
       setTeacherPublished(result.published);
+      setTeacherPublisherDraft(resolvedPublisher);
+      setTeacherCopyPublisher((current) => current || resolvedPublisher);
       setTeacherDirty(false);
       setTeacherStatus(
         result.items.length > 0
@@ -545,11 +628,18 @@ export function useVocabularyLibrary() {
       return;
     }
 
+    const cleanPublisher = teacherPublisherDraft.trim();
+    if (!cleanPublisher) {
+      setTeacherError("출판사를 먼저 선택하세요.");
+      return;
+    }
+
     setTeacherSaving(true);
     setTeacherStatus("");
     setTeacherError("");
 
     try {
+      await persistTeacherGradePublisher(teacherSelection.grade, cleanPublisher);
       await saveTeacherVocabularySet({
         userId,
         schoolId: teacherProfile.schoolId,
@@ -558,8 +648,11 @@ export function useVocabularyLibrary() {
         selection: teacherSelection,
         items: teacherItems,
         published: teacherPublished,
+        publisher: cleanPublisher,
         sourceType: "manual",
       });
+      setTeacherPublisherDraft(cleanPublisher);
+      setTeacherCopyPublisher((current) => current || cleanPublisher);
       setTeacherDirty(false);
       setTeacherStatus(
         teacherPublished
@@ -666,11 +759,18 @@ export function useVocabularyLibrary() {
       return;
     }
 
+    const cleanPublisher = teacherPublisherDraft.trim();
+    if (!cleanPublisher) {
+      setTeacherError("출판사를 먼저 선택하세요.");
+      return;
+    }
+
     setTeacherImporting(true);
     setTeacherStatus("");
     setTeacherError("");
 
     try {
+      await persistTeacherGradePublisher(grade, cleanPublisher);
       const groupedSets = await parseVocabularyWorkbook(file);
       const publishImportedSets =
         publishOverride === null ? teacherPublished : publishOverride;
@@ -698,6 +798,7 @@ export function useVocabularyLibrary() {
           selection: { grade, unit: groupedSet.unit },
           items: normalizedItems,
           published: publishImportedSets,
+          publisher: cleanPublisher,
           sourceType: "xlsx",
         });
 
@@ -720,6 +821,8 @@ export function useVocabularyLibrary() {
         setTeacherPublished(publishImportedSets);
         setTeacherDirty(false);
       }
+      setTeacherPublisherDraft(cleanPublisher);
+      setTeacherCopyPublisher((current) => current || cleanPublisher);
 
       setTeacherStatus(
         publishImportedSets
@@ -773,6 +876,177 @@ export function useVocabularyLibrary() {
   function clearTeacherItems() {
     setTeacherItems([]);
     setTeacherDirty(true);
+  }
+
+  async function searchTeacherCopySources() {
+    if (!isFirebaseConfigured || !teacherProfile) {
+      setTeacherCopyError("선생님 정보 등록 후 사용할 수 있습니다.");
+      return;
+    }
+
+    if (teacherDirty) {
+      setTeacherCopyError("저장되지 않은 변경사항이 있습니다. 먼저 저장하세요.");
+      return;
+    }
+
+    if (!teacherSelection.grade) {
+      setTeacherCopyError("학년을 먼저 선택하세요.");
+      return;
+    }
+
+    const cleanPublisher = teacherCopyPublisher.trim();
+    if (!cleanPublisher) {
+      setTeacherCopyError("검색할 출판사를 먼저 선택하세요.");
+      return;
+    }
+
+    setTeacherCopyLoading(true);
+    setTeacherCopyError("");
+    setTeacherCopyStatus("");
+    setTeacherCopySources([]);
+    setTeacherSelectedCopySourceId("");
+
+    try {
+      const entries = await searchPublishedPublisherSources({
+        grade: teacherSelection.grade,
+        publisher: cleanPublisher,
+        excludedSchoolId: teacherProfile.schoolId,
+      });
+      const grouped = groupPublisherSourcesByTeacherAndSchool(entries);
+      setTeacherCopySources(grouped);
+      setTeacherCopyStatus(
+        grouped.length > 0
+          ? `${teacherSelection.grade}학년 ${cleanPublisher} 카드 ${grouped.length}건을 찾았습니다.`
+          : "해당 출판사의 공개 카드가 없습니다.",
+      );
+    } catch (error) {
+      setTeacherCopyError(
+        normalizeErrorMessage(
+          error,
+          "다른 학교 단어카드를 검색하지 못했습니다.",
+        ),
+      );
+    } finally {
+      setTeacherCopyLoading(false);
+    }
+  }
+
+  function selectTeacherCopySource(sourceId) {
+    setTeacherSelectedCopySourceId(sourceId);
+    setTeacherCopyStatus("");
+    setTeacherCopyError("");
+  }
+
+  async function copyTeacherPublisherSource() {
+    if (!isFirebaseConfigured || !teacherProfile || !userId) {
+      setTeacherCopyError("선생님 정보 등록 후 사용할 수 있습니다.");
+      return false;
+    }
+
+    if (teacherDirty) {
+      setTeacherCopyError("저장되지 않은 변경사항이 있습니다. 먼저 저장하세요.");
+      return false;
+    }
+
+    const selectedSource = teacherCopySources.find(
+      (source) => source.id === teacherSelectedCopySourceId,
+    );
+
+    if (!selectedSource) {
+      setTeacherCopyError("복사할 단어카드를 먼저 선택하세요.");
+      return false;
+    }
+
+    const publisherToPersist =
+      teacherPublisherDraft.trim() || selectedSource.publisher;
+
+    if (!publisherToPersist) {
+      setTeacherCopyError("출판사를 먼저 선택하세요.");
+      return false;
+    }
+
+    setTeacherCopying(true);
+    setTeacherCopyError("");
+    setTeacherCopyStatus("");
+
+    try {
+      await persistTeacherGradePublisher(
+        teacherSelection.grade,
+        publisherToPersist,
+      );
+
+      const sourceSets = await fetchPublishedPublisherSourceUnits({
+        ownerUid: selectedSource.ownerUid,
+        grade: teacherSelection.grade,
+        publisher: selectedSource.publisher,
+      });
+
+      let savedUnitCount = 0;
+      let addedVocabularyCount = 0;
+      let duplicateVocabularyCount = 0;
+      const savedItemsByUnit = new Map();
+
+      for (const sourceSet of sourceSets) {
+        const existingSet = await fetchTeacherVocabularySet(userId, {
+          grade: teacherSelection.grade,
+          unit: sourceSet.unit,
+        });
+
+        const { mergedItems, addedCount, duplicateCount } = mergeVocabularyItems(
+          existingSet.items ?? [],
+          sourceSet.items ?? [],
+        );
+        const normalizedItems = normalizeDraftVocabulary(mergedItems);
+
+        await saveTeacherVocabularySet({
+          userId,
+          schoolId: teacherProfile.schoolId,
+          schoolName: teacherProfile.schoolName,
+          teacherName: teacherProfile.teacherName,
+          selection: { grade: teacherSelection.grade, unit: sourceSet.unit },
+          items: normalizedItems,
+          published: teacherPublished,
+          publisher: publisherToPersist,
+          sourceType: "copied",
+        });
+
+        savedUnitCount += 1;
+        addedVocabularyCount += addedCount;
+        duplicateVocabularyCount += duplicateCount;
+        savedItemsByUnit.set(sourceSet.unit, normalizedItems);
+      }
+
+      await refreshTeacherCatalog();
+
+      if (savedItemsByUnit.has(teacherSelection.unit)) {
+        setTeacherItems(savedItemsByUnit.get(teacherSelection.unit) ?? []);
+        setTeacherPublished(teacherPublished);
+        setTeacherDirty(false);
+      }
+
+      setTeacherPublisherDraft(publisherToPersist);
+      setTeacherCopyStatus(
+        summarizePublisherCopyResult({
+          savedUnitCount,
+          addedVocabularyCount,
+          duplicateVocabularyCount,
+        }),
+      );
+      setTeacherStatus(
+        `${selectedSource.schoolName} ${selectedSource.teacherName} 선생님의 공개 카드를 복사했습니다.`,
+      );
+      return true;
+    } catch (error) {
+      setTeacherCopyError(
+        normalizeErrorMessage(
+          error,
+          "다른 학교 단어카드를 복사하지 못했습니다.",
+        ),
+      );
+      return false;
+    } finally {
+      setTeacherCopying(false);
+    }
   }
 
   function updateStudentSchoolQuery(value) {
@@ -1118,6 +1392,18 @@ export function useVocabularyLibrary() {
     [teacherCatalog, teacherSelection.grade, teacherSelection.unit],
   );
 
+  useEffect(() => {
+    const profilePublisher =
+      teacherProfile?.gradePublishers?.[teacherSelection.grade] ?? "";
+
+    setTeacherPublisherDraft(profilePublisher);
+    setTeacherCopyPublisher(profilePublisher);
+    setTeacherCopySources([]);
+    setTeacherSelectedCopySourceId("");
+    setTeacherCopyStatus("");
+    setTeacherCopyError("");
+  }, [teacherProfile?.gradePublishers, teacherSelection.grade]);
+
   const requiresTeacherOnboarding =
     Boolean(userId) &&
     !teacherProfileLoading &&
@@ -1150,6 +1436,7 @@ export function useVocabularyLibrary() {
       },
       selection: teacherSelection,
       items: teacherItems,
+      publisher: teacherPublisherDraft,
       published: teacherPublished,
       dirty: teacherDirty,
       loading: teacherLoading || teacherCatalogLoading,
@@ -1157,15 +1444,27 @@ export function useVocabularyLibrary() {
       importing: teacherImporting,
       status: teacherStatus,
       error: teacherError,
+      copyPublisher: teacherCopyPublisher,
+      copySources: teacherCopySources,
+      selectedCopySourceId: teacherSelectedCopySourceId,
+      copyLoading: teacherCopyLoading,
+      copying: teacherCopying,
+      copyStatus: teacherCopyStatus,
+      copyError: teacherCopyError,
       units: teacherUnits,
       catalogEntry: currentTeacherCatalogEntry,
       updateSelection: updateTeacherSelection,
+      updatePublisher: updateTeacherPublisher,
       setPublished: setTeacherPublishState,
       loadSet: loadTeacherSet,
       saveSet: saveTeacherSet,
       deleteSet: removeTeacherSet,
       resetGradeSets: resetTeacherGradeSets,
       importWorkbook,
+      updateCopyPublisher: updateTeacherCopyPublisher,
+      searchCopySources: searchTeacherCopySources,
+      selectCopySource: selectTeacherCopySource,
+      copySource: copyTeacherPublisherSource,
       addItem: addTeacherItem,
       updateItem: updateTeacherItem,
       removeItem: removeTeacherItem,

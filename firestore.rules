@@ -31,13 +31,18 @@ service cloud.firestore {
           'schoolId',
           'schoolName',
           'isActive',
+          'gradePublishers',
           'createdAt',
           'updatedAt'
         ])
         && request.resource.data.teacherName is string
         && request.resource.data.schoolId is string
         && request.resource.data.schoolName is string
-        && request.resource.data.isActive is bool;
+        && request.resource.data.isActive is bool
+        && (
+          !request.resource.data.keys().hasAny(['gradePublishers'])
+          || request.resource.data.gradePublishers is map
+        );
       allow delete: if isTeacherOwner(teacherId);
     }
 
@@ -55,6 +60,7 @@ service cloud.firestore {
           'teacherName',
           'grade',
           'unit',
+          'publisher',
           'published',
           'sourceType',
           'items',
@@ -66,6 +72,10 @@ service cloud.firestore {
         && request.resource.data.teacherName is string
         && request.resource.data.grade is string
         && request.resource.data.unit is string
+        && (
+          !request.resource.data.keys().hasAny(['publisher'])
+          || request.resource.data.publisher is string
+        )
         && request.resource.data.published is bool
         && request.resource.data.sourceType is string
         && request.resource.data.items is list;

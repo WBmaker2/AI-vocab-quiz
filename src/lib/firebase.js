@@ -222,10 +222,17 @@ export async function getTeacherProfile(userId) {
     teacherName: data.teacherName,
     schoolId: data.schoolId,
     schoolName: data.schoolName,
+    gradePublishers: data.gradePublishers ?? {},
   };
 }
 
-export async function upsertTeacherProfile({ userId, teacherName, schoolId, schoolName }) {
+export async function upsertTeacherProfile({
+  userId,
+  teacherName,
+  schoolId,
+  schoolName,
+  gradePublishers = {},
+}) {
   const { db: firestore } = ensureFirebase();
   const teacherRef = doc(firestore, "teachers", userId);
 
@@ -234,6 +241,7 @@ export async function upsertTeacherProfile({ userId, teacherName, schoolId, scho
     schoolId,
     schoolName: schoolName.trim(),
     isActive: true,
+    gradePublishers,
     updatedAt: serverTimestamp(),
   };
 
@@ -337,13 +345,14 @@ export async function fetchTeacherVocabularySet(userId, selection) {
   const snapshot = await getDocs(setQuery);
 
   if (snapshot.empty) {
-    return { items: [], published: false };
+    return { items: [], published: false, publisher: "" };
   }
 
   const data = snapshot.docs[0].data();
   return {
     items: data.items ?? [],
     published: Boolean(data.published),
+    publisher: String(data.publisher ?? "").trim(),
   };
 }
 
@@ -355,6 +364,7 @@ export async function saveTeacherVocabularySet({
   selection,
   items,
   published,
+  publisher,
   sourceType = "manual",
 }) {
   const { db: firestore } = ensureFirebase();
@@ -373,6 +383,7 @@ export async function saveTeacherVocabularySet({
     teacherName,
     grade,
     unit,
+    publisher: String(publisher ?? "").trim(),
     published: Boolean(published),
     sourceType,
     items,
@@ -447,6 +458,50 @@ export async function listPublishedUnitsForTeacher(userId, grade) {
     .map((entry) => entry.unit)
     .sort((left, right) =>
       String(left).localeCompare(String(right), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+}
+
+export async function searchPublishedPublisherSources({
+  grade,
+  publisher,
+  excludedSchoolId = "",
+}) {
+  const { db: firestore } = ensureFirebase();
+  const setsQuery = query(
+    collection(firestore, "vocabularySets"),
+    where("published", "==", true),
+    where("grade", "==", String(grade ?? "").trim()),
+    where("publisher", "==", String(publisher ?? "").trim()),
+  );
+  const snapshot = await getDocs(setsQuery);
+
+  return snapshot.docs
+    .map((item) => item.data())
+    .filter((entry) => String(entry.schoolId ?? "").trim() !== String(excludedSchoolId ?? "").trim());
+}
+
+export async function fetchPublishedPublisherSourceUnits({
+  ownerUid,
+  grade,
+  publisher,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const setsQuery = query(
+    collection(firestore, "vocabularySets"),
+    where("ownerUid", "==", String(ownerUid ?? "").trim()),
+    where("published", "==", true),
+    where("grade", "==", String(grade ?? "").trim()),
+    where("publisher", "==", String(publisher ?? "").trim()),
+  );
+  const snapshot = await getDocs(setsQuery);
+
+  return snapshot.docs
+    .map((item) => item.data())
+    .sort((left, right) =>
+      String(left.unit ?? "").localeCompare(String(right.unit ?? ""), undefined, {
         numeric: true,
         sensitivity: "base",
       }),

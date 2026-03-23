@@ -7,7 +7,7 @@ import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
 import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
 import { WordMatchingGame } from "./components/WordMatchingGame.jsx";
 import { APP_UPDATES, APP_VERSION } from "./constants/app.js";
-import { GRADE_OPTIONS } from "./constants/vocabulary.js";
+import { GRADE_OPTIONS, PUBLISHER_OPTIONS } from "./constants/vocabulary.js";
 import { useCelebrationAudio } from "./hooks/useCelebrationAudio.js";
 import { isSpeechRecognitionSupported } from "./hooks/useSpeechRecognition.js";
 import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis.js";
@@ -122,6 +122,7 @@ function App() {
         {view === APP_VIEWS.TEACHER ? (
           <TeacherWorkspace
             gradeOptions={GRADE_OPTIONS}
+            publisherOptions={PUBLISHER_OPTIONS}
             remoteConfigured={library.remoteConfigured}
             auth={library.auth}
             profile={library.teacher.profile}
@@ -130,6 +131,7 @@ function App() {
             requiresOnboarding={library.teacher.requiresOnboarding}
             onboarding={library.teacher.onboarding}
             selection={library.teacher.selection}
+            publisher={library.teacher.publisher}
             units={library.teacher.units}
             published={library.teacher.published}
             catalogEntry={library.teacher.catalogEntry}
@@ -142,12 +144,24 @@ function App() {
             items={library.teacher.items}
             speech={speechSynthesis}
             onSelectionChange={library.teacher.updateSelection}
+            onPublisherChange={library.teacher.updatePublisher}
             onPublishedChange={library.teacher.setPublished}
             onLoadSet={library.teacher.loadSet}
             onSaveSet={library.teacher.saveSet}
             onDeleteSet={library.teacher.deleteSet}
             onResetGradeSets={library.teacher.resetGradeSets}
             onImportWorkbook={library.teacher.importWorkbook}
+            copyPublisher={library.teacher.copyPublisher}
+            copySources={library.teacher.copySources}
+            selectedCopySourceId={library.teacher.selectedCopySourceId}
+            copyLoading={library.teacher.copyLoading}
+            copying={library.teacher.copying}
+            copyStatus={library.teacher.copyStatus}
+            copyError={library.teacher.copyError}
+            onCopyPublisherChange={library.teacher.updateCopyPublisher}
+            onSearchCopySources={library.teacher.searchCopySources}
+            onSelectCopySource={library.teacher.selectCopySource}
+            onCopySource={library.teacher.copySource}
             onAddItem={library.teacher.addItem}
             onUpdateItem={library.teacher.updateItem}
             onRemoveItem={library.teacher.removeItem}
