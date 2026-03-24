@@ -1084,6 +1084,75 @@ button:disabled {
   white-space: nowrap;
 }
 
+.teacher-leaderboard-card {
+  gap: 0.25rem;
+}
+
+.teacher-leaderboard-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.teacher-leaderboard-item {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(23, 50, 77, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.teacher-leaderboard-meta {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.teacher-leaderboard-meta strong {
+  color: #1f63a8;
+  font-size: 1rem;
+}
+
+.teacher-leaderboard-meta span {
+  color: #17324d;
+  font-size: 1.06rem;
+  font-weight: 800;
+}
+
+.teacher-leaderboard-meta small {
+  color: #5d6f81;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.teacher-leaderboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.teacher-leaderboard-edit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) auto auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.teacher-leaderboard-edit-row input {
+  min-height: 3rem;
+  border: 1px solid rgba(23, 50, 77, 0.14);
+  border-radius: 16px;
+  padding: 0.8rem 0.95rem;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.teacher-leaderboard-edit-row input:focus {
+  outline: 2px solid rgba(29, 143, 255, 0.22);
+  border-color: #1d8fff;
+}
+
 @keyframes matching-card-fade-out {
   0% {
     opacity: 1;
@@ -1247,6 +1316,19 @@ button:disabled {
   .matching-leaderboard-item {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .teacher-leaderboard-edit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .teacher-leaderboard-actions {
+    width: 100%;
+  }
+
+  .teacher-leaderboard-actions > button,
+  .teacher-leaderboard-edit-row > button {
+    width: 100%;
   }
 }
 

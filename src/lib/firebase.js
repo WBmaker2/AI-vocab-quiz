@@ -32,6 +32,7 @@ import {
   createMatchingLeaderboardScopeKey,
   normalizeStudentName,
   normalizeStudentNameKey,
+  pickBetterMatchingLeaderboardEntry,
 } from "../utils/leaderboard";
 
 function getEnvValue(name) {
@@ -127,6 +128,66 @@ function createMatchingLeaderboardPayload({
     score: toNonNegativeInteger(score, "score"),
     elapsedSeconds: toNonNegativeInteger(elapsedSeconds, "elapsedSeconds"),
     solvedPairs: toNonNegativeInteger(solvedPairs, "solvedPairs"),
+  };
+}
+
+function createMatchingLeaderboardEntryRef(
+  firestore,
+  { schoolId, grade, periodType, periodKey, studentName },
+) {
+  const scopeKey = createMatchingLeaderboardScopeKey({
+    schoolId,
+    grade,
+    periodType,
+    periodKey,
+  });
+  const studentKey = normalizeStudentNameKey(studentName);
+
+  return {
+    scopeKey,
+    studentKey,
+    ref: doc(
+      firestore,
+      "matchingLeaderboards",
+      scopeKey,
+      "entries",
+      studentKey,
+    ),
+  };
+}
+
+function createMatchingLeaderboardWritePayload({
+  source,
+  schoolId,
+  schoolName,
+  grade,
+  studentName,
+  periodType,
+  periodKey,
+}) {
+  const cleanStudentName = normalizeLeaderboardText(studentName);
+  const cleanSchoolName = normalizeLeaderboardText(
+    source.schoolName ?? schoolName,
+  );
+  const payload = createMatchingLeaderboardPayload({
+    schoolId,
+    schoolName: cleanSchoolName,
+    grade,
+    studentName: cleanStudentName,
+    periodType,
+    periodKey,
+    score: source.score,
+    elapsedSeconds: source.elapsedSeconds,
+    solvedPairs: source.solvedPairs,
+  });
+
+  return {
+    ...payload,
+    schoolName: cleanSchoolName,
+    studentName: cleanStudentName,
+    studentNameNormalized: normalizeStudentNameKey(cleanStudentName),
+    createdAt: source.createdAt ?? serverTimestamp(),
+    updatedAt: serverTimestamp(),
   };
 }
 
@@ -256,6 +317,171 @@ async function fetchMatchingLeaderboardPeriod({
     periodType,
     periodKey,
     entries,
+  };
+}
+
+export async function fetchTeacherMatchingLeaderboards({
+  schoolId,
+  grade,
+  now = new Date(),
+  limitCount = 20,
+}) {
+  return fetchMatchingLeaderboards({
+    schoolId,
+    grade,
+    now,
+    limitCount,
+  });
+}
+
+export async function renameTeacherMatchingLeaderboardStudent({
+  schoolId,
+  grade,
+  oldStudentName,
+  newStudentName,
+  now = new Date(),
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
+  const cleanGrade = normalizeLeaderboardScope(grade);
+  const cleanOldStudentName = normalizeStudentName(oldStudentName);
+  const cleanNewStudentName = normalizeStudentName(newStudentName);
+  const oldStudentKey = normalizeStudentNameKey(cleanOldStudentName);
+  const newStudentKey = normalizeStudentNameKey(cleanNewStudentName);
+
+  if (!cleanSchoolId) {
+    throw new Error("School id is required.");
+  }
+
+  if (!cleanGrade) {
+    throw new Error("Grade is required.");
+  }
+
+  if (!cleanOldStudentName) {
+    throw new Error("Existing student name is required.");
+  }
+
+  if (!cleanNewStudentName) {
+    throw new Error("New student name is required.");
+  }
+
+  if (oldStudentKey === newStudentKey) {
+    throw new Error("The new student name must be different from the current name.");
+  }
+
+  const periodKeys = createLeaderboardPeriodKeys(now);
+  const updatedPeriods = [];
+  const keptPeriods = [];
+  const skippedPeriods = [];
+  await runTransaction(firestore, async (transaction) => {
+    for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
+      const periodKey = periodKeys[type];
+      const oldEntry = createMatchingLeaderboardEntryRef(firestore, {
+        schoolId: cleanSchoolId,
+        grade: cleanGrade,
+        periodType: type,
+        periodKey,
+        studentName: cleanOldStudentName,
+      });
+      const newEntry = createMatchingLeaderboardEntryRef(firestore, {
+        schoolId: cleanSchoolId,
+        grade: cleanGrade,
+        periodType: type,
+        periodKey,
+        studentName: cleanNewStudentName,
+      });
+
+      const oldSnapshot = await transaction.get(oldEntry.ref);
+      if (!oldSnapshot.exists()) {
+        skippedPeriods.push(type);
+        continue;
+      }
+
+      const oldData = oldSnapshot.data();
+      const newSnapshot = await transaction.get(newEntry.ref);
+      const newData = newSnapshot.exists() ? newSnapshot.data() : null;
+      const winner = pickBetterMatchingLeaderboardEntry(newData, oldData);
+
+      if (newData && winner === newData) {
+        transaction.delete(oldEntry.ref);
+        keptPeriods.push(type);
+        continue;
+      }
+
+      const mergedPayload = createMatchingLeaderboardWritePayload({
+        source: winner ?? oldData,
+        schoolId: cleanSchoolId,
+        schoolName: oldData.schoolName ?? newData?.schoolName ?? "",
+        grade: cleanGrade,
+        studentName: cleanNewStudentName,
+        periodType: type,
+        periodKey,
+      });
+
+      transaction.set(newEntry.ref, mergedPayload);
+      transaction.delete(oldEntry.ref);
+      updatedPeriods.push(type);
+    }
+  });
+
+  return {
+    updatedPeriods,
+    keptPeriods,
+    skippedPeriods,
+  };
+}
+
+export async function deleteTeacherMatchingLeaderboardStudent({
+  schoolId,
+  grade,
+  studentName,
+  now = new Date(),
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
+  const cleanGrade = normalizeLeaderboardScope(grade);
+  const cleanStudentName = normalizeStudentName(studentName);
+
+  if (!cleanSchoolId) {
+    throw new Error("School id is required.");
+  }
+
+  if (!cleanGrade) {
+    throw new Error("Grade is required.");
+  }
+
+  if (!cleanStudentName) {
+    throw new Error("Student name is required.");
+  }
+
+  const periodKeys = createLeaderboardPeriodKeys(now);
+  const deletedPeriods = [];
+  const skippedPeriods = [];
+  await runTransaction(firestore, async (transaction) => {
+    for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
+      const periodKey = periodKeys[type];
+      const entry = createMatchingLeaderboardEntryRef(firestore, {
+        schoolId: cleanSchoolId,
+        grade: cleanGrade,
+        periodType: type,
+        periodKey,
+        studentName: cleanStudentName,
+      });
+
+      const snapshot = await transaction.get(entry.ref);
+      if (!snapshot.exists()) {
+        skippedPeriods.push(type);
+        continue;
+      }
+
+      transaction.delete(entry.ref);
+      deletedPeriods.push(type);
+    }
+  });
+
+  return {
+    deletedPeriods,
+    skippedPeriods,
   };
 }
 

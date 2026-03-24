@@ -26,8 +26,23 @@ service cloud.firestore {
       return scopeKey == schoolId + "__" + grade + "__" + periodType + "__" + periodKey;
     }
 
-    function isMatchingLeaderboardWrite() {
-      return request.resource.data.keys().hasOnly([
+    function teacherDoc(uid) {
+      return get(/databases/$(database)/documents/teachers/$(uid));
+    }
+
+    function teacherDocExists(uid) {
+      return exists(/databases/$(database)/documents/teachers/$(uid));
+    }
+
+    function isTeacherForSchool(schoolId) {
+      return isSignedIn()
+        && teacherDocExists(request.auth.uid)
+        && teacherDoc(request.auth.uid).data.isActive == true
+        && teacherDoc(request.auth.uid).data.schoolId == schoolId;
+    }
+
+    function isMatchingLeaderboardDocument(data) {
+      return data.keys().hasOnly([
           'scopeKey',
           'schoolId',
           'schoolName',
@@ -42,31 +57,54 @@ service cloud.firestore {
           'createdAt',
           'updatedAt'
         ])
-        && request.resource.data.scopeKey is string
-        && request.resource.data.scopeKey.size() > 0
-        && request.resource.data.schoolId is string
-        && request.resource.data.schoolId.size() > 0
-        && request.resource.data.schoolName is string
-        && request.resource.data.schoolName.size() > 0
-        && request.resource.data.grade is string
-        && request.resource.data.grade.size() > 0
-        && request.resource.data.studentName is string
-        && request.resource.data.studentName.size() > 0
-        && request.resource.data.studentNameNormalized is string
-        && request.resource.data.studentNameNormalized.size() > 0
-        && isMatchingLeaderboardPeriodType(request.resource.data.periodType)
-        && request.resource.data.periodKey is string
-        && request.resource.data.periodKey.size() > 0
+        && data.scopeKey is string
+        && data.scopeKey.size() > 0
+        && data.schoolId is string
+        && data.schoolId.size() > 0
+        && data.schoolName is string
+        && data.schoolName.size() > 0
+        && data.grade is string
+        && data.grade.size() > 0
+        && data.studentName is string
+        && data.studentName.size() > 0
+        && data.studentNameNormalized is string
+        && data.studentNameNormalized.size() > 0
+        && isMatchingLeaderboardPeriodType(data.periodType)
+        && data.periodKey is string
+        && data.periodKey.size() > 0
         && isMatchingLeaderboardScopeKey(
-          request.resource.data.scopeKey,
-          request.resource.data.schoolId,
-          request.resource.data.grade,
-          request.resource.data.periodType,
-          request.resource.data.periodKey
+          data.scopeKey,
+          data.schoolId,
+          data.grade,
+          data.periodType,
+          data.periodKey
         )
-        && isNonNegativeNumber(request.resource.data.score)
-        && isNonNegativeNumber(request.resource.data.elapsedSeconds)
-        && isNonNegativeNumber(request.resource.data.solvedPairs);
+        && isNonNegativeNumber(data.score)
+        && isNonNegativeNumber(data.elapsedSeconds)
+        && isNonNegativeNumber(data.solvedPairs);
+    }
+
+    function isMatchingLeaderboardStudentWrite() {
+      return isMatchingLeaderboardDocument(request.resource.data)
+        && request.resource.data.scopeKey == request.resource.data.schoolId + "__" + request.resource.data.grade + "__" + request.resource.data.periodType + "__" + request.resource.data.periodKey;
+    }
+
+    function isMatchingLeaderboardTeacherCreate(studentKey) {
+      return isMatchingLeaderboardDocument(request.resource.data)
+        && isTeacherForSchool(request.resource.data.schoolId)
+        && studentKey == request.resource.data.studentNameNormalized;
+    }
+
+    function isMatchingLeaderboardTeacherUpdate(studentKey) {
+      return isMatchingLeaderboardTeacherCreate(studentKey)
+        && resource.data.schoolId == request.resource.data.schoolId
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.periodType == request.resource.data.periodType
+        && resource.data.periodKey == request.resource.data.periodKey;
+    }
+
+    function isMatchingLeaderboardTeacherDelete() {
+      return isTeacherForSchool(resource.data.schoolId);
     }
 
     match /schools/{schoolId} {
@@ -144,11 +182,16 @@ service cloud.firestore {
       match /entries/{studentKey} {
         allow read: if true;
 
-        allow create: if isMatchingLeaderboardWrite()
+        allow create: if (
+          isMatchingLeaderboardStudentWrite()
           && scopeKey == request.resource.data.scopeKey
-          && studentKey == request.resource.data.studentNameNormalized;
+          && studentKey == request.resource.data.studentNameNormalized
+        ) || (
+          isMatchingLeaderboardTeacherCreate(studentKey)
+          && scopeKey == request.resource.data.scopeKey
+        );
 
-        allow update: if isMatchingLeaderboardWrite()
+        allow update: if isMatchingLeaderboardStudentWrite()
           && scopeKey == request.resource.data.scopeKey
           && studentKey == request.resource.data.studentNameNormalized
           && resource.data.scopeKey == request.resource.data.scopeKey
@@ -160,7 +203,11 @@ service cloud.firestore {
           && resource.data.periodKey == request.resource.data.periodKey
           && request.resource.data.score > resource.data.score;
 
-        allow delete: if false;
+        allow update: if isMatchingLeaderboardTeacherUpdate(studentKey)
+          && scopeKey == request.resource.data.scopeKey
+          && studentKey == request.resource.data.studentNameNormalized;
+
+        allow delete: if isMatchingLeaderboardTeacherDelete();
       }
     }
   }

@@ -16,6 +16,22 @@ export const LEADERBOARD_PERIOD_DEFINITIONS = [
   },
 ];
 
+function toMillis(value) {
+  if (!value) {
+    return 0;
+  }
+
+  if (typeof value.toMillis === "function") {
+    return value.toMillis();
+  }
+
+  if (value.seconds != null) {
+    return Number(value.seconds) * 1000;
+  }
+
+  return 0;
+}
+
 function getKoreanCalendarParts(now) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: LEADERBOARD_TIME_ZONE,
@@ -63,6 +79,39 @@ export function createLeaderboardPeriodKeys(now = new Date()) {
   };
 }
 
+export function pickBetterMatchingLeaderboardEntry(left, right) {
+  if (!left) {
+    return right ?? null;
+  }
+
+  if (!right) {
+    return left;
+  }
+
+  const leftScore = Number(left.score ?? 0);
+  const rightScore = Number(right.score ?? 0);
+
+  if (leftScore !== rightScore) {
+    return rightScore > leftScore ? right : left;
+  }
+
+  const leftElapsed = Number(left.elapsedSeconds ?? Number.POSITIVE_INFINITY);
+  const rightElapsed = Number(right.elapsedSeconds ?? Number.POSITIVE_INFINITY);
+
+  if (leftElapsed !== rightElapsed) {
+    return rightElapsed < leftElapsed ? right : left;
+  }
+
+  const leftUpdatedAt = toMillis(left.updatedAt) || toMillis(left.createdAt);
+  const rightUpdatedAt = toMillis(right.updatedAt) || toMillis(right.createdAt);
+
+  if (leftUpdatedAt !== rightUpdatedAt) {
+    return rightUpdatedAt > leftUpdatedAt ? right : left;
+  }
+
+  return left;
+}
+
 export function normalizeStudentName(value) {
   return String(value ?? "")
     .trim()
@@ -103,4 +152,8 @@ export function createMatchingLeaderboardId({
     periodType,
     periodKey,
   })}__${normalizeStudentNameKey(studentName)}`;
+}
+
+export function pickBetterLeaderboardEntry(left, right) {
+  return pickBetterMatchingLeaderboardEntry(left, right);
 }

@@ -11,9 +11,11 @@ import {
   deleteTeacherAccountData,
   deleteTeacherVocabularySetsForGrade,
   deleteTeacherVocabularySet,
+  deleteTeacherMatchingLeaderboardStudent,
   fetchPublishedPublisherSourceUnits,
   fetchPublishedVocabularySet,
   fetchTeacherVocabularySet,
+  fetchTeacherMatchingLeaderboards,
   findOrCreateSchool,
   getCurrentUser,
   getTeacherProfile,
@@ -23,6 +25,7 @@ import {
   listTeacherSetCatalog,
   listTeachersForSchool,
   saveTeacherVocabularySet,
+  renameTeacherMatchingLeaderboardStudent,
   searchPublishedPublisherSources,
   searchSchoolsByName,
   signInWithGoogle,
@@ -35,6 +38,7 @@ import {
   groupPublisherSourcesByTeacherAndSchool,
   summarizePublisherCopyResult,
 } from "../utils/publisherCopy.js";
+import { LEADERBOARD_PERIOD_DEFINITIONS } from "../utils/leaderboard.js";
 import { mergeVocabularyItems } from "../utils/vocabularyMerge.js";
 import { parseVocabularyWorkbook } from "../utils/xlsxImport.js";
 
@@ -54,6 +58,25 @@ function normalizeErrorMessage(error, fallback) {
   }
 
   return error.message || fallback;
+}
+
+function summarizeTeacherLeaderboardOutcome(periods, kind) {
+  if (!periods || periods.length === 0) {
+    return "";
+  }
+
+  const periodLabelMap = {
+    week: "주간",
+    month: "월간",
+    year: "연간",
+  };
+  const labels = periods.map((period) => periodLabelMap[period] ?? period);
+
+  if (labels.length === 1) {
+    return `${labels[0]} ${kind}`;
+  }
+
+  return `${labels.join(", ")} ${kind}`;
 }
 
 export function useVocabularyLibrary() {
@@ -87,6 +110,18 @@ export function useVocabularyLibrary() {
   const [teacherCopying, setTeacherCopying] = useState(false);
   const [teacherCopyStatus, setTeacherCopyStatus] = useState("");
   const [teacherCopyError, setTeacherCopyError] = useState("");
+  const [teacherLeaderboards, setTeacherLeaderboards] = useState({});
+  const [teacherLeaderboardLoading, setTeacherLeaderboardLoading] =
+    useState(false);
+  const [teacherLeaderboardError, setTeacherLeaderboardError] = useState("");
+  const [teacherLeaderboardStatus, setTeacherLeaderboardStatus] = useState("");
+  const [teacherLeaderboardTab, setTeacherLeaderboardTab] = useState("week");
+  const [teacherLeaderboardEditingName, setTeacherLeaderboardEditingName] =
+    useState("");
+  const [teacherLeaderboardDraftName, setTeacherLeaderboardDraftName] =
+    useState("");
+  const [teacherLeaderboardSaving, setTeacherLeaderboardSaving] =
+    useState(false);
 
   const [studentSchoolQuery, setStudentSchoolQuery] = useState("");
   const [studentSchoolBrowseMode, setStudentSchoolBrowseMode] =
@@ -208,6 +243,14 @@ export function useVocabularyLibrary() {
       setTeacherSelectedCopySourceId("");
       setTeacherCopyStatus("");
       setTeacherCopyError("");
+      setTeacherLeaderboards({});
+      setTeacherLeaderboardLoading(false);
+      setTeacherLeaderboardError("");
+      setTeacherLeaderboardStatus("");
+      setTeacherLeaderboardTab("week");
+      setTeacherLeaderboardEditingName("");
+      setTeacherLeaderboardDraftName("");
+      setTeacherLeaderboardSaving(false);
       setOnboarding(EMPTY_ONBOARDING);
       return;
     }
@@ -262,6 +305,60 @@ export function useVocabularyLibrary() {
 
     refreshTeacherCatalog(teacherProfile.userId);
   }, [teacherProfile?.userId]);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !teacherProfile?.schoolId || !teacherSelection.grade) {
+      setTeacherLeaderboards({});
+      setTeacherLeaderboardLoading(false);
+      setTeacherLeaderboardError("");
+      setTeacherLeaderboardStatus("");
+      setTeacherLeaderboardEditingName("");
+      setTeacherLeaderboardDraftName("");
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadTeacherLeaderboards() {
+      setTeacherLeaderboardLoading(true);
+      setTeacherLeaderboardError("");
+      setTeacherLeaderboardStatus("");
+
+      try {
+        const boards = await fetchTeacherMatchingLeaderboards({
+          schoolId: teacherProfile.schoolId,
+          grade: teacherSelection.grade,
+          limitCount: 20,
+        });
+
+        if (!cancelled) {
+          setTeacherLeaderboards(boards);
+          setTeacherLeaderboardTab((current) =>
+            boards[current] ? current : Object.keys(boards)[0] ?? "week",
+          );
+          setTeacherLeaderboardEditingName("");
+          setTeacherLeaderboardDraftName("");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTeacherLeaderboards({});
+          setTeacherLeaderboardError(
+            normalizeErrorMessage(error, "리더보드를 불러오지 못했습니다."),
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setTeacherLeaderboardLoading(false);
+        }
+      }
+    }
+
+    loadTeacherLeaderboards();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [teacherProfile?.schoolId, teacherSelection.grade]);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !userId) {
@@ -526,6 +623,184 @@ export function useVocabularyLibrary() {
     setTeacherCopyError("");
     setTeacherCopySources([]);
     setTeacherSelectedCopySourceId("");
+  }
+
+  function refreshTeacherLeaderboards() {
+    if (!teacherProfile?.schoolId || !teacherSelection.grade) {
+      setTeacherLeaderboards({});
+      return Promise.resolve();
+    }
+
+    setTeacherLeaderboardLoading(true);
+    setTeacherLeaderboardError("");
+    setTeacherLeaderboardStatus("");
+
+    return fetchTeacherMatchingLeaderboards({
+      schoolId: teacherProfile.schoolId,
+      grade: teacherSelection.grade,
+      limitCount: 20,
+    })
+      .then((boards) => {
+        setTeacherLeaderboards(boards);
+        setTeacherLeaderboardTab((current) =>
+          boards[current] ? current : Object.keys(boards)[0] ?? "week",
+        );
+      })
+      .catch((error) => {
+        setTeacherLeaderboardError(
+          normalizeErrorMessage(error, "리더보드를 불러오지 못했습니다."),
+        );
+      })
+      .finally(() => {
+        setTeacherLeaderboardLoading(false);
+      });
+  }
+
+  function startTeacherLeaderboardEdit(studentName) {
+    const cleanName = String(studentName ?? "").trim();
+    if (!cleanName) {
+      return;
+    }
+
+    setTeacherLeaderboardEditingName(cleanName);
+    setTeacherLeaderboardDraftName(cleanName);
+    setTeacherLeaderboardStatus("");
+    setTeacherLeaderboardError("");
+  }
+
+  function cancelTeacherLeaderboardEdit() {
+    setTeacherLeaderboardEditingName("");
+    setTeacherLeaderboardDraftName("");
+  }
+
+  async function renameTeacherLeaderboardStudent(oldName, newName) {
+    if (!teacherProfile?.schoolId || !teacherSelection.grade) {
+      setTeacherLeaderboardError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
+      return false;
+    }
+
+    const cleanOldName = String(oldName ?? "").trim().replace(/\s+/g, " ");
+    const cleanNewName = String(newName ?? "").trim().replace(/\s+/g, " ");
+
+    if (!cleanOldName || !cleanNewName) {
+      setTeacherLeaderboardError("학생 이름을 입력해 주세요.");
+      return false;
+    }
+
+    if (cleanOldName === cleanNewName) {
+      setTeacherLeaderboardError("같은 이름으로는 수정할 수 없습니다.");
+      return false;
+    }
+
+    if (
+      !window.confirm(
+        `'${cleanOldName}' 이름을 '${cleanNewName}'(으)로 현재 주/월/연 리더보드에서 모두 수정할까요?`,
+      )
+    ) {
+      return false;
+    }
+
+    setTeacherLeaderboardSaving(true);
+    setTeacherLeaderboardError("");
+    setTeacherLeaderboardStatus("");
+
+    try {
+      const result = await renameTeacherMatchingLeaderboardStudent({
+        schoolId: teacherProfile.schoolId,
+        grade: teacherSelection.grade,
+        oldStudentName: cleanOldName,
+        newStudentName: cleanNewName,
+      });
+
+      const updatedLabel = summarizeTeacherLeaderboardOutcome(
+        result.updatedPeriods,
+        "수정",
+      );
+      const keptLabel = summarizeTeacherLeaderboardOutcome(
+        result.keptPeriods,
+        "유지",
+      );
+      const skippedLabel = summarizeTeacherLeaderboardOutcome(
+        result.skippedPeriods,
+        "없음",
+      );
+
+      cancelTeacherLeaderboardEdit();
+      await refreshTeacherLeaderboards();
+
+      setTeacherLeaderboardStatus(
+        [updatedLabel, keptLabel, skippedLabel].filter(Boolean).join(" · ") ||
+          "학생 이름을 수정했습니다.",
+      );
+      return true;
+    } catch (error) {
+      setTeacherLeaderboardError(
+        normalizeErrorMessage(error, "학생 이름을 수정하지 못했습니다."),
+      );
+      return false;
+    } finally {
+      setTeacherLeaderboardSaving(false);
+    }
+  }
+
+  async function deleteTeacherLeaderboardStudent(studentName) {
+    if (!teacherProfile?.schoolId || !teacherSelection.grade) {
+      setTeacherLeaderboardError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
+      return false;
+    }
+
+    const cleanStudentName = String(studentName ?? "").trim().replace(/\s+/g, " ");
+    if (!cleanStudentName) {
+      setTeacherLeaderboardError("삭제할 학생 이름이 없습니다.");
+      return false;
+    }
+
+    if (
+      !window.confirm(
+        `'${cleanStudentName}' 학생 기록을 현재 주/월/연 리더보드에서 모두 삭제할까요?`,
+      )
+    ) {
+      return false;
+    }
+
+    setTeacherLeaderboardSaving(true);
+    setTeacherLeaderboardError("");
+    setTeacherLeaderboardStatus("");
+
+    try {
+      const result = await deleteTeacherMatchingLeaderboardStudent({
+        schoolId: teacherProfile.schoolId,
+        grade: teacherSelection.grade,
+        studentName: cleanStudentName,
+      });
+
+      const deletedLabel = summarizeTeacherLeaderboardOutcome(
+        result.deletedPeriods,
+        "삭제",
+      );
+      const skippedLabel = summarizeTeacherLeaderboardOutcome(
+        result.skippedPeriods,
+        "없음",
+      );
+
+      if (teacherLeaderboardEditingName === cleanStudentName) {
+        cancelTeacherLeaderboardEdit();
+      }
+
+      await refreshTeacherLeaderboards();
+      setTeacherLeaderboardStatus(
+        [deletedLabel, skippedLabel].filter(Boolean).join(" · ") ||
+          "학생 기록을 삭제했습니다.",
+      );
+      return true;
+    } catch (error) {
+      setTeacherLeaderboardError(
+        normalizeErrorMessage(error, "학생 기록을 삭제하지 못했습니다."),
+      );
+      return false;
+    } finally {
+      setTeacherLeaderboardSaving(false);
+    }
   }
 
   function setTeacherPublishState(nextPublished) {
@@ -1442,6 +1717,23 @@ export function useVocabularyLibrary() {
       copying: teacherCopying,
       copyStatus: teacherCopyStatus,
       copyError: teacherCopyError,
+      leaderboard: {
+        boards: teacherLeaderboards,
+        loading: teacherLeaderboardLoading,
+        error: teacherLeaderboardError,
+        status: teacherLeaderboardStatus,
+        tab: teacherLeaderboardTab,
+        setTab: setTeacherLeaderboardTab,
+        editingName: teacherLeaderboardEditingName,
+        draftName: teacherLeaderboardDraftName,
+        saving: teacherLeaderboardSaving,
+        refresh: refreshTeacherLeaderboards,
+        startEdit: startTeacherLeaderboardEdit,
+        cancelEdit: cancelTeacherLeaderboardEdit,
+        setDraftName: setTeacherLeaderboardDraftName,
+        renameStudent: renameTeacherLeaderboardStudent,
+        deleteStudent: deleteTeacherLeaderboardStudent,
+      },
       units: teacherUnits,
       catalogEntry: currentTeacherCatalogEntry,
       updateSelection: updateTeacherSelection,

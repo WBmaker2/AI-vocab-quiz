@@ -160,13 +160,14 @@ function App() {
             onSearchCopySources={library.teacher.searchCopySources}
             onSelectCopySource={library.teacher.selectCopySource}
             onCopySource={library.teacher.copySource}
-            onAddItem={library.teacher.addItem}
-            onUpdateItem={library.teacher.updateItem}
-            onRemoveItem={library.teacher.removeItem}
-            onClearItems={library.teacher.clearItems}
-            onBack={() => navigateTo(APP_VIEWS.HOME)}
-          />
-        ) : null}
+          onAddItem={library.teacher.addItem}
+          onUpdateItem={library.teacher.updateItem}
+          onRemoveItem={library.teacher.removeItem}
+          onClearItems={library.teacher.clearItems}
+          leaderboard={library.teacher.leaderboard}
+          onBack={() => navigateTo(APP_VIEWS.HOME)}
+        />
+      ) : null}
 
         {view === APP_VIEWS.LISTENING ? (
           <ListeningQuiz
