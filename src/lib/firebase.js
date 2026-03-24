@@ -374,6 +374,8 @@ export async function renameTeacherMatchingLeaderboardStudent({
   const keptPeriods = [];
   const skippedPeriods = [];
   await runTransaction(firestore, async (transaction) => {
+    const periodSnapshots = [];
+
     for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
       const periodKey = periodKeys[type];
       const oldEntry = createMatchingLeaderboardEntryRef(firestore, {
@@ -392,13 +394,27 @@ export async function renameTeacherMatchingLeaderboardStudent({
       });
 
       const oldSnapshot = await transaction.get(oldEntry.ref);
+      const newSnapshot = await transaction.get(newEntry.ref);
+      periodSnapshots.push({
+        type,
+        periodKey,
+        oldEntry,
+        newEntry,
+        oldSnapshot,
+        newSnapshot,
+      });
+    }
+
+    for (const periodSnapshot of periodSnapshots) {
+      const { type, periodKey, oldEntry, newEntry, oldSnapshot, newSnapshot } =
+        periodSnapshot;
+
       if (!oldSnapshot.exists()) {
         skippedPeriods.push(type);
         continue;
       }
 
       const oldData = oldSnapshot.data();
-      const newSnapshot = await transaction.get(newEntry.ref);
       const newData = newSnapshot.exists() ? newSnapshot.data() : null;
       const winner = pickBetterMatchingLeaderboardEntry(newData, oldData);
 
@@ -458,6 +474,8 @@ export async function deleteTeacherMatchingLeaderboardStudent({
   const deletedPeriods = [];
   const skippedPeriods = [];
   await runTransaction(firestore, async (transaction) => {
+    const periodSnapshots = [];
+
     for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
       const periodKey = periodKeys[type];
       const entry = createMatchingLeaderboardEntryRef(firestore, {
@@ -469,6 +487,16 @@ export async function deleteTeacherMatchingLeaderboardStudent({
       });
 
       const snapshot = await transaction.get(entry.ref);
+      periodSnapshots.push({
+        type,
+        entry,
+        snapshot,
+      });
+    }
+
+    for (const periodSnapshot of periodSnapshots) {
+      const { type, entry, snapshot } = periodSnapshot;
+
       if (!snapshot.exists()) {
         skippedPeriods.push(type);
         continue;

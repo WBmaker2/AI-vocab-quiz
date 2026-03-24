@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.4.3",
+    date: "2026-03-24",
+    summary: [
+      "교사 리더보드 이름 수정과 기록 삭제가 여러 기간을 함께 처리할 때도 안정적으로 동작하도록 트랜잭션 흐름을 바로잡았습니다.",
+      "주간, 월간, 연간 기록을 한 번에 읽은 뒤 반영하도록 정리해 Firestore transaction 오류를 제거했습니다.",
+    ],
+  },
+  {
     version: "v1.4.2",
     date: "2026-03-24",
     summary: [
