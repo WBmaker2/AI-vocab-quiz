@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.4.0",
+    date: "2026-03-24",
+    summary: [
+      "매칭 게임 완료 화면에서 학교와 학년 기준 리더보드를 바로 확인할 수 있습니다.",
+      "학생 이름으로 점수를 저장하면 주간, 월간, 연간 탭이 즉시 새 기록으로 갱신됩니다.",
+      "같은 이름의 기존 기록이 더 높으면 친절한 안내와 함께 기존 최고 점수를 유지합니다.",
+    ],
+  },
+  {
     version: "v1.3.1",
     date: "2026-03-23",
     summary: [

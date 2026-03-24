@@ -192,6 +192,8 @@ function App() {
           <WordMatchingGame
             items={library.student.matchingItems}
             selectedUnits={library.student.matchingUnits}
+            leaderboardContext={library.student.leaderboardContext}
+            remoteConfigured={library.remoteConfigured}
             speech={speechSynthesis}
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}

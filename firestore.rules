@@ -14,6 +14,62 @@ service cloud.firestore {
       return resource.data.published == true;
     }
 
+    function isMatchingLeaderboardPeriodType(periodType) {
+      return periodType == 'week' || periodType == 'month' || periodType == 'year';
+    }
+
+    function isMatchingLeaderboardScopeKey(scopeKey, schoolId, grade, periodType, periodKey) {
+      return scopeKey == schoolId + "__" + grade + "__" + periodType + "__" + periodKey;
+    }
+
+    function isMatchingLeaderboardWrite() {
+      return request.resource.data.keys().hasOnly([
+          'scopeKey',
+          'schoolId',
+          'schoolName',
+          'grade',
+          'studentName',
+          'studentNameNormalized',
+          'periodType',
+          'periodKey',
+          'score',
+          'elapsedSeconds',
+          'solvedPairs',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.scopeKey is string
+        && request.resource.data.scopeKey.size() > 0
+        && request.resource.data.schoolId is string
+        && request.resource.data.schoolId.size() > 0
+        && request.resource.data.schoolName is string
+        && request.resource.data.schoolName.size() > 0
+        && request.resource.data.grade is string
+        && request.resource.data.grade.size() > 0
+        && request.resource.data.studentName is string
+        && request.resource.data.studentName.size() > 0
+        && request.resource.data.studentNameNormalized is string
+        && request.resource.data.studentNameNormalized.size() > 0
+        && isMatchingLeaderboardPeriodType(request.resource.data.periodType)
+        && request.resource.data.periodKey is string
+        && request.resource.data.periodKey.size() > 0
+        && isMatchingLeaderboardScopeKey(
+          request.resource.data.scopeKey,
+          request.resource.data.schoolId,
+          request.resource.data.grade,
+          request.resource.data.periodType,
+          request.resource.data.periodKey
+        )
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.elapsedSeconds is int
+        && request.resource.data.elapsedSeconds >= 0
+        && request.resource.data.solvedPairs is int
+        && request.resource.data.solvedPairs >= 0
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+
     match /schools/{schoolId} {
       allow read: if true;
       allow create: if isSignedIn()
@@ -81,6 +137,49 @@ service cloud.firestore {
         && request.resource.data.items is list;
 
       allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /matchingLeaderboards/{scopeKey} {
+      allow read, write: if false;
+
+      match /entries/{studentKey} {
+        allow read: if resource.data.scopeKey is string
+          && resource.data.scopeKey.size() > 0
+          && resource.data.schoolId is string
+          && resource.data.schoolName is string
+          && resource.data.grade is string
+          && resource.data.studentName is string
+          && resource.data.studentNameNormalized is string
+          && isMatchingLeaderboardPeriodType(resource.data.periodType)
+          && resource.data.periodKey is string
+          && isMatchingLeaderboardScopeKey(
+            resource.data.scopeKey,
+            resource.data.schoolId,
+            resource.data.grade,
+            resource.data.periodType,
+            resource.data.periodKey
+          )
+          && scopeKey == resource.data.scopeKey
+          && studentKey == resource.data.studentNameNormalized;
+
+        allow create: if isMatchingLeaderboardWrite()
+          && scopeKey == request.resource.data.scopeKey
+          && studentKey == request.resource.data.studentNameNormalized;
+
+        allow update: if isMatchingLeaderboardWrite()
+          && scopeKey == request.resource.data.scopeKey
+          && studentKey == request.resource.data.studentNameNormalized
+          && resource.data.scopeKey == request.resource.data.scopeKey
+          && resource.data.schoolId == request.resource.data.schoolId
+          && resource.data.schoolName == request.resource.data.schoolName
+          && resource.data.grade == request.resource.data.grade
+          && resource.data.studentNameNormalized == request.resource.data.studentNameNormalized
+          && resource.data.periodType == request.resource.data.periodType
+          && resource.data.periodKey == request.resource.data.periodKey
+          && request.resource.data.score > resource.data.score;
+
+        allow delete: if false;
+      }
     }
   }
 }

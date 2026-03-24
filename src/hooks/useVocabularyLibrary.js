@@ -1472,6 +1472,11 @@ export function useVocabularyLibrary() {
       teachersLoading: studentTeachersLoading,
       selectedTeacher,
       selection: studentSelection,
+      leaderboardContext: {
+        schoolId: selectedSchool?.id ?? "",
+        schoolName: selectedSchool?.name ?? "",
+        grade: studentSelection.grade,
+      },
       units: studentUnits,
       unitsLoading: studentUnitsLoading,
       items: studentItems,
