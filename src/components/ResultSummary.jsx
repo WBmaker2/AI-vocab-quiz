@@ -2,6 +2,7 @@ export function ResultSummary({
   title,
   score,
   total,
+  extraContent = null,
   onRetry,
   onBack,
   onOpenTeacher,
@@ -16,6 +17,7 @@ export function ResultSummary({
         {score} / {total}
       </p>
       <p className="result-copy">정답률 {percentage}%로 활동을 마쳤습니다.</p>
+      {extraContent}
       <div className="toolbar-row">
         <button className="primary-button" onClick={onRetry}>
           다시 하기

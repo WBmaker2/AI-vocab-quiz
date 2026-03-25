@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchMatchingLeaderboards,
+  saveStudentProgress,
   saveMatchingLeaderboardScore,
 } from "../lib/firebase.js";
+import { StudentProgressPanel } from "./StudentProgressPanel.jsx";
 import {
   advanceMatchingBoard,
   calculateMatchingScore,
@@ -17,7 +19,10 @@ function MatchingSummary({
   elapsedSeconds,
   finalScore,
   leaderboardContext,
+  progressionContext,
   remoteConfigured,
+  studentNameDraft,
+  onStudentNameDraftChange,
   onRetry,
   onChooseUnits,
   onBack,
@@ -25,15 +30,28 @@ function MatchingSummary({
   const [leaderboards, setLeaderboards] = useState({});
   const [activePeriodType, setActivePeriodType] = useState("week");
   const [showSaveForm, setShowSaveForm] = useState(false);
-  const [studentName, setStudentName] = useState("");
   const [loadingLeaderboards, setLoadingLeaderboards] = useState(false);
   const [leaderboardStatus, setLeaderboardStatus] = useState("");
   const [leaderboardError, setLeaderboardError] = useState("");
   const [savingScore, setSavingScore] = useState(false);
+  const [progressionLoading, setProgressionLoading] = useState(false);
+  const [progressionStatus, setProgressionStatus] = useState("");
+  const [progressionError, setProgressionError] = useState("");
+  const [progressionComparison, setProgressionComparison] = useState(null);
+  const [newlyEarnedBadges, setNewlyEarnedBadges] = useState([]);
+  const [progressionStudentName, setProgressionStudentName] = useState("");
   const schoolId = String(leaderboardContext?.schoolId ?? "").trim();
   const schoolName = String(leaderboardContext?.schoolName ?? "").trim();
   const grade = String(leaderboardContext?.grade ?? "").trim();
   const canUseLeaderboard = remoteConfigured && schoolId && schoolName && grade;
+  const progressionSchoolId = String(progressionContext?.schoolId ?? "").trim();
+  const progressionSchoolName = String(progressionContext?.schoolName ?? "").trim();
+  const progressionGrade = String(progressionContext?.grade ?? "").trim();
+  const canSaveProgress =
+    remoteConfigured &&
+    progressionSchoolId &&
+    progressionSchoolName &&
+    progressionGrade;
   const availablePeriods = Object.values(leaderboards);
   const activePeriod = leaderboards[activePeriodType] ?? availablePeriods[0] ?? null;
   const contextLabel =
@@ -90,12 +108,87 @@ function MatchingSummary({
 
   useEffect(() => {
     setShowSaveForm(false);
-    setStudentName("");
     setSavingScore(false);
+    setProgressionLoading(false);
+    setProgressionStatus("");
+    setProgressionError("");
+    setProgressionComparison(null);
+    setNewlyEarnedBadges([]);
+    setProgressionStudentName("");
   }, [finalScore, solvedPairs, elapsedSeconds, schoolId, grade]);
 
+  useEffect(() => {
+    const cleanDraft = String(studentNameDraft ?? "").trim().replace(/\s+/g, " ");
+    const cleanSaved = String(progressionStudentName ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+
+    if (cleanSaved && cleanDraft && cleanSaved === cleanDraft) {
+      return;
+    }
+
+    if (!cleanDraft || (cleanSaved && cleanSaved !== cleanDraft)) {
+      setProgressionStatus("");
+      setProgressionError("");
+      setProgressionComparison(null);
+      setNewlyEarnedBadges([]);
+      if (cleanSaved && cleanSaved !== cleanDraft) {
+        setProgressionStudentName("");
+      }
+    }
+  }, [progressionStudentName, studentNameDraft]);
+
+  async function handleSaveProgress() {
+    const cleanStudentName = String(studentNameDraft ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+
+    if (!canSaveProgress) {
+      setProgressionError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
+      return;
+    }
+
+    if (!cleanStudentName) {
+      setProgressionError("학생 이름을 입력해 주세요.");
+      return;
+    }
+
+    setProgressionLoading(true);
+    setProgressionError("");
+    setProgressionStatus("");
+
+    try {
+      const saved = await saveStudentProgress({
+        schoolId: progressionSchoolId,
+        schoolName: progressionSchoolName,
+        grade: progressionGrade,
+        studentName: cleanStudentName,
+        activityType: "matching",
+        result: {
+          score: finalScore,
+          elapsedSeconds,
+          solvedPairs,
+        },
+      });
+
+      onStudentNameDraftChange?.(cleanStudentName);
+      setProgressionStudentName(cleanStudentName);
+      setProgressionComparison(saved.comparison);
+      setNewlyEarnedBadges(saved.newlyEarnedBadges ?? []);
+      setProgressionStatus(
+        `${cleanStudentName} 학생의 짝 맞추기 성장 기록을 저장했습니다.`,
+      );
+    } catch (error) {
+      setProgressionError(error?.message || "개인 기록을 저장하지 못했습니다.");
+    } finally {
+      setProgressionLoading(false);
+    }
+  }
+
   async function handleSaveScore() {
-    const cleanStudentName = studentName.trim().replace(/\s+/g, " ");
+    const cleanStudentName = String(studentNameDraft ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
 
     if (!canUseLeaderboard) {
       setLeaderboardError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
@@ -121,8 +214,7 @@ function MatchingSummary({
         elapsedSeconds,
         solvedPairs,
       });
-
-      setStudentName(cleanStudentName);
+      onStudentNameDraftChange?.(cleanStudentName);
       setShowSaveForm(false);
 
       if (result.failedPeriods?.length > 0 && result.updatedPeriods.length > 0) {
@@ -165,6 +257,15 @@ function MatchingSummary({
     }
   }
 
+  const progressionDisabledReason = !remoteConfigured
+    ? "Firebase 연결이 없어 이 기기에서는 개인 기록을 저장할 수 없습니다."
+    : !progressionSchoolId || !progressionSchoolName || !progressionGrade
+      ? "학교와 학년을 먼저 선택하면 개인 최고 기록과 배지를 저장할 수 있어요."
+      : !String(studentNameDraft ?? "").trim()
+        ? "학생 이름을 입력하면 개인 최고 기록과 배지를 저장할 수 있어요."
+        : "";
+  const hasSavedProgress = Boolean(progressionStudentName);
+
   return (
     <article className="result-card">
       <p className="mode-label">Matching Result</p>
@@ -183,6 +284,61 @@ function MatchingSummary({
       <p className="result-copy">
         맞춘 문제 수와 걸린 시간을 반영해 최종 점수를 계산했습니다.
       </p>
+      <section className="result-progression-block">
+        <div className="matching-leaderboard-head">
+          <div>
+            <p className="mode-label">Student Progress</p>
+            <h4>개인 최고 기록과 배지를 저장할까요?</h4>
+          </div>
+        </div>
+
+        <div className="matching-save-form">
+          <label className="matching-save-field">
+            <span>학생 이름</span>
+            <input
+              type="text"
+              value={studentNameDraft}
+              maxLength={20}
+              placeholder="이름을 입력하세요"
+              onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
+              disabled={progressionLoading || savingScore || hasSavedProgress}
+            />
+          </label>
+          <div className="matching-leaderboard-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => void handleSaveProgress()}
+              disabled={
+                progressionLoading ||
+                hasSavedProgress ||
+                !String(studentNameDraft ?? "").trim()
+              }
+            >
+              {progressionLoading
+                ? "저장 중..."
+                : hasSavedProgress
+                  ? "저장 완료"
+                  : "개인 기록 저장"}
+            </button>
+          </div>
+        </div>
+
+        {progressionStatus ? (
+          <p className="matching-leaderboard-status">{progressionStatus}</p>
+        ) : null}
+        {progressionError ? (
+          <p className="matching-leaderboard-error">{progressionError}</p>
+        ) : null}
+
+        <StudentProgressPanel
+          comparison={progressionComparison}
+          newlyEarnedBadges={newlyEarnedBadges}
+          disabledReason={!progressionComparison ? progressionDisabledReason : ""}
+          loading={progressionLoading}
+          title="짝 맞추기 성장 기록"
+        />
+      </section>
       <section className="matching-leaderboard-panel" aria-label="매칭 게임 리더보드">
         <div className="matching-leaderboard-head">
           <div>
@@ -239,11 +395,11 @@ function MatchingSummary({
                   <span>학생 이름</span>
                   <input
                     type="text"
-                    value={studentName}
+                    value={studentNameDraft}
                     maxLength={20}
                     placeholder="이름을 입력하세요"
-                    onChange={(event) => setStudentName(event.target.value)}
-                    disabled={savingScore}
+                    onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
+                    disabled={savingScore || progressionLoading}
                   />
                 </label>
                 <div className="matching-leaderboard-actions">
@@ -341,7 +497,10 @@ export function WordMatchingGame({
   items,
   selectedUnits,
   leaderboardContext,
+  progressionContext,
   remoteConfigured,
+  studentNameDraft,
+  onStudentNameDraftChange,
   speech,
   celebration,
   onBack,
@@ -649,7 +808,10 @@ export function WordMatchingGame({
           elapsedSeconds={elapsedSeconds}
           finalScore={finalScore}
           leaderboardContext={leaderboardContext}
+          progressionContext={progressionContext}
           remoteConfigured={remoteConfigured}
+          studentNameDraft={studentNameDraft}
+          onStudentNameDraftChange={onStudentNameDraftChange}
           onRetry={handleRetry}
           onChooseUnits={onChooseUnits}
           onBack={onBack}

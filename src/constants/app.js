@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.5.0",
+    date: "2026-03-25",
+    summary: [
+      "듣기, 말하기, 짝 맞추기 활동 결과를 학생별 개인 최고 기록으로 저장할 수 있습니다.",
+      "첫 도전, 듣기 스타, 말하기 용기상, 짝 맞추기 스피드왕, 꾸준한 연습왕 배지를 공통 보상으로 추가했습니다.",
+      "같은 학생 이름을 세 활동에서 함께 이어 쓰도록 공통 학생 이름 흐름을 연결했습니다.",
+    ],
+  },
+  {
     version: "v1.4.3",
     date: "2026-03-24",
     summary: [

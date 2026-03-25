@@ -172,6 +172,10 @@ function App() {
         {view === APP_VIEWS.LISTENING ? (
           <ListeningQuiz
             items={library.student.items}
+            remoteConfigured={library.remoteConfigured}
+            progressionContext={library.student.progressionContext}
+            studentNameDraft={library.student.nameDraft}
+            onStudentNameDraftChange={library.student.updateNameDraft}
             speech={speechSynthesis}
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
@@ -182,6 +186,10 @@ function App() {
         {view === APP_VIEWS.SPEAKING ? (
           <SpeakingQuiz
             items={library.student.items}
+            remoteConfigured={library.remoteConfigured}
+            progressionContext={library.student.progressionContext}
+            studentNameDraft={library.student.nameDraft}
+            onStudentNameDraftChange={library.student.updateNameDraft}
             speech={speechSynthesis}
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
@@ -194,7 +202,10 @@ function App() {
             items={library.student.matchingItems}
             selectedUnits={library.student.matchingUnits}
             leaderboardContext={library.student.leaderboardContext}
+            progressionContext={library.student.progressionContext}
             remoteConfigured={library.remoteConfigured}
+            studentNameDraft={library.student.nameDraft}
+            onStudentNameDraftChange={library.student.updateNameDraft}
             speech={speechSynthesis}
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}

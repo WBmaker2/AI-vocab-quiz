@@ -34,6 +34,16 @@ import {
   normalizeStudentNameKey,
   pickBetterMatchingLeaderboardEntry,
 } from "../utils/leaderboard";
+import { BADGE_IDS } from "../constants/badges.js";
+import {
+  buildProgressSummary,
+  compareListeningProgress,
+  compareMatchingProgress,
+  compareSpeakingProgress,
+  createStudentProfileId,
+  evaluateEarnedBadges,
+  normalizeStudentProfileName,
+} from "../utils/studentProgress.js";
 
 function getEnvValue(name) {
   return String(import.meta.env[name] ?? "").trim();
@@ -92,6 +102,168 @@ function toNonNegativeInteger(value, fieldName) {
   }
 
   return Math.max(0, Math.floor(numberValue));
+}
+
+const STUDENT_PROGRESS_ACTIVITY_TYPES = new Set([
+  "listening",
+  "speaking",
+  "matching",
+]);
+
+const STUDENT_BADGE_ID_SET = new Set(BADGE_IDS);
+
+function normalizeStudentProgressSchoolName(value) {
+  return normalizeLeaderboardText(value);
+}
+
+function normalizeStudentProgressGrade(value) {
+  return normalizeLeaderboardScope(value);
+}
+
+function normalizeStudentProgressActivityType(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function isStudentProgressActivityType(value) {
+  return STUDENT_PROGRESS_ACTIVITY_TYPES.has(
+    normalizeStudentProgressActivityType(value),
+  );
+}
+
+function createStudentProgressRef(firestore, { schoolId, grade, studentName }) {
+  return doc(
+    firestore,
+    "studentProfiles",
+    createStudentProfileId({
+      schoolId,
+      grade,
+      studentName,
+    }),
+  );
+}
+
+function normalizeStudentProfileDocument(snapshotData, fallback) {
+  const cleanFallback = fallback ?? {};
+  const studentName = normalizeStudentProfileName(
+    snapshotData?.studentName ?? cleanFallback.studentName,
+  );
+  const schoolId = normalizeLeaderboardScope(
+    snapshotData?.schoolId ?? cleanFallback.schoolId,
+  );
+  const schoolName = normalizeStudentProgressSchoolName(
+    snapshotData?.schoolName ?? cleanFallback.schoolName,
+  );
+  const grade = normalizeStudentProgressGrade(
+    snapshotData?.grade ?? cleanFallback.grade,
+  );
+  const studentNameNormalized = normalizeStudentNameKey(studentName);
+  const totalSessions = toNonNegativeInteger(snapshotData?.totalSessions ?? 0);
+  const earnedBadges = Array.from(
+    new Set(
+      Array.isArray(snapshotData?.earnedBadges)
+        ? snapshotData.earnedBadges
+            .map((badgeId) => String(badgeId ?? "").trim())
+            .filter((badgeId) => badgeId && STUDENT_BADGE_ID_SET.has(badgeId))
+        : [],
+    ),
+  );
+
+  return {
+    schoolId,
+    schoolName,
+    grade,
+    studentName,
+    studentNameNormalized,
+    totalSessions,
+    listeningSessions: toNonNegativeInteger(
+      snapshotData?.listeningSessions ?? 0,
+    ),
+    speakingSessions: toNonNegativeInteger(
+      snapshotData?.speakingSessions ?? 0,
+    ),
+    matchingSessions: toNonNegativeInteger(
+      snapshotData?.matchingSessions ?? 0,
+    ),
+    listeningBestScore: toNonNegativeInteger(
+      snapshotData?.listeningBestScore ?? 0,
+    ),
+    listeningBestCorrectCount: toNonNegativeInteger(
+      snapshotData?.listeningBestCorrectCount ?? 0,
+    ),
+    speakingBestScore: toNonNegativeInteger(
+      snapshotData?.speakingBestScore ?? 0,
+    ),
+    speakingBestCorrectCount: toNonNegativeInteger(
+      snapshotData?.speakingBestCorrectCount ?? 0,
+    ),
+    matchingBestScore: toNonNegativeInteger(
+      snapshotData?.matchingBestScore ?? 0,
+    ),
+    matchingBestTime: toNonNegativeInteger(snapshotData?.matchingBestTime ?? 0),
+    earnedBadges,
+    createdAt: snapshotData?.createdAt ?? cleanFallback.createdAt ?? null,
+    updatedAt: snapshotData?.updatedAt ?? cleanFallback.updatedAt ?? null,
+  };
+}
+
+function createNextStudentProfile({
+  currentProfile,
+  schoolId,
+  schoolName,
+  grade,
+  studentName,
+  activityType,
+  comparisonResult,
+  newlyEarnedBadges,
+}) {
+  const nextProfile = {
+    schoolId,
+    schoolName,
+    grade,
+    studentName,
+    studentNameNormalized: normalizeStudentNameKey(studentName),
+    totalSessions: currentProfile.totalSessions + 1,
+    listeningSessions: currentProfile.listeningSessions,
+    speakingSessions: currentProfile.speakingSessions,
+    matchingSessions: currentProfile.matchingSessions,
+    listeningBestScore: currentProfile.listeningBestScore,
+    listeningBestCorrectCount: currentProfile.listeningBestCorrectCount,
+    speakingBestScore: currentProfile.speakingBestScore,
+    speakingBestCorrectCount: currentProfile.speakingBestCorrectCount,
+    matchingBestScore: currentProfile.matchingBestScore,
+    matchingBestTime: currentProfile.matchingBestTime,
+    earnedBadges: Array.from(
+      new Set([...currentProfile.earnedBadges, ...newlyEarnedBadges]),
+    ),
+    createdAt: currentProfile.createdAt ?? serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  if (activityType === "listening" && comparisonResult.isNewBest) {
+    nextProfile.listeningSessions += 1;
+    nextProfile.listeningBestScore = comparisonResult.bestValue.score;
+    nextProfile.listeningBestCorrectCount = comparisonResult.bestValue.correctCount;
+  } else if (activityType === "listening") {
+    nextProfile.listeningSessions += 1;
+  }
+
+  if (activityType === "speaking" && comparisonResult.isNewBest) {
+    nextProfile.speakingSessions += 1;
+    nextProfile.speakingBestScore = comparisonResult.bestValue.score;
+    nextProfile.speakingBestCorrectCount = comparisonResult.bestValue.correctCount;
+  } else if (activityType === "speaking") {
+    nextProfile.speakingSessions += 1;
+  }
+
+  if (activityType === "matching" && comparisonResult.isNewBest) {
+    nextProfile.matchingSessions += 1;
+    nextProfile.matchingBestScore = comparisonResult.bestValue.score;
+    nextProfile.matchingBestTime = comparisonResult.bestValue.elapsedSeconds;
+  } else if (activityType === "matching") {
+    nextProfile.matchingSessions += 1;
+  }
+
+  return nextProfile;
 }
 
 function createMatchingLeaderboardPayload({
@@ -972,6 +1144,145 @@ export async function fetchPublishedVocabularySet({ teacherUserId, grade, unit }
   }
 
   return data.items ?? [];
+}
+
+export async function fetchStudentProfile({ schoolId, grade, studentName }) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
+  const cleanGrade = normalizeStudentProgressGrade(grade);
+  const cleanStudentName = normalizeStudentProfileName(studentName);
+
+  if (!cleanSchoolId || !cleanGrade || !cleanStudentName) {
+    return null;
+  }
+
+  const profileRef = createStudentProgressRef(firestore, {
+    schoolId: cleanSchoolId,
+    grade: cleanGrade,
+    studentName: cleanStudentName,
+  });
+  const snapshot = await getDoc(profileRef);
+
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  return {
+    id: snapshot.id,
+    ...normalizeStudentProfileDocument(snapshot.data(), {
+      schoolId: cleanSchoolId,
+      grade: cleanGrade,
+      studentName: cleanStudentName,
+    }),
+  };
+}
+
+export async function saveStudentProgress({
+  schoolId,
+  schoolName,
+  grade,
+  studentName,
+  activityType,
+  result,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
+  const cleanSchoolName = normalizeStudentProgressSchoolName(schoolName);
+  const cleanGrade = normalizeStudentProgressGrade(grade);
+  const cleanStudentName = normalizeStudentProfileName(studentName);
+  const cleanActivityType = normalizeStudentProgressActivityType(activityType);
+
+  if (!cleanSchoolId) {
+    throw new Error("School id is required.");
+  }
+
+  if (!cleanSchoolName) {
+    throw new Error("School name is required.");
+  }
+
+  if (!cleanGrade) {
+    throw new Error("Grade is required.");
+  }
+
+  if (!cleanStudentName) {
+    throw new Error("Student name is required.");
+  }
+
+  if (!isStudentProgressActivityType(cleanActivityType)) {
+    throw new Error("Activity type must be listening, speaking, or matching.");
+  }
+
+  const profileRef = createStudentProgressRef(firestore, {
+    schoolId: cleanSchoolId,
+    grade: cleanGrade,
+    studentName: cleanStudentName,
+  });
+
+  let comparisonResult = null;
+  let newlyEarnedBadges = [];
+  let nextProfile = null;
+
+  await runTransaction(firestore, async (transaction) => {
+    const snapshot = await transaction.get(profileRef);
+    const currentProfile = normalizeStudentProfileDocument(
+      snapshot.exists() ? snapshot.data() : null,
+      {
+        schoolId: cleanSchoolId,
+        schoolName: cleanSchoolName,
+        grade: cleanGrade,
+        studentName: cleanStudentName,
+      },
+    );
+
+    comparisonResult =
+      cleanActivityType === "listening"
+        ? compareListeningProgress(currentProfile, result)
+        : cleanActivityType === "speaking"
+          ? compareSpeakingProgress(currentProfile, result)
+          : compareMatchingProgress(currentProfile, result);
+
+    newlyEarnedBadges = evaluateEarnedBadges({
+      profile: currentProfile,
+      activityType: cleanActivityType,
+      result,
+      comparison: comparisonResult,
+    });
+
+    nextProfile = createNextStudentProfile({
+      currentProfile,
+      schoolId: cleanSchoolId,
+      schoolName: cleanSchoolName,
+      grade: cleanGrade,
+      studentName: cleanStudentName,
+      activityType: cleanActivityType,
+      comparisonResult,
+      newlyEarnedBadges,
+    });
+
+    if (snapshot.exists()) {
+      transaction.update(profileRef, nextProfile);
+      return;
+    }
+
+    transaction.set(profileRef, nextProfile);
+  });
+
+  const committedSnapshot = await getDoc(profileRef);
+  const profile = committedSnapshot.exists()
+    ? {
+        id: committedSnapshot.id,
+        ...normalizeStudentProfileDocument(committedSnapshot.data(), nextProfile),
+      }
+    : null;
+
+  return {
+    profile,
+    comparison: buildProgressSummary({
+      activityType: cleanActivityType,
+      comparisonResult,
+    }),
+    newlyEarnedBadges,
+  };
 }
 
 export async function fetchMatchingLeaderboards({

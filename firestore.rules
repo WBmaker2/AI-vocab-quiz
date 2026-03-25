@@ -22,6 +22,110 @@ service cloud.firestore {
       return (value is int || value is float) && value >= 0;
     }
 
+    function isStudentBadgeId(badgeId) {
+      return badgeId == 'first_challenge'
+        || badgeId == 'listening_star'
+        || badgeId == 'speaking_bravery'
+        || badgeId == 'matching_speed'
+        || badgeId == 'practice_keeper';
+    }
+
+    function isStudentProfileId(profileId, schoolId, grade, studentNameNormalized) {
+      return profileId == schoolId + "__" + grade + "__" + studentNameNormalized;
+    }
+
+    function isStudentProfileDocument(data) {
+      return data.keys().hasOnly([
+          'schoolId',
+          'schoolName',
+          'grade',
+          'studentName',
+          'studentNameNormalized',
+          'totalSessions',
+          'listeningSessions',
+          'speakingSessions',
+          'matchingSessions',
+          'listeningBestScore',
+          'listeningBestCorrectCount',
+          'speakingBestScore',
+          'speakingBestCorrectCount',
+          'matchingBestScore',
+          'matchingBestTime',
+          'earnedBadges',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.schoolId is string
+        && data.schoolId.size() > 0
+        && data.schoolName is string
+        && data.schoolName.size() > 0
+        && data.grade is string
+        && data.grade.size() > 0
+        && data.studentName is string
+        && data.studentName.size() > 0
+        && data.studentNameNormalized is string
+        && data.studentNameNormalized.size() > 0
+        && isNonNegativeNumber(data.totalSessions)
+        && isNonNegativeNumber(data.listeningSessions)
+        && isNonNegativeNumber(data.speakingSessions)
+        && isNonNegativeNumber(data.matchingSessions)
+        && isNonNegativeNumber(data.listeningBestScore)
+        && isNonNegativeNumber(data.listeningBestCorrectCount)
+        && isNonNegativeNumber(data.speakingBestScore)
+        && isNonNegativeNumber(data.speakingBestCorrectCount)
+        && isNonNegativeNumber(data.matchingBestScore)
+        && isNonNegativeNumber(data.matchingBestTime)
+        && data.earnedBadges is list
+        && data.earnedBadges.hasOnly([
+          'first_challenge',
+          'listening_star',
+          'speaking_bravery',
+          'matching_speed',
+          'practice_keeper'
+        ])
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isStudentProfileWrite(profileId) {
+      return isStudentProfileDocument(request.resource.data)
+        && isStudentProfileId(
+          profileId,
+          request.resource.data.schoolId,
+          request.resource.data.grade,
+          request.resource.data.studentNameNormalized
+        );
+    }
+
+    function studentProfileSessionsMatchTotal(data) {
+      return data.totalSessions
+        == data.listeningSessions + data.speakingSessions + data.matchingSessions;
+    }
+
+    function isStudentProfileFirstSessionShape(data) {
+      return studentProfileSessionsMatchTotal(data)
+        && (
+          (data.listeningSessions == 1 && data.speakingSessions == 0 && data.matchingSessions == 0)
+          || (data.listeningSessions == 0 && data.speakingSessions == 1 && data.matchingSessions == 0)
+          || (data.listeningSessions == 0 && data.speakingSessions == 0 && data.matchingSessions == 1)
+        );
+    }
+
+    function isStudentProfileSingleSessionAdvance() {
+      return request.resource.data.listeningSessions >= resource.data.listeningSessions
+        && request.resource.data.speakingSessions >= resource.data.speakingSessions
+        && request.resource.data.matchingSessions >= resource.data.matchingSessions
+        && request.resource.data.listeningSessions <= resource.data.listeningSessions + 1
+        && request.resource.data.speakingSessions <= resource.data.speakingSessions + 1
+        && request.resource.data.matchingSessions <= resource.data.matchingSessions + 1
+        && studentProfileSessionsMatchTotal(request.resource.data)
+        && (
+          request.resource.data.listeningSessions - resource.data.listeningSessions
+          + request.resource.data.speakingSessions - resource.data.speakingSessions
+          + request.resource.data.matchingSessions - resource.data.matchingSessions
+        ) == 1;
+    }
+
     function isMatchingLeaderboardScopeKey(scopeKey, schoolId, grade, periodType, periodKey) {
       return scopeKey == schoolId + "__" + grade + "__" + periodType + "__" + periodKey;
     }
@@ -137,6 +241,36 @@ service cloud.firestore {
           || request.resource.data.gradePublishers is map
         );
       allow delete: if isTeacherOwner(teacherId);
+    }
+
+    match /studentProfiles/{profileId} {
+      allow get: if true;
+      allow list: if false;
+
+      allow create: if isStudentProfileWrite(profileId)
+        && request.resource.data.totalSessions == 1
+        && isStudentProfileFirstSessionShape(request.resource.data);
+
+      allow update: if isStudentProfileWrite(profileId)
+        && resource.data.schoolId == request.resource.data.schoolId
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.studentNameNormalized == request.resource.data.studentNameNormalized
+        && resource.data.createdAt == request.resource.data.createdAt
+        && request.resource.data.totalSessions == resource.data.totalSessions + 1
+        && isStudentProfileSingleSessionAdvance()
+        && request.resource.data.listeningBestScore >= resource.data.listeningBestScore
+        && request.resource.data.listeningBestCorrectCount >= resource.data.listeningBestCorrectCount
+        && request.resource.data.speakingBestScore >= resource.data.speakingBestScore
+        && request.resource.data.speakingBestCorrectCount >= resource.data.speakingBestCorrectCount
+        && request.resource.data.matchingBestScore >= resource.data.matchingBestScore
+        && (
+          request.resource.data.matchingBestScore > resource.data.matchingBestScore
+          || request.resource.data.matchingBestTime <= resource.data.matchingBestTime
+        )
+        && request.resource.data.earnedBadges.hasAll(resource.data.earnedBadges)
+        && request.resource.data.earnedBadges.size() >= resource.data.earnedBadges.size();
+
+      allow delete: if false;
     }
 
     match /vocabularySets/{setId} {

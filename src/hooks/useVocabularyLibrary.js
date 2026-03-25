@@ -144,6 +144,7 @@ export function useVocabularyLibrary() {
   const [studentItems, setStudentItems] = useState([]);
   const [studentMatchingUnits, setStudentMatchingUnits] = useState([]);
   const [studentMatchingItems, setStudentMatchingItems] = useState([]);
+  const [studentNameDraft, setStudentNameDraft] = useState("");
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentStatus, setStudentStatus] = useState("");
   const [studentError, setStudentError] = useState("");
@@ -1324,6 +1325,7 @@ export function useVocabularyLibrary() {
       setStudentSchoolResults([]);
       setSelectedSchool(null);
       setSelectedTeacher(null);
+      setStudentNameDraft("");
       setStudentTeachers([]);
       setStudentUnits([]);
       setStudentItems([]);
@@ -1373,6 +1375,7 @@ export function useVocabularyLibrary() {
       setStudentSchoolResults([]);
       setSelectedSchool(null);
       setSelectedTeacher(null);
+      setStudentNameDraft("");
       setStudentTeachers([]);
       setStudentUnits([]);
       setStudentItems([]);
@@ -1420,6 +1423,7 @@ export function useVocabularyLibrary() {
 
     setSelectedSchool(school);
     setSelectedTeacher(null);
+    setStudentNameDraft("");
     setStudentTeachers([]);
     setStudentUnits([]);
     setStudentItems([]);
@@ -1490,6 +1494,7 @@ export function useVocabularyLibrary() {
   async function chooseStudentTeacher(teacherUserId) {
     const teacher = studentTeachers.find((entry) => entry.userId === teacherUserId);
     setSelectedTeacher(teacher ?? null);
+    setStudentNameDraft("");
     setStudentItems([]);
     resetStudentMatchingState();
     setStudentUnits([]);
@@ -1509,6 +1514,7 @@ export function useVocabularyLibrary() {
     setStudentStatus("");
 
     if (field === "grade") {
+      setStudentNameDraft("");
       setStudentSelection((current) => ({
         ...current,
         grade: value,
@@ -1774,14 +1780,24 @@ export function useVocabularyLibrary() {
       items: studentItems,
       matchingUnits: studentMatchingUnits,
       matchingItems: studentMatchingItems,
+      nameDraft: studentNameDraft,
       loading: studentLoading,
       status: studentStatus,
       error: studentError,
+      progressionContext: {
+        schoolId: selectedSchool?.id ?? "",
+        schoolName: selectedSchool?.name ?? "",
+        grade: studentSelection.grade,
+        unit: studentSelection.unit,
+        teacherUserId: selectedTeacher?.userId ?? "",
+        teacherName: selectedTeacher?.teacherName ?? "",
+      },
       updateSchoolQuery: updateStudentSchoolQuery,
       searchSchools: searchStudentSchools,
       chooseSchool: chooseStudentSchool,
       chooseTeacher: chooseStudentTeacher,
       updateSelection: updateStudentSelection,
+      updateNameDraft: setStudentNameDraft,
       loadSet: loadStudentSet,
       toggleMatchingUnit: toggleStudentMatchingUnit,
       seedMatchingUnits: seedStudentMatchingUnits,

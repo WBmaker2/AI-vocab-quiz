@@ -837,6 +837,188 @@ button:disabled {
   line-height: 1;
 }
 
+.progression-panel {
+  margin-top: 1rem;
+  padding: 1.15rem;
+  border: 1px solid rgba(23, 50, 77, 0.09);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 243, 0.98), rgba(239, 248, 255, 0.98));
+  box-shadow: 0 16px 40px rgba(23, 50, 77, 0.08);
+}
+
+.result-progression-block {
+  margin-top: 1.5rem;
+}
+
+.result-progression-form {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.95rem;
+}
+
+.progression-panel-disabled {
+  background:
+    linear-gradient(180deg, rgba(251, 252, 254, 0.98), rgba(244, 246, 249, 0.98));
+}
+
+.progression-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.progression-head h3 {
+  margin: 0.15rem 0 0;
+}
+
+.progression-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.2rem;
+  padding: 0.42rem 0.82rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: #1f63a8;
+  font-size: 0.88rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.progression-banner {
+  margin: 0.95rem 0 0;
+  padding: 0.85rem 0.95rem;
+  border-radius: 18px;
+  border: 1px solid rgba(159, 79, 0, 0.14);
+  background: #fff4e6;
+  color: #7c5a2f;
+  font-weight: 700;
+}
+
+.progression-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.85fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.progression-section {
+  min-width: 0;
+  padding: 1rem 1.05rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(23, 50, 77, 0.06);
+}
+
+.progression-section h4 {
+  margin: 0;
+  font-size: 1.06rem;
+}
+
+.progression-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.progression-section-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: #1f63a8;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.progression-copy {
+  margin: 0.65rem 0 0;
+  color: #51677e;
+  font-weight: 700;
+}
+
+.progression-summary-list {
+  margin: 0.7rem 0 0;
+  padding: 0 0 0 1.1rem;
+  color: #17324d;
+  font-weight: 700;
+}
+
+.progression-summary-list li + li {
+  margin-top: 0.35rem;
+}
+
+.progression-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.progression-metric,
+.progression-hint {
+  padding: 0.85rem 0.9rem;
+  border-radius: 18px;
+  background: rgba(249, 251, 255, 0.96);
+  border: 1px solid rgba(23, 50, 77, 0.08);
+}
+
+.progression-metric span,
+.progression-hint span {
+  display: block;
+  color: #5d6f81;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.progression-metric strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.25rem;
+}
+
+.progression-hint p {
+  margin: 0.25rem 0 0;
+  color: #17324d;
+  font-weight: 700;
+}
+
+.progression-section-badges {
+  background:
+    linear-gradient(180deg, rgba(255, 245, 226, 0.8), rgba(244, 250, 255, 0.96));
+}
+
+.progression-badge-list {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.75rem;
+}
+
+.progression-badge-chip {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 18px;
+  border: 1px solid rgba(29, 143, 255, 0.14);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(29, 143, 255, 0.08);
+}
+
+.progression-badge-chip strong {
+  color: #1f63a8;
+  font-size: 1rem;
+}
+
+.progression-badge-chip small {
+  color: #5d6f81;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
 .speaking-word-card {
   margin-top: 1rem;
   padding: 1.25rem;
@@ -1178,14 +1360,21 @@ button:disabled {
   .choices-grid,
   .matching-columns,
   .matching-unit-grid,
-  .matching-result-grid {
+  .matching-result-grid,
+  .progression-grid,
+  .progression-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .result-progression-form {
+    gap: 0.7rem;
   }
 
   .notice-card,
   .section-heading,
   .question-head,
-  .matching-leaderboard-head {
+  .matching-leaderboard-head,
+  .progression-head {
     flex-direction: column;
   }
 
@@ -1318,6 +1507,10 @@ button:disabled {
     flex-direction: column;
   }
 
+  .progression-state {
+    width: fit-content;
+  }
+
   .teacher-leaderboard-edit-row {
     grid-template-columns: 1fr;
   }
@@ -1350,6 +1543,7 @@ button:disabled {
   .placeholder-card,
   .scoreboard-card,
   .result-card,
+  .progression-panel,
   .question-card,
   .hint-card {
     border-radius: 22px;

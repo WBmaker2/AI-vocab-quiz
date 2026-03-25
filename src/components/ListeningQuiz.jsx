@@ -1,7 +1,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { saveStudentProgress } from "../lib/firebase.js";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { ResultSummary } from "./ResultSummary.jsx";
 import { ScoreBoard } from "./ScoreBoard.jsx";
+import { StudentProgressPanel } from "./StudentProgressPanel.jsx";
 import { createListeningQuestions } from "../utils/quiz.js";
 
 function getFeedbackMessage(question, selectedAnswer, status) {
@@ -18,6 +20,10 @@ function getFeedbackMessage(question, selectedAnswer, status) {
 
 export function ListeningQuiz({
   items,
+  remoteConfigured,
+  progressionContext,
+  studentNameDraft,
+  onStudentNameDraftChange,
   speech,
   celebration,
   onBack,
@@ -33,6 +39,12 @@ export function ListeningQuiz({
   const announcedQuestionIdRef = useRef("");
   const celebratedQuestionIdRef = useRef("");
   const completionCelebratedRef = useRef(false);
+  const [progressionLoading, setProgressionLoading] = useState(false);
+  const [progressionStatus, setProgressionStatus] = useState("");
+  const [progressionError, setProgressionError] = useState("");
+  const [progressionComparison, setProgressionComparison] = useState(null);
+  const [newlyEarnedBadges, setNewlyEarnedBadges] = useState([]);
+  const [progressionStudentName, setProgressionStudentName] = useState("");
 
   useEffect(() => {
     setQuestions(createListeningQuestions(items));
@@ -43,7 +55,32 @@ export function ListeningQuiz({
     announcedQuestionIdRef.current = "";
     celebratedQuestionIdRef.current = "";
     completionCelebratedRef.current = false;
+    setProgressionLoading(false);
+    setProgressionStatus("");
+    setProgressionError("");
+    setProgressionComparison(null);
+    setNewlyEarnedBadges([]);
+    setProgressionStudentName("");
   }, [items]);
+
+  useEffect(() => {
+    const cleanDraft = String(studentNameDraft ?? "").trim().replace(/\s+/g, " ");
+    const cleanSaved = String(progressionStudentName ?? "").trim().replace(/\s+/g, " ");
+
+    if (cleanSaved && cleanDraft && cleanSaved === cleanDraft) {
+      return;
+    }
+
+    if (!cleanDraft || (cleanSaved && cleanSaved !== cleanDraft)) {
+      setProgressionStatus("");
+      setProgressionError("");
+      setProgressionComparison(null);
+      setNewlyEarnedBadges([]);
+      if (cleanSaved && cleanSaved !== cleanDraft) {
+        setProgressionStudentName("");
+      }
+    }
+  }, [progressionStudentName, studentNameDraft]);
 
   const totalQuestions = questions.length;
   const question = questions[questionIndex];
@@ -137,7 +174,125 @@ export function ListeningQuiz({
     announcedQuestionIdRef.current = "";
     celebratedQuestionIdRef.current = "";
     completionCelebratedRef.current = false;
+    setProgressionLoading(false);
+    setProgressionStatus("");
+    setProgressionError("");
+    setProgressionComparison(null);
+    setNewlyEarnedBadges([]);
+    setProgressionStudentName("");
   }
+
+  async function handleSaveProgress() {
+    const cleanStudentName = String(studentNameDraft ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+    const schoolId = String(progressionContext?.schoolId ?? "").trim();
+    const schoolName = String(progressionContext?.schoolName ?? "").trim();
+    const grade = String(progressionContext?.grade ?? "").trim();
+
+    if (!remoteConfigured) {
+      setProgressionError("Firebase 연결이 없어 개인 기록을 저장할 수 없습니다.");
+      return;
+    }
+
+    if (!schoolId || !schoolName || !grade) {
+      setProgressionError("학교와 학년을 확인한 뒤 다시 시도해 주세요.");
+      return;
+    }
+
+    if (!cleanStudentName) {
+      setProgressionError("학생 이름을 입력해 주세요.");
+      return;
+    }
+
+    setProgressionLoading(true);
+    setProgressionError("");
+    setProgressionStatus("");
+
+    try {
+      const saved = await saveStudentProgress({
+        schoolId,
+        schoolName,
+        grade,
+        studentName: cleanStudentName,
+        activityType: "listening",
+        result: {
+          score,
+          correctCount: score,
+        },
+      });
+
+      onStudentNameDraftChange?.(cleanStudentName);
+      setProgressionStudentName(cleanStudentName);
+      setProgressionComparison(saved.comparison);
+      setNewlyEarnedBadges(saved.newlyEarnedBadges ?? []);
+      setProgressionStatus(
+        `${cleanStudentName} 학생의 듣기 성장 기록을 저장했습니다.`,
+      );
+    } catch (error) {
+      setProgressionError(error?.message || "개인 기록을 저장하지 못했습니다.");
+    } finally {
+      setProgressionLoading(false);
+    }
+  }
+
+  const progressionDisabledReason = !remoteConfigured
+    ? "Firebase 연결이 없어 이 기기에서는 개인 기록을 저장할 수 없습니다."
+    : !progressionContext?.schoolId || !progressionContext?.schoolName || !progressionContext?.grade
+      ? "학교와 학년을 먼저 선택하면 개인 최고 기록과 배지를 저장할 수 있어요."
+      : !String(studentNameDraft ?? "").trim()
+        ? "학생 이름을 입력하면 개인 최고 기록과 배지를 저장할 수 있어요."
+        : "";
+  const hasSavedProgress = Boolean(progressionStudentName);
+
+  const progressionContent = (
+    <section className="result-progression-block">
+      <div className="result-progression-form">
+        <label className="matching-save-field">
+          <span>학생 이름</span>
+          <input
+            type="text"
+            value={studentNameDraft}
+            maxLength={20}
+            placeholder="이름을 입력하세요"
+            onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
+            disabled={progressionLoading || hasSavedProgress}
+          />
+        </label>
+        <div className="matching-leaderboard-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => void handleSaveProgress()}
+            disabled={
+              progressionLoading ||
+              hasSavedProgress ||
+              !String(studentNameDraft ?? "").trim()
+            }
+          >
+            {progressionLoading
+              ? "저장 중..."
+              : hasSavedProgress
+                ? "저장 완료"
+                : "개인 기록 저장"}
+          </button>
+        </div>
+      </div>
+      {progressionStatus ? (
+        <p className="matching-leaderboard-status">{progressionStatus}</p>
+      ) : null}
+      {progressionError ? (
+        <p className="matching-leaderboard-error">{progressionError}</p>
+      ) : null}
+      <StudentProgressPanel
+        comparison={progressionComparison}
+        newlyEarnedBadges={newlyEarnedBadges}
+        disabledReason={!progressionComparison ? progressionDisabledReason : ""}
+        loading={progressionLoading}
+        title="듣기 성장 기록"
+      />
+    </section>
+  );
 
   if (items.length === 0) {
     return (
@@ -188,6 +343,7 @@ export function ListeningQuiz({
           title="듣고 뜻 고르기 완료"
           score={score}
           total={totalQuestions}
+          extraContent={progressionContent}
           onRetry={handleRetry}
           onBack={onBack}
           onOpenTeacher={onOpenTeacher}
