@@ -15,13 +15,10 @@ import {
   getDocs,
   getFirestore,
   limit,
-  orderBy,
   query,
   runTransaction,
   serverTimestamp,
   setDoc,
-  startAt,
-  endAt,
   updateDoc,
   where,
   deleteDoc,
@@ -741,29 +738,27 @@ export async function signOutCurrentUser() {
 }
 
 export async function searchSchoolsByName(queryText) {
-  const { db: firestore } = ensureFirebase();
   const normalized = normalizeSchoolName(queryText);
 
   if (!normalized) {
     return [];
   }
 
-  const schoolsQuery = query(
-    collection(firestore, "schools"),
-    orderBy("normalizedName"),
-    startAt(normalized),
-    endAt(`${normalized}\uf8ff`),
-    limit(8),
-  );
+  const schools = await listPublishedSchools();
 
-  const snapshot = await getDocs(schoolsQuery);
-  return snapshot.docs.map((item) => ({
-    id: item.id,
-    name: item.data().name,
-  }));
+  return schools
+    .filter((school) => school.normalizedName.startsWith(normalized))
+    .slice(0, 8)
+    .map(({ id, name }) => ({ id, name }));
 }
 
 export async function listPopularSchools(limitCount = 5) {
+  const schools = await listPublishedSchools();
+
+  return schools.slice(0, limitCount).map(({ id, name }) => ({ id, name }));
+}
+
+async function listPublishedSchools() {
   const { db: firestore } = ensureFirebase();
   const snapshot = await getDocs(
     query(collection(firestore, "vocabularySets"), where("published", "==", true)),
@@ -775,20 +770,23 @@ export async function listPopularSchools(limitCount = 5) {
     const data = item.data();
     const schoolId = String(data.schoolId ?? "").trim();
     const schoolName = String(data.schoolName ?? "").trim();
+    const normalizedName = normalizeSchoolName(schoolName);
 
-    if (!schoolId || !schoolName) {
+    if (!schoolId || !schoolName || !normalizedName) {
       return;
     }
 
     const existing = schoolUsage.get(schoolId) ?? {
       id: schoolId,
       name: schoolName,
+      normalizedName,
       setCount: 0,
     };
 
     schoolUsage.set(schoolId, {
       ...existing,
       name: existing.name || schoolName,
+      normalizedName: existing.normalizedName || normalizedName,
       setCount: existing.setCount + 1,
     });
   });
@@ -803,9 +801,7 @@ export async function listPopularSchools(limitCount = 5) {
       return String(left.name).localeCompare(String(right.name), undefined, {
         sensitivity: "base",
       });
-    })
-    .slice(0, limitCount)
-    .map(({ id, name }) => ({ id, name }));
+    });
 }
 
 export async function findOrCreateSchool(name) {
