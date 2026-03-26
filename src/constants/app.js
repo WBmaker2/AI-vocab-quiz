@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.6.0",
+    date: "2026-03-26",
+    summary: [
+      "교사 모드에서 단어 추가, 수정, 삭제를 하면 자동 저장 상태를 보면서 바로 반영할 수 있습니다.",
+      "단원 선택을 저장된 단원 드롭다운과 새 단원 만들기 흐름으로 바꾸고, 말하기 퀴즈는 3회 실패 또는 인식 실패 누적 시 다음 문제로 넘어갈 수 있게 했습니다.",
+      "짝 맞추기 리더보드에 우리학교 전체 TOP 20 탭을 추가하고 학생 화면의 교사용 편집 버튼은 정리했습니다.",
+    ],
+  },
+  {
     version: "v1.5.0",
     date: "2026-03-25",
     summary: [

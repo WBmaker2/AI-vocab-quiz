@@ -104,7 +104,6 @@ export function SpeakingQuiz({
   speech,
   celebration,
   onBack,
-  onOpenTeacher,
 }) {
   const recognition = useSpeechRecognition({ lang: "en-US" });
   const [questions, setQuestions] = useState(() =>
@@ -122,6 +121,15 @@ export function SpeakingQuiz({
   const [progressionComparison, setProgressionComparison] = useState(null);
   const [newlyEarnedBadges, setNewlyEarnedBadges] = useState([]);
   const [progressionStudentName, setProgressionStudentName] = useState("");
+  const [incorrectAttempts, setIncorrectAttempts] = useState(0);
+  const [noSpeechAttempts, setNoSpeechAttempts] = useState(0);
+  const [blockingError, setBlockingError] = useState("");
+
+  function resetQuestionFailureState() {
+    setIncorrectAttempts(0);
+    setNoSpeechAttempts(0);
+    setBlockingError("");
+  }
 
   useEffect(() => {
     setQuestions(createSpeakingSequence(items));
@@ -137,6 +145,7 @@ export function SpeakingQuiz({
     setProgressionComparison(null);
     setNewlyEarnedBadges([]);
     setProgressionStudentName("");
+    resetQuestionFailureState();
     recognition.reset();
   }, [items]);
 
@@ -162,7 +171,11 @@ export function SpeakingQuiz({
   const totalQuestions = questions.length;
   const question = questions[questionIndex];
   const isComplete = status === "complete";
-  const canAdvance = status === "correct" || status === "incorrect" || status === "empty";
+  const canAdvance =
+    status === "correct" ||
+    incorrectAttempts >= 3 ||
+    noSpeechAttempts >= 3 ||
+    Boolean(blockingError);
   const isLockedAfterCorrect = status === "correct";
   const guidance = getGuidance(recognition.error);
 
@@ -179,16 +192,19 @@ export function SpeakingQuiz({
     setAttemptTranscript(transcript);
 
     if (isSpeechMatch(transcript, question.word)) {
+      resetQuestionFailureState();
       setStatus((current) => {
         if (current !== "correct") {
           setScore((scoreValue) => scoreValue + 1);
         }
-
         return "correct";
       });
       return;
     }
 
+    setBlockingError("");
+    setNoSpeechAttempts(0);
+    setIncorrectAttempts((current) => current + 1);
     setStatus("incorrect");
   }, [question?.id, question?.word, recognition.listening, recognition.transcript]);
 
@@ -198,15 +214,20 @@ export function SpeakingQuiz({
     }
 
     if (recognition.error === "no-speech") {
+      setBlockingError("");
+      setIncorrectAttempts(0);
+      setNoSpeechAttempts((current) => current + 1);
       setStatus("empty");
       return;
     }
 
     if (CONFIGURATION_ERRORS.has(recognition.error)) {
+      setBlockingError(recognition.error);
       setStatus("idle");
       return;
     }
 
+    setBlockingError("");
     setStatus("incorrect");
   }, [question?.id, recognition.error]);
 
@@ -253,6 +274,7 @@ export function SpeakingQuiz({
   function handleNext() {
     recognition.stop();
     recognition.reset();
+    resetQuestionFailureState();
 
     if (questionIndex === totalQuestions - 1) {
       setStatus("complete");
@@ -279,6 +301,7 @@ export function SpeakingQuiz({
     setProgressionComparison(null);
     setNewlyEarnedBadges([]);
     setProgressionStudentName("");
+    resetQuestionFailureState();
     recognition.stop();
     recognition.reset();
   }
@@ -286,6 +309,7 @@ export function SpeakingQuiz({
   function handleTryAgain() {
     setStatus("idle");
     setAttemptTranscript("");
+    resetQuestionFailureState();
     recognition.reset();
   }
 
@@ -425,9 +449,6 @@ export function SpeakingQuiz({
             <button className="ghost-button" onClick={onBack}>
               홈으로
             </button>
-            <button className="secondary-button" onClick={onOpenTeacher}>
-              Teacher Mode 열기
-            </button>
           </div>
         </article>
       </section>
@@ -454,9 +475,6 @@ export function SpeakingQuiz({
             Edge에서 다시 열면 마이크 기반 STT 평가가 동작합니다.
           </p>
           <div className="toolbar-row">
-            <button className="primary-button" onClick={onOpenTeacher}>
-              단어 세트 수정
-            </button>
             <button className="ghost-button" onClick={onBack}>
               홈으로
             </button>
@@ -486,7 +504,6 @@ export function SpeakingQuiz({
           extraContent={progressionContent}
           onRetry={handleRetry}
           onBack={onBack}
-          onOpenTeacher={onOpenTeacher}
         />
       </section>
     );
@@ -595,9 +612,6 @@ export function SpeakingQuiz({
                 {questionIndex === totalQuestions - 1
                   ? "결과 보기"
                   : "다음 단어"}
-              </button>
-              <button className="ghost-button" onClick={onOpenTeacher}>
-                단어 세트 수정
               </button>
             </div>
           </article>

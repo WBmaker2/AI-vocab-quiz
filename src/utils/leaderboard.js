@@ -14,6 +14,10 @@ export const LEADERBOARD_PERIOD_DEFINITIONS = [
     type: "year",
     label: "올해의 영단어 왕",
   },
+  {
+    type: "school_all",
+    label: "우리학교 단어 왕",
+  },
 ];
 
 function toMillis(value) {
@@ -76,7 +80,16 @@ export function createLeaderboardPeriodKeys(now = new Date()) {
     week: createIsoWeekKey({ year, month, day }),
     month: `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`,
     year: String(year),
+    school_all: "all-time",
   };
+}
+
+export function createMatchingLeaderboardGradeScope(periodType, grade) {
+  if (String(periodType ?? "").trim() === "school_all") {
+    return "all";
+  }
+
+  return String(grade ?? "").trim();
 }
 
 export function pickBetterMatchingLeaderboardEntry(left, right) {

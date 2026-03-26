@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_STUDENT_SELECTION,
   DEFAULT_TEACHER_SELECTION,
@@ -69,6 +69,7 @@ function summarizeTeacherLeaderboardOutcome(periods, kind) {
     week: "주간",
     month: "월간",
     year: "연간",
+    school_all: "학교 전체",
   };
   const labels = periods.map((period) => periodLabelMap[period] ?? period);
 
@@ -77,6 +78,13 @@ function summarizeTeacherLeaderboardOutcome(periods, kind) {
   }
 
   return `${labels.join(", ")} ${kind}`;
+}
+
+function clearTeacherAutoSaveTimer(timerRef) {
+  if (timerRef.current) {
+    window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }
 }
 
 export function useVocabularyLibrary() {
@@ -122,6 +130,11 @@ export function useVocabularyLibrary() {
     useState("");
   const [teacherLeaderboardSaving, setTeacherLeaderboardSaving] =
     useState(false);
+  const [teacherAutoSaveStatus, setTeacherAutoSaveStatus] = useState("");
+  const [teacherAutoSaveToken, setTeacherAutoSaveToken] = useState(0);
+
+  const teacherAutoSaveTimerRef = useRef(null);
+  const teacherAutoSaveSnapshotRef = useRef(null);
 
   const [studentSchoolQuery, setStudentSchoolQuery] = useState("");
   const [studentSchoolBrowseMode, setStudentSchoolBrowseMode] =
@@ -150,6 +163,56 @@ export function useVocabularyLibrary() {
   const [studentError, setStudentError] = useState("");
 
   const userId = session?.user?.uid ?? "";
+
+  useEffect(() => {
+    teacherAutoSaveSnapshotRef.current = {
+      userId,
+      profile: teacherProfile,
+      selection: teacherSelection,
+      publisher: teacherPublisherDraft,
+      published: teacherPublished,
+      items: teacherItems,
+      dirty: teacherDirty,
+      loading: teacherLoading,
+      saving: teacherSaving,
+      importing: teacherImporting,
+      copying: teacherCopying,
+    };
+  }, [
+    userId,
+    teacherProfile,
+    teacherSelection,
+    teacherPublisherDraft,
+    teacherPublished,
+    teacherItems,
+    teacherDirty,
+    teacherLoading,
+    teacherSaving,
+    teacherImporting,
+    teacherCopying,
+  ]);
+
+  useEffect(() => {
+    if (!teacherAutoSaveToken) {
+      return;
+    }
+
+    if (!teacherDirty) {
+      clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+      setTeacherAutoSaveToken(0);
+      setTeacherAutoSaveStatus("");
+      return;
+    }
+
+    queueTeacherAutoSave();
+  }, [teacherAutoSaveToken]);
+
+  useEffect(
+    () => () => {
+      clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -231,6 +294,8 @@ export function useVocabularyLibrary() {
     }
 
     if (!userId) {
+      clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+      setTeacherAutoSaveToken(0);
       setTeacherProfile(null);
       setTeacherProfileError("");
       setTeacherCatalog([]);
@@ -239,6 +304,7 @@ export function useVocabularyLibrary() {
       setTeacherPublisherDraft("");
       setTeacherDirty(false);
       setTeacherStatus("");
+      setTeacherAutoSaveStatus("");
       setTeacherError("");
       setTeacherCopySources([]);
       setTeacherSelectedCopySourceId("");
@@ -573,6 +639,9 @@ export function useVocabularyLibrary() {
       setTeacherPublished(false);
       setTeacherDirty(false);
       setTeacherSelection(DEFAULT_TEACHER_SELECTION);
+      setTeacherAutoSaveToken(0);
+      clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+      setTeacherAutoSaveStatus("");
       setTeacherProfile(null);
       setOnboarding((current) => ({
         ...current,
@@ -604,10 +673,25 @@ export function useVocabularyLibrary() {
   }
 
   function updateTeacherSelection(field, value) {
-    setTeacherSelection((current) => ({
-      ...current,
-      [field]: value,
-    }));
+    setTeacherSelection((current) => {
+      if (field === "grade") {
+        const nextGrade = String(value ?? "").trim();
+        const nextUnits = getUnitsForGrade(teacherCatalog, nextGrade);
+        return {
+          ...current,
+          grade: nextGrade,
+          unit: nextUnits[0] ?? "",
+        };
+      }
+
+      return {
+        ...current,
+        [field]: value,
+      };
+    });
+    clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+    setTeacherAutoSaveToken(0);
+    setTeacherAutoSaveStatus("");
     setTeacherStatus("");
     setTeacherError("");
     setTeacherCopyStatus("");
@@ -618,6 +702,9 @@ export function useVocabularyLibrary() {
 
   function updateTeacherPublisher(value) {
     setTeacherPublisherDraft(value);
+    clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+    setTeacherAutoSaveToken(0);
+    setTeacherAutoSaveStatus("");
     setTeacherStatus("");
     setTeacherError("");
     setTeacherCopyStatus("");
@@ -807,6 +894,9 @@ export function useVocabularyLibrary() {
   function setTeacherPublishState(nextPublished) {
     setTeacherPublished(nextPublished);
     setTeacherDirty(true);
+    clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+    setTeacherAutoSaveToken(0);
+    setTeacherAutoSaveStatus("");
     setTeacherStatus("");
   }
 
@@ -847,6 +937,123 @@ export function useVocabularyLibrary() {
     return nextGradePublishers;
   }
 
+  function canAutoSaveTeacherSet(snapshot = teacherAutoSaveSnapshotRef.current) {
+    const cleanPublisher = String(snapshot?.publisher ?? "").trim();
+    return Boolean(
+      isFirebaseConfigured &&
+        snapshot?.userId &&
+        snapshot?.profile &&
+        snapshot?.selection?.grade &&
+        snapshot?.selection?.unit &&
+        cleanPublisher &&
+        snapshot?.dirty &&
+        !snapshot?.loading &&
+        !snapshot?.saving &&
+        !snapshot?.importing &&
+        !snapshot?.copying,
+    );
+  }
+
+  async function persistTeacherSetSnapshot(snapshot, sourceType) {
+    if (!snapshot?.profile || !snapshot?.userId) {
+      throw new Error("Google 로그인과 선생님 정보 등록이 필요합니다.");
+    }
+
+    const selection = snapshot.selection ?? {};
+    if (!selection.grade || !selection.unit) {
+      throw new Error("학년과 단원을 먼저 선택하세요.");
+    }
+
+    const cleanPublisher = String(snapshot.publisher ?? "").trim();
+    if (!cleanPublisher) {
+      throw new Error("출판사를 먼저 선택하세요.");
+    }
+
+    const nextGradePublishers = {
+      ...(snapshot.profile.gradePublishers ?? {}),
+      [selection.grade]: cleanPublisher,
+    };
+
+    await upsertTeacherProfile({
+      userId: snapshot.userId,
+      teacherName: snapshot.profile.teacherName,
+      schoolId: snapshot.profile.schoolId,
+      schoolName: snapshot.profile.schoolName,
+      gradePublishers: nextGradePublishers,
+    });
+
+    setTeacherProfile((current) =>
+      current
+        ? {
+            ...current,
+            gradePublishers: nextGradePublishers,
+          }
+        : current,
+    );
+
+    await saveTeacherVocabularySet({
+      userId: snapshot.userId,
+      schoolId: snapshot.profile.schoolId,
+      schoolName: snapshot.profile.schoolName,
+      teacherName: snapshot.profile.teacherName,
+      selection,
+      items: snapshot.items ?? [],
+      published: snapshot.published,
+      publisher: cleanPublisher,
+      sourceType,
+    });
+
+    return {
+      cleanPublisher,
+      nextGradePublishers,
+    };
+  }
+
+  function queueTeacherAutoSave() {
+    if (!teacherDirty) {
+      setTeacherAutoSaveStatus("");
+      return;
+    }
+
+    clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+
+    if (!canAutoSaveTeacherSet()) {
+      setTeacherAutoSaveStatus("자동 저장 대기 중");
+      return;
+    }
+
+    setTeacherAutoSaveStatus("자동 저장 예약 중");
+    teacherAutoSaveTimerRef.current = window.setTimeout(async () => {
+      const snapshot = teacherAutoSaveSnapshotRef.current;
+      if (!canAutoSaveTeacherSet(snapshot)) {
+        setTeacherAutoSaveStatus("자동 저장 대기 중");
+        clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+        return;
+      }
+
+      setTeacherAutoSaveStatus("자동 저장 중...");
+
+      try {
+        const { cleanPublisher } = await persistTeacherSetSnapshot(
+          snapshot,
+          "autosave",
+        );
+        setTeacherPublisherDraft(cleanPublisher);
+        setTeacherDirty(false);
+        setTeacherAutoSaveStatus("자동 저장됨");
+        setTeacherError("");
+        await refreshTeacherCatalog();
+      } catch (error) {
+        setTeacherAutoSaveStatus("자동 저장 실패");
+        setTeacherError(
+          normalizeErrorMessage(error, "단어 세트를 자동 저장하지 못했습니다."),
+        );
+      } finally {
+        clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+      }
+    }, 700);
+  }
+
   async function loadTeacherSet() {
     if (!isFirebaseConfigured || !userId) {
       setTeacherError("Google 로그인 후 단어 세트를 불러올 수 있습니다.");
@@ -860,7 +1067,10 @@ export function useVocabularyLibrary() {
 
     setTeacherLoading(true);
     setTeacherStatus("");
+    setTeacherAutoSaveStatus("");
     setTeacherError("");
+    clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+    setTeacherAutoSaveToken(0);
 
     try {
       const result = await fetchTeacherVocabularySet(userId, teacherSelection);
@@ -897,36 +1107,51 @@ export function useVocabularyLibrary() {
       return;
     }
 
-    const cleanPublisher = teacherPublisherDraft.trim();
-    if (!cleanPublisher) {
+    clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+    setTeacherAutoSaveToken(0);
+    setTeacherAutoSaveStatus("");
+
+    const snapshot = teacherAutoSaveSnapshotRef.current ?? {
+      userId,
+      profile: teacherProfile,
+      selection: teacherSelection,
+      publisher: teacherPublisherDraft,
+      published: teacherPublished,
+      items: teacherItems,
+      dirty: teacherDirty,
+    };
+
+    if (!snapshot.profile || !snapshot.userId) {
+      setTeacherError("Google 로그인과 선생님 정보 등록이 필요합니다.");
+      return;
+    }
+
+    if (!snapshot.selection?.grade || !snapshot.selection?.unit) {
+      setTeacherError("학년과 단원을 먼저 선택하세요.");
+      return;
+    }
+
+    if (!String(snapshot.publisher ?? "").trim()) {
       setTeacherError("출판사를 먼저 선택하세요.");
       return;
     }
+
+    const cleanPublisher = String(snapshot.publisher ?? "").trim();
 
     setTeacherSaving(true);
     setTeacherStatus("");
     setTeacherError("");
 
     try {
-      await persistTeacherGradePublisher(teacherSelection.grade, cleanPublisher);
-      await saveTeacherVocabularySet({
-        userId,
-        schoolId: teacherProfile.schoolId,
-        schoolName: teacherProfile.schoolName,
-        teacherName: teacherProfile.teacherName,
-        selection: teacherSelection,
-        items: teacherItems,
-        published: teacherPublished,
-        publisher: cleanPublisher,
-        sourceType: "manual",
-      });
+      await persistTeacherSetSnapshot(snapshot, "manual");
       setTeacherPublisherDraft(cleanPublisher);
       setTeacherDirty(false);
       setTeacherStatus(
-        teacherPublished
-          ? `${formatSetLabel(teacherSelection)} 세트를 저장하고 학생에게 공개했습니다.`
-          : `${formatSetLabel(teacherSelection)} 세트를 저장했습니다. 아직 공개 전입니다.`,
+        snapshot.published
+          ? `${formatSetLabel(snapshot.selection)} 세트를 저장하고 학생에게 공개했습니다.`
+          : `${formatSetLabel(snapshot.selection)} 세트를 저장했습니다. 아직 공개 전입니다.`,
       );
+      setTeacherAutoSaveStatus("");
       await refreshTeacherCatalog();
     } catch (error) {
       setTeacherError(
@@ -948,6 +1173,9 @@ export function useVocabularyLibrary() {
       return;
     }
 
+    clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+    setTeacherAutoSaveToken(0);
+    setTeacherAutoSaveStatus("");
     setTeacherSaving(true);
     setTeacherStatus("");
     setTeacherError("");
@@ -981,6 +1209,9 @@ export function useVocabularyLibrary() {
       return;
     }
 
+    clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+    setTeacherAutoSaveToken(0);
+    setTeacherAutoSaveStatus("");
     setTeacherSaving(true);
     setTeacherStatus("");
     setTeacherError("");
@@ -1035,7 +1266,10 @@ export function useVocabularyLibrary() {
 
     setTeacherImporting(true);
     setTeacherStatus("");
+    setTeacherAutoSaveStatus("");
     setTeacherError("");
+    clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+    setTeacherAutoSaveToken(0);
 
     try {
       await persistTeacherGradePublisher(grade, cleanPublisher);
@@ -1111,6 +1345,7 @@ export function useVocabularyLibrary() {
       createDraftVocabularyItem(item, current.length),
     ]);
     setTeacherDirty(true);
+    setTeacherAutoSaveToken((current) => current + 1);
   }
 
   function updateTeacherItem(id, nextItem) {
@@ -1126,6 +1361,7 @@ export function useVocabularyLibrary() {
       ),
     );
     setTeacherDirty(true);
+    setTeacherAutoSaveToken((current) => current + 1);
   }
 
   function removeTeacherItem(id) {
@@ -1138,11 +1374,13 @@ export function useVocabularyLibrary() {
         })),
     );
     setTeacherDirty(true);
+    setTeacherAutoSaveToken((current) => current + 1);
   }
 
   function clearTeacherItems() {
     setTeacherItems([]);
     setTeacherDirty(true);
+    setTeacherAutoSaveToken((current) => current + 1);
   }
 
   async function searchTeacherCopySources() {

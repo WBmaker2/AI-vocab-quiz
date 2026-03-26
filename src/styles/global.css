@@ -267,6 +267,7 @@ button {
 .toolbar-row,
 .teacher-summary,
 .stack-actions,
+.stacked-field-controls,
 .placeholder-stats,
 .vocab-card-head,
 .selection-chip-group {
@@ -277,6 +278,11 @@ button {
 
 .hero-badges {
   margin-top: 1.25rem;
+}
+
+.stacked-field-controls {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .hero-badges span,
@@ -392,6 +398,11 @@ button:disabled {
 .inline-hint {
   margin-top: 0.9rem;
   color: #5d6f81;
+}
+
+.autosave-hint {
+  color: #1f63a8;
+  font-weight: 700;
 }
 
 .section-heading {

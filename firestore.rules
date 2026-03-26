@@ -15,7 +15,7 @@ service cloud.firestore {
     }
 
     function isMatchingLeaderboardPeriodType(periodType) {
-      return periodType == 'week' || periodType == 'month' || periodType == 'year';
+      return periodType == 'week' || periodType == 'month' || periodType == 'year' || periodType == 'school_all';
     }
 
     function isNonNegativeNumber(value) {

@@ -4,7 +4,6 @@ export function StudentPlaceholder({
   description,
   items,
   onBack,
-  onOpenTeacher,
 }) {
   return (
     <section className="workspace-panel">
@@ -25,9 +24,6 @@ export function StudentPlaceholder({
           <strong>{items.length}</strong>
         </div>
         <div className="toolbar-row">
-          <button className="primary-button" onClick={onOpenTeacher}>
-            단어 세트 수정
-          </button>
           <button className="ghost-button" onClick={onBack}>
             모드 선택으로
           </button>

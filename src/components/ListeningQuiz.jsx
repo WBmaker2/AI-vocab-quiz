@@ -27,7 +27,6 @@ export function ListeningQuiz({
   speech,
   celebration,
   onBack,
-  onOpenTeacher,
 }) {
   const [questions, setQuestions] = useState(() =>
     createListeningQuestions(items),
@@ -317,9 +316,6 @@ export function ListeningQuiz({
             <button className="ghost-button" onClick={onBack}>
               홈으로
             </button>
-            <button className="secondary-button" onClick={onOpenTeacher}>
-              Teacher Mode 열기
-            </button>
           </div>
         </article>
       </section>
@@ -346,7 +342,6 @@ export function ListeningQuiz({
           extraContent={progressionContent}
           onRetry={handleRetry}
           onBack={onBack}
-          onOpenTeacher={onOpenTeacher}
         />
       </section>
     );
@@ -444,9 +439,6 @@ export function ListeningQuiz({
                 {questionIndex === totalQuestions - 1
                   ? "결과 보기"
                   : "다음 문제"}
-              </button>
-              <button className="ghost-button" onClick={onOpenTeacher}>
-                단어 세트 수정
               </button>
             </div>
           </article>

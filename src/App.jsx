@@ -136,6 +136,7 @@ function App() {
             published={library.teacher.published}
             catalogEntry={library.teacher.catalogEntry}
             status={library.teacher.status}
+            autoSaveStatus={library.teacher.autoSaveStatus}
             error={library.teacher.error}
             loading={library.teacher.loading}
             saving={library.teacher.saving}
@@ -179,7 +180,6 @@ function App() {
             speech={speechSynthesis}
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
-            onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
           />
         ) : null}
 
@@ -193,7 +193,6 @@ function App() {
             speech={speechSynthesis}
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
-            onOpenTeacher={() => navigateTo(APP_VIEWS.TEACHER)}
           />
         ) : null}
 

@@ -463,7 +463,14 @@ function MatchingSummary({
                         <strong>
                           {entry.rank}위 · {entry.studentName}
                         </strong>
-                        <span>{formatElapsedSeconds(entry.elapsedSeconds)}</span>
+                        <span>
+                          {activePeriod.periodType === "school_all" &&
+                          entry.grade &&
+                          entry.grade !== "all"
+                            ? `${entry.grade}학년 · `
+                            : ""}
+                          {formatElapsedSeconds(entry.elapsedSeconds)}
+                        </span>
                       </div>
                       <span>{entry.score}점</span>
                     </li>

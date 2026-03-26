@@ -29,6 +29,7 @@ import {
 import {
   LEADERBOARD_PERIOD_DEFINITIONS,
   createLeaderboardPeriodKeys,
+  createMatchingLeaderboardGradeScope,
   createMatchingLeaderboardScopeKey,
   normalizeStudentName,
   normalizeStudentNameKey,
@@ -550,16 +551,17 @@ export async function renameTeacherMatchingLeaderboardStudent({
 
     for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
       const periodKey = periodKeys[type];
+      const scopeGrade = createMatchingLeaderboardGradeScope(type, cleanGrade);
       const oldEntry = createMatchingLeaderboardEntryRef(firestore, {
         schoolId: cleanSchoolId,
-        grade: cleanGrade,
+        grade: scopeGrade,
         periodType: type,
         periodKey,
         studentName: cleanOldStudentName,
       });
       const newEntry = createMatchingLeaderboardEntryRef(firestore, {
         schoolId: cleanSchoolId,
-        grade: cleanGrade,
+        grade: scopeGrade,
         periodType: type,
         periodKey,
         studentName: cleanNewStudentName,
@@ -570,6 +572,7 @@ export async function renameTeacherMatchingLeaderboardStudent({
       periodSnapshots.push({
         type,
         periodKey,
+        scopeGrade,
         oldEntry,
         newEntry,
         oldSnapshot,
@@ -578,7 +581,15 @@ export async function renameTeacherMatchingLeaderboardStudent({
     }
 
     for (const periodSnapshot of periodSnapshots) {
-      const { type, periodKey, oldEntry, newEntry, oldSnapshot, newSnapshot } =
+      const {
+        type,
+        periodKey,
+        scopeGrade,
+        oldEntry,
+        newEntry,
+        oldSnapshot,
+        newSnapshot,
+      } =
         periodSnapshot;
 
       if (!oldSnapshot.exists()) {
@@ -600,7 +611,7 @@ export async function renameTeacherMatchingLeaderboardStudent({
         source: winner ?? oldData,
         schoolId: cleanSchoolId,
         schoolName: oldData.schoolName ?? newData?.schoolName ?? "",
-        grade: cleanGrade,
+        grade: scopeGrade,
         studentName: cleanNewStudentName,
         periodType: type,
         periodKey,
@@ -650,9 +661,10 @@ export async function deleteTeacherMatchingLeaderboardStudent({
 
     for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
       const periodKey = periodKeys[type];
+      const scopeGrade = createMatchingLeaderboardGradeScope(type, cleanGrade);
       const entry = createMatchingLeaderboardEntryRef(firestore, {
         schoolId: cleanSchoolId,
-        grade: cleanGrade,
+        grade: scopeGrade,
         periodType: type,
         periodKey,
         studentName: cleanStudentName,
@@ -1295,10 +1307,11 @@ export async function fetchMatchingLeaderboards({
   const periodKeys = createLeaderboardPeriodKeys(now);
   const leaderboardEntries = await Promise.all(
     LEADERBOARD_PERIOD_DEFINITIONS.map(async ({ type, label }) => {
+      const scopeGrade = createMatchingLeaderboardGradeScope(type, grade);
       const periodResult = await fetchMatchingLeaderboardPeriod({
         firestore,
         schoolId,
-        grade,
+        grade: scopeGrade,
         periodType: type,
         periodKey: periodKeys[type],
         limitCount,
@@ -1358,12 +1371,13 @@ export async function saveMatchingLeaderboardScore({
   let lastError = null;
 
   for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
+    const scopeGrade = createMatchingLeaderboardGradeScope(type, cleanGrade);
     try {
       const result = await upsertMatchingLeaderboardPeriod({
         firestore,
         schoolId: cleanSchoolId,
         schoolName: cleanSchoolName,
-        grade: cleanGrade,
+        grade: scopeGrade,
         studentName: cleanStudentName,
         periodType: type,
         periodKey: periodKeys[type],

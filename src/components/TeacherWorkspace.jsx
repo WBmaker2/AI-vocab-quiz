@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { VocabularyForm } from "./VocabularyForm.jsx";
 import { VocabularyList } from "./VocabularyList.jsx";
 import { LEADERBOARD_PERIOD_DEFINITIONS } from "../utils/leaderboard.js";
@@ -10,6 +10,8 @@ const EMPTY_FORM = {
   imageHint: "",
   exampleSentence: "",
 };
+
+const CREATE_UNIT_VALUE = "__create_new_unit__";
 
 export function TeacherWorkspace({
   gradeOptions,
@@ -62,10 +64,20 @@ export function TeacherWorkspace({
   const [editingId, setEditingId] = useState("");
   const [importFile, setImportFile] = useState(null);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [unitChoice, setUnitChoice] = useState(
+    units.includes(selection.unit) ? selection.unit : CREATE_UNIT_VALUE,
+  );
+  const [newUnitDraft, setNewUnitDraft] = useState(
+    units.includes(selection.unit) ? "" : selection.unit,
+  );
   const importInputRef = useRef(null);
 
   const isEditing = Boolean(editingId);
   const hasItems = items.length > 0;
+  const statusToneClass =
+    typeof status === "string" && status.includes("실패")
+      ? "warning-hint"
+      : "success-hint";
 
   const stats = useMemo(
     () => ({
@@ -74,6 +86,30 @@ export function TeacherWorkspace({
     }),
     [items],
   );
+
+  useEffect(() => {
+    if (selection.unit && units.includes(selection.unit)) {
+      setUnitChoice(selection.unit);
+      setNewUnitDraft("");
+      return;
+    }
+
+    if (selection.unit) {
+      setUnitChoice(CREATE_UNIT_VALUE);
+      setNewUnitDraft(selection.unit);
+      return;
+    }
+
+    if (unitChoice === CREATE_UNIT_VALUE) {
+      setNewUnitDraft("");
+      return;
+    }
+
+    if (units.length === 0) {
+      setUnitChoice("");
+      setNewUnitDraft("");
+    }
+  }, [selection.unit, units, unitChoice]);
 
   function resetForm() {
     setFormValues(EMPTY_FORM);
@@ -113,6 +149,24 @@ export function TeacherWorkspace({
   function handleChange(event) {
     const { name, value } = event.target;
     setFormValues((current) => ({ ...current, [name]: value }));
+  }
+
+  function handleUnitChoiceChange(nextChoice) {
+    setUnitChoice(nextChoice);
+
+    if (nextChoice === CREATE_UNIT_VALUE) {
+      setNewUnitDraft("");
+      onSelectionChange("unit", "");
+      return;
+    }
+
+    setNewUnitDraft("");
+    onSelectionChange("unit", nextChoice);
+  }
+
+  function handleUnitDraftChange(value) {
+    setNewUnitDraft(value);
+    onSelectionChange("unit", value);
   }
 
   function handleEdit(item) {
@@ -593,8 +647,8 @@ export function TeacherWorkspace({
         </div>
 
         <p className="inline-hint">
-          현재 선택한 {selection.grade}학년의 같은 학교 리더보드를 수정하거나
-          삭제할 수 있습니다.
+          현재 학교의 같은 학년 리더보드를 관리하고, 학교 전체 순위 탭도 함께
+          확인할 수 있습니다.
         </p>
 
         {!profile?.schoolId ? (
@@ -884,17 +938,25 @@ export function TeacherWorkspace({
 
           <label className="field">
             <span>단원</span>
-            <input
-              list="teacher-unit-options"
-              value={selection.unit}
-              onChange={(event) => onSelectionChange("unit", event.target.value)}
-              placeholder="예: 1"
-            />
-            <datalist id="teacher-unit-options">
+            <select
+              value={unitChoice}
+              onChange={(event) => handleUnitChoiceChange(event.target.value)}
+            >
+              <option value="">단원 선택</option>
               {units.map((unit) => (
-                <option key={unit} value={unit} />
+                <option key={unit} value={unit}>
+                  {unit}단원
+                </option>
               ))}
-            </datalist>
+              <option value={CREATE_UNIT_VALUE}>+ 새 단원 만들기</option>
+            </select>
+            {unitChoice === CREATE_UNIT_VALUE ? (
+              <input
+                value={newUnitDraft}
+                onChange={(event) => handleUnitDraftChange(event.target.value)}
+                placeholder="새 단원 번호를 입력하세요"
+              />
+            ) : null}
           </label>
 
           <label className="field field-wide">
@@ -937,7 +999,9 @@ export function TeacherWorkspace({
           </p>
         ) : null}
         {error ? <p className="inline-hint warning-hint">{error}</p> : null}
-        {status ? <p className="inline-hint success-hint">{status}</p> : null}
+        {status ? (
+          <p className={`inline-hint ${statusToneClass}`}>{status}</p>
+        ) : null}
         {dirty ? (
           <p className="inline-hint warning-hint">
             저장되지 않은 변경사항이 있습니다.

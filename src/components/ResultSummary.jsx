@@ -5,7 +5,6 @@ export function ResultSummary({
   extraContent = null,
   onRetry,
   onBack,
-  onOpenTeacher,
 }) {
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
 
@@ -21,9 +20,6 @@ export function ResultSummary({
       <div className="toolbar-row">
         <button className="primary-button" onClick={onRetry}>
           다시 하기
-        </button>
-        <button className="secondary-button" onClick={onOpenTeacher}>
-          단어 세트 수정
         </button>
         <button className="ghost-button" onClick={onBack}>
           홈으로
