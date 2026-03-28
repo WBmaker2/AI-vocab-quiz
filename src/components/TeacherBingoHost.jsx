@@ -106,6 +106,7 @@ export function TeacherBingoHost({
 }) {
   const [rollingVisual, setRollingVisual] = useState(false);
   const [revealPulse, setRevealPulse] = useState(false);
+  const [showSessionCodeModal, setShowSessionCodeModal] = useState(false);
   const pendingSpeakRef = useRef(false);
   const previousWordRef = useRef(currentWord);
   const revealTimerRef = useRef(null);
@@ -249,9 +250,13 @@ export function TeacherBingoHost({
       </div>
 
       <div className="bingo-session-strip">
-        <span className="bingo-session-pill">
+        <button
+          className="bingo-session-pill bingo-session-pill-button"
+          type="button"
+          onClick={() => setShowSessionCodeModal(true)}
+        >
           세션 코드 <strong>{sessionCode || "-"}</strong>
-        </span>
+        </button>
         {teacherName ? (
           <span className="bingo-session-pill">
             선생님 <strong>{teacherName}</strong>
@@ -482,6 +487,40 @@ export function TeacherBingoHost({
           <p className="bingo-empty-state">아직 호출 기록이 없습니다.</p>
         )}
       </section>
+
+      {showSessionCodeModal ? (
+        <div
+          className="bingo-code-modal-backdrop"
+          role="presentation"
+          onClick={() => setShowSessionCodeModal(false)}
+        >
+          <div
+            className="bingo-code-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bingo-session-code-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="mode-label" id="bingo-session-code-title">
+              Session Code
+            </p>
+            <h3>학생들에게 이 코드를 보여주세요</h3>
+            <div className="bingo-code-modal-code">{sessionCode || "-"}</div>
+            <p className="bingo-host-copy">
+              학생은 참여 화면에서 이 세션 코드를 입력해 학급 빙고에 들어옵니다.
+            </p>
+            <div className="toolbar-row">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => setShowSessionCodeModal(false)}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

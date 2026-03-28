@@ -19,6 +19,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  Timestamp,
   updateDoc,
   where,
   deleteDoc,
@@ -1829,12 +1830,13 @@ export async function callBingoWord({
       imageHint: normalizeBingoText(selectedItem.imageHint),
       exampleSentence: normalizeBingoText(selectedItem.exampleSentence),
     };
+    const calledAt = Timestamp.now();
     const callRecord = {
       wordId: normalizedSelectedItem.id,
       word: normalizedSelectedItem.word,
       meaning: normalizedSelectedItem.meaning,
       mode: cleanMode === "tts" ? "tts" : currentSession.mode,
-      calledAt: serverTimestamp(),
+      calledAt,
       calledBy: cleanTeacherUserId || currentSession.teacherUserId,
     };
     const nextCalledWordIds = Array.from(
@@ -1901,12 +1903,13 @@ export async function drawNextBingoWord({
     }
 
     const nextWordId = createBingoWordId(nextWord);
+    const calledAt = Timestamp.now();
     const callRecord = {
       wordId: nextWordId,
       word: normalizeBingoText(nextWord.word),
       meaning: normalizeBingoText(nextWord.meaning),
       mode: cleanMode === "tts" ? "tts" : currentSession.mode,
-      calledAt: serverTimestamp(),
+      calledAt,
       calledBy: currentSession.teacherUserId,
       isRandomDraw: true,
     };
