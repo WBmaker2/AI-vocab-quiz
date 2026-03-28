@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.8.0",
+    date: "2026-03-29",
+    summary: [
+      "학생 모드에 단어 낚시 게임을 추가해 TTS로 읽어주는 영어를 듣고 떠다니는 뜻 카드를 눌러 반응 속도를 겨룰 수 있습니다.",
+      "단어 낚시는 문제당 10초, 총 10문제로 진행되고 학생 화면의 버튼은 단어 짝 맞추기와 학급 빙고 게임 사이에 배치했습니다.",
+    ],
+  },
+  {
     version: "v1.7.1",
     date: "2026-03-28",
     summary: [

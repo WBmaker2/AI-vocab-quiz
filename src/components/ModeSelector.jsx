@@ -37,6 +37,7 @@ export function ModeSelector({
   onOpenListening,
   onOpenSpeaking,
   onOpenMatching,
+  onOpenFishing,
   onOpenBingo,
 }) {
   const [matchingPanelOpen, setMatchingPanelOpen] = useState(false);
@@ -318,6 +319,13 @@ export function ModeSelector({
             disabled={!remoteConfigured || !selectedTeacher || unitsLoading}
           >
             단어 짝 맞추기
+          </button>
+          <button
+            className="ghost-button"
+            onClick={onOpenFishing}
+            disabled={!hasVocabulary}
+          >
+            단어 낚시
           </button>
           <button
             className="ghost-button"

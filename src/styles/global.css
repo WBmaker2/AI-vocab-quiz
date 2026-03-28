@@ -848,6 +848,144 @@ button:disabled {
   line-height: 1;
 }
 
+.word-fishing-shell {
+  margin-top: 1rem;
+}
+
+.word-fishing-grid {
+  align-items: start;
+}
+
+.word-fishing-start-card,
+.word-fishing-result-card {
+  margin-top: 1rem;
+}
+
+.word-fishing-rule-grid,
+.word-fishing-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.word-fishing-rule-card,
+.word-fishing-summary-card {
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(23, 50, 77, 0.08);
+  border-radius: 20px;
+  background: rgba(249, 251, 255, 0.96);
+}
+
+.word-fishing-rule-card span,
+.word-fishing-summary-card span {
+  display: block;
+  color: #5d6f81;
+}
+
+.word-fishing-rule-card strong,
+.word-fishing-summary-card strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.7rem;
+}
+
+.word-fishing-call-card,
+.word-fishing-board-card {
+  overflow: hidden;
+}
+
+.word-fishing-target {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 244, 214, 0.88), rgba(234, 245, 255, 0.88));
+}
+
+.word-fishing-target strong {
+  font-size: clamp(2.1rem, 4vw, 3.4rem);
+  line-height: 1;
+}
+
+.word-fishing-target span {
+  color: #51677e;
+  font-weight: 700;
+}
+
+.word-fishing-board {
+  position: relative;
+  min-height: 25rem;
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(23, 50, 77, 0.08);
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255, 227, 157, 0.35), transparent 22%),
+    radial-gradient(circle at 88% 16%, rgba(138, 210, 255, 0.32), transparent 18%),
+    linear-gradient(180deg, rgba(241, 248, 255, 0.98), rgba(226, 240, 255, 0.98));
+}
+
+.word-fishing-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: min(13rem, 48vw);
+  max-width: min(17rem, 52vw);
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(23, 50, 77, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #17324d;
+  font-size: clamp(1rem, 1.4vw, 1.18rem);
+  font-weight: 800;
+  box-shadow: 0 14px 28px rgba(23, 50, 77, 0.1);
+  transform: translate(-24%, var(--fishing-top)) scale(var(--fishing-scale, 1));
+  animation: fishing-swim var(--fishing-duration, 12s) linear infinite;
+  animation-delay: var(--fishing-delay, 0s);
+}
+
+.word-fishing-card:hover {
+  border-color: rgba(29, 143, 255, 0.24);
+  box-shadow: 0 18px 30px rgba(29, 143, 255, 0.12);
+}
+
+.word-fishing-card-selected,
+.word-fishing-card:disabled {
+  cursor: default;
+}
+
+.word-fishing-card-correct {
+  border-color: rgba(18, 105, 60, 0.24);
+  background: #e7f9ef;
+  color: #12693c;
+}
+
+.word-fishing-card-wrong {
+  border-color: rgba(158, 47, 36, 0.24);
+  background: #fff1ef;
+  color: #9e2f24;
+}
+
+.word-fishing-feedback {
+  min-height: 5.2rem;
+}
+
+.word-fishing-feedback-idle {
+  background: #f5f9fd;
+}
+
+.word-fishing-feedback-correct {
+  background: #e7f9ef;
+}
+
+.word-fishing-feedback-wrong,
+.word-fishing-feedback-timeout {
+  background: #fff4e6;
+}
+
 .progression-panel {
   margin-top: 1rem;
   padding: 1.15rem;
@@ -1888,6 +2026,24 @@ button:disabled {
   }
 }
 
+@keyframes fishing-swim {
+  0% {
+    transform: translate(-24%, var(--fishing-top)) scale(var(--fishing-scale, 1)) rotate(-2deg);
+  }
+  25% {
+    transform: translate(6vw, calc(var(--fishing-top) + var(--fishing-drift, 10px))) scale(var(--fishing-scale, 1)) rotate(1deg);
+  }
+  50% {
+    transform: translate(38vw, calc(var(--fishing-top) - (var(--fishing-drift, 10px) * 0.5))) scale(var(--fishing-scale, 1)) rotate(-1deg);
+  }
+  75% {
+    transform: translate(70vw, calc(var(--fishing-top) + var(--fishing-drift, 10px))) scale(var(--fishing-scale, 1)) rotate(2deg);
+  }
+  100% {
+    transform: translate(110vw, var(--fishing-top)) scale(var(--fishing-scale, 1)) rotate(-2deg);
+  }
+}
+
 @keyframes matching-card-fade-out {
   0% {
     opacity: 1;
@@ -1928,6 +2084,15 @@ button:disabled {
 
   .bingo-board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .word-fishing-rule-grid,
+  .word-fishing-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .word-fishing-board {
+    min-height: 22rem;
   }
 
   .result-progression-form {
@@ -1995,7 +2160,9 @@ button:disabled {
   .compact-grid,
   .list-grid,
   .choices-grid,
-  .matching-unit-grid {
+  .matching-unit-grid,
+  .word-fishing-rule-grid,
+  .word-fishing-summary-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2023,6 +2190,16 @@ button:disabled {
   .support-pill {
     width: 100%;
     justify-content: center;
+  }
+
+  .word-fishing-board {
+    min-height: 20rem;
+  }
+
+  .word-fishing-card {
+    min-width: min(12rem, 72vw);
+    max-width: min(14rem, 78vw);
+    padding: 0.8rem 0.9rem;
   }
 
   .app-backdrop {
@@ -2175,5 +2352,13 @@ button:disabled {
 
   .bingo-current-word {
     min-height: 5.9rem;
+  }
+
+  .word-fishing-board {
+    min-height: 18rem;
+  }
+
+  .word-fishing-target strong {
+    font-size: clamp(1.75rem, 11vw, 2.5rem);
   }
 }

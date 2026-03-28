@@ -8,6 +8,7 @@ import { TeacherBingoHost } from "./components/TeacherBingoHost.jsx";
 import { UpdateHistoryModal } from "./components/UpdateHistoryModal.jsx";
 import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
 import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
+import { WordFishingGame } from "./components/WordFishingGame.jsx";
 import { WordMatchingGame } from "./components/WordMatchingGame.jsx";
 import { APP_UPDATES, APP_VERSION } from "./constants/app.js";
 import { GRADE_OPTIONS, PUBLISHER_OPTIONS } from "./constants/vocabulary.js";
@@ -23,6 +24,7 @@ const APP_VIEWS = {
   LISTENING: "listening",
   SPEAKING: "speaking",
   MATCHING: "matching",
+  FISHING: "fishing",
   BINGO_HOST: "bingo-host",
   BINGO_JOIN: "bingo-join",
   BINGO_BOARD: "bingo-board",
@@ -209,6 +211,7 @@ function App() {
             onOpenListening={() => navigateTo(APP_VIEWS.LISTENING)}
             onOpenSpeaking={() => navigateTo(APP_VIEWS.SPEAKING)}
             onOpenMatching={() => navigateTo(APP_VIEWS.MATCHING)}
+            onOpenFishing={() => navigateTo(APP_VIEWS.FISHING)}
             onOpenBingo={() => navigateTo(APP_VIEWS.BINGO_JOIN)}
           />
         ) : null}
@@ -305,6 +308,15 @@ function App() {
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
             onChooseUnits={() => navigateTo(APP_VIEWS.HOME, { openMatchingPanel: true })}
+          />
+        ) : null}
+
+        {view === APP_VIEWS.FISHING ? (
+          <WordFishingGame
+            items={library.student.items}
+            speech={speechSynthesis}
+            celebration={celebrationAudio}
+            onBack={() => navigateTo(APP_VIEWS.HOME)}
           />
         ) : null}
 
