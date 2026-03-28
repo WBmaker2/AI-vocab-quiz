@@ -2,12 +2,16 @@ import { useState } from "react";
 import { BrowserSupportNotice } from "./components/BrowserSupportNotice.jsx";
 import { ListeningQuiz } from "./components/ListeningQuiz.jsx";
 import { ModeSelector } from "./components/ModeSelector.jsx";
+import { StudentBingoBoard } from "./components/StudentBingoBoard.jsx";
+import { StudentBingoJoin } from "./components/StudentBingoJoin.jsx";
+import { TeacherBingoHost } from "./components/TeacherBingoHost.jsx";
 import { UpdateHistoryModal } from "./components/UpdateHistoryModal.jsx";
 import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
 import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
 import { WordMatchingGame } from "./components/WordMatchingGame.jsx";
 import { APP_UPDATES, APP_VERSION } from "./constants/app.js";
 import { GRADE_OPTIONS, PUBLISHER_OPTIONS } from "./constants/vocabulary.js";
+import { useBingoSession } from "./hooks/useBingoSession.js";
 import { useCelebrationAudio } from "./hooks/useCelebrationAudio.js";
 import { isSpeechRecognitionSupported } from "./hooks/useSpeechRecognition.js";
 import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis.js";
@@ -19,15 +23,38 @@ const APP_VIEWS = {
   LISTENING: "listening",
   SPEAKING: "speaking",
   MATCHING: "matching",
+  BINGO_HOST: "bingo-host",
+  BINGO_JOIN: "bingo-join",
+  BINGO_BOARD: "bingo-board",
 };
+
+function formatBingoCallSource(entry) {
+  if (!entry) {
+    return "";
+  }
+
+  if (entry.isRandomDraw) {
+    return entry.mode === "tts" ? "랜덤 TTS" : "랜덤";
+  }
+
+  if (entry.mode === "tts") {
+    return "선생님 TTS";
+  }
+
+  return "선생님 직접 읽기";
+}
 
 function App() {
   const [view, setView] = useState(APP_VIEWS.HOME);
   const [homeMatchingPanelOpen, setHomeMatchingPanelOpen] = useState(false);
   const [updateHistoryOpen, setUpdateHistoryOpen] = useState(false);
+  const [bingoTeacherMode, setBingoTeacherMode] = useState("manual");
+  const [bingoJoinCode, setBingoJoinCode] = useState("");
   const speechSynthesis = useSpeechSynthesis();
   const celebrationAudio = useCelebrationAudio();
   const library = useVocabularyLibrary();
+  const teacherBingo = useBingoSession();
+  const studentBingo = useBingoSession();
 
   const support = {
     tts: speechSynthesis.supported,
@@ -35,6 +62,29 @@ function App() {
   };
 
   const hasStudentVocabulary = library.student.items.length > 0;
+  const canStartTeacherBingo =
+    library.teacher.items.length >= 9 &&
+    Boolean(library.teacher.selection.grade) &&
+    Boolean(library.teacher.selection.unit) &&
+    Boolean(library.teacher.profile?.userId);
+  const teacherBingoSessionTitle =
+    library.teacher.selection.grade && library.teacher.selection.unit
+      ? `${library.teacher.selection.grade}학년 ${library.teacher.selection.unit}단원 학급 빙고`
+      : "학급 빙고 수업";
+  const studentBingoCall =
+    studentBingo.session?.callSequence?.[studentBingo.session.callSequence.length - 1] ??
+    null;
+
+  function speakBingoWord(word) {
+    if (!word) {
+      return;
+    }
+
+    speechSynthesis.speak(word, {
+      lang: "en-US",
+      rate: 0.88,
+    });
+  }
 
   function navigateTo(nextView, options = {}) {
     speechSynthesis.cancel();
@@ -44,6 +94,49 @@ function App() {
       setHomeMatchingPanelOpen(false);
     }
     setView(nextView);
+  }
+
+  async function handleOpenTeacherBingoHost() {
+    if (!canStartTeacherBingo) {
+      return;
+    }
+
+    try {
+      const result = await teacherBingo.startSession({
+        teacherUserId: library.teacher.profile.userId,
+        teacherName: library.teacher.profile.teacherName,
+        schoolId: library.teacher.profile.schoolId,
+        schoolName: library.teacher.profile.schoolName,
+        grade: library.teacher.selection.grade,
+        unit: library.teacher.selection.unit,
+        publisher: library.teacher.publisher,
+        mode: bingoTeacherMode === "tts" ? "tts" : "manual",
+        items: library.teacher.items,
+      });
+
+      setBingoTeacherMode(
+        result.session?.mode === "tts" ? "tts" : "manual",
+      );
+      navigateTo(APP_VIEWS.BINGO_HOST);
+    } catch {
+      // Hook error state already captures the message for the host.
+    }
+  }
+
+  async function handleJoinBingoSession() {
+    if (!bingoJoinCode.trim() || !library.student.nameDraft.trim()) {
+      return;
+    }
+
+    try {
+      await studentBingo.joinSession({
+        sessionCode: bingoJoinCode,
+        studentName: library.student.nameDraft,
+      });
+      navigateTo(APP_VIEWS.BINGO_BOARD);
+    } catch {
+      // Hook error state already captures the message for the board.
+    }
   }
 
   return (
@@ -116,6 +209,7 @@ function App() {
             onOpenListening={() => navigateTo(APP_VIEWS.LISTENING)}
             onOpenSpeaking={() => navigateTo(APP_VIEWS.SPEAKING)}
             onOpenMatching={() => navigateTo(APP_VIEWS.MATCHING)}
+            onOpenBingo={() => navigateTo(APP_VIEWS.BINGO_JOIN)}
           />
         ) : null}
 
@@ -163,12 +257,14 @@ function App() {
             onCopySource={library.teacher.copySource}
           onAddItem={library.teacher.addItem}
           onUpdateItem={library.teacher.updateItem}
-          onRemoveItem={library.teacher.removeItem}
-          onClearItems={library.teacher.clearItems}
-          leaderboard={library.teacher.leaderboard}
-          onBack={() => navigateTo(APP_VIEWS.HOME)}
-        />
-      ) : null}
+            onRemoveItem={library.teacher.removeItem}
+            onClearItems={library.teacher.clearItems}
+            onOpenBingoHost={handleOpenTeacherBingoHost}
+            canStartBingo={canStartTeacherBingo}
+            leaderboard={library.teacher.leaderboard}
+            onBack={() => navigateTo(APP_VIEWS.HOME)}
+          />
+        ) : null}
 
         {view === APP_VIEWS.LISTENING ? (
           <ListeningQuiz
@@ -209,6 +305,158 @@ function App() {
             celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
             onChooseUnits={() => navigateTo(APP_VIEWS.HOME, { openMatchingPanel: true })}
+          />
+        ) : null}
+
+        {view === APP_VIEWS.BINGO_HOST ? (
+          <TeacherBingoHost
+            sessionCode={teacherBingo.sessionCode}
+            sessionTitle={teacherBingoSessionTitle}
+            teacherName={library.teacher.profile?.teacherName ?? ""}
+            classLabel={
+              library.teacher.selection.grade && library.teacher.selection.unit
+                ? `${library.teacher.selection.grade}학년 · ${library.teacher.selection.unit}단원`
+                : ""
+            }
+            roomLabel={library.teacher.publisher ? `출판사 ${library.teacher.publisher}` : ""}
+            callMode={bingoTeacherMode}
+            currentWordId={teacherBingo.session?.activeWordId ?? ""}
+            currentWord={teacherBingo.session?.activeWordText ?? ""}
+            students={teacherBingo.players.map((player) => ({
+              id: player.playerId ?? player.id,
+              name: player.studentName,
+              bingoCount: player.bingoLines ?? 0,
+              connected: true,
+              status:
+                (player.bingoLines ?? 0) >= 3
+                  ? `${player.bingoLines}빙고 달성`
+                  : (player.bingoLines ?? 0) > 0
+                    ? `${player.bingoLines}빙고 진행 중`
+                    : "대기 중",
+            }))}
+            callHistory={[...(teacherBingo.session?.callSequence ?? [])]
+              .reverse()
+              .map((entry, index) => ({
+                id: `${entry.wordId ?? entry.word ?? "call"}-${index}`,
+                word: entry.word,
+                source: formatBingoCallSource(entry),
+              }))}
+            wordOptions={teacherBingo.session?.vocabularyItems ?? []}
+            statusMessage={
+              teacherBingo.session?.status === "finished"
+                ? "세션을 종료했습니다."
+                : teacherBingo.players.length > 0
+                  ? `${teacherBingo.players.length}명의 학생이 참여 중입니다.`
+                  : "참여 코드를 알려주고 학생들이 들어오기를 기다리세요."
+            }
+            errorMessage={teacherBingo.error}
+            isPicking={bingoTeacherMode === "random" && teacherBingo.actionLoading}
+            isComplete={teacherBingo.session?.status === "finished"}
+            onToggleCallMode={setBingoTeacherMode}
+            onPickRandomWord={async () => {
+              try {
+                await teacherBingo.drawWord({
+                  sessionId: teacherBingo.sessionCode,
+                  teacherUserId: library.teacher.profile?.userId ?? "",
+                  mode: "tts",
+                });
+              } catch {
+                // Hook error state already captures the message for the host.
+              }
+            }}
+            onSelectWord={async (option) => {
+              try {
+                await teacherBingo.callWord({
+                  sessionId: teacherBingo.sessionCode,
+                  teacherUserId: library.teacher.profile?.userId ?? "",
+                  wordId: option.id,
+                  word: option.word,
+                  meaning: option.meaning,
+                  mode: bingoTeacherMode === "tts" ? "tts" : "manual",
+                });
+                if (bingoTeacherMode === "tts") {
+                  speakBingoWord(option.word);
+                }
+              } catch {
+                // Hook error state already captures the message for the host.
+              }
+            }}
+            onSpeakCurrentWord={speakBingoWord}
+            onEndGame={async () => {
+              try {
+                await teacherBingo.endSession({
+                  sessionId: teacherBingo.sessionCode,
+                  teacherUserId: library.teacher.profile?.userId ?? "",
+                });
+              } catch {
+                return;
+              }
+
+              navigateTo(APP_VIEWS.TEACHER);
+            }}
+            onBack={() => navigateTo(APP_VIEWS.TEACHER)}
+          />
+        ) : null}
+
+        {view === APP_VIEWS.BINGO_JOIN ? (
+          <StudentBingoJoin
+            sessionCode={studentBingo.sessionCode}
+            teacherName={studentBingo.session?.teacherName ?? ""}
+            playerName={library.student.nameDraft}
+            joinCode={bingoJoinCode}
+            statusMessage={
+              studentBingo.session?.teacherName
+                ? `${studentBingo.session.teacherName} 선생님 세션입니다.`
+                : ""
+            }
+            errorMessage={studentBingo.error}
+            joining={studentBingo.actionLoading}
+            onSessionCodeChange={setBingoJoinCode}
+            onPlayerNameChange={library.student.updateNameDraft}
+            onJoin={handleJoinBingoSession}
+            onBack={() => navigateTo(APP_VIEWS.HOME)}
+          />
+        ) : null}
+
+        {view === APP_VIEWS.BINGO_BOARD ? (
+          <StudentBingoBoard
+            sessionCode={studentBingo.sessionCode}
+            playerName={studentBingo.player?.studentName ?? library.student.nameDraft}
+            boardTitle={
+              studentBingo.session?.schoolName && studentBingo.session?.unit
+                ? `${studentBingo.session.schoolName} · ${studentBingo.session.unit}단원 빙고`
+                : "영어 단어 빙고 보드"
+            }
+            boardWords={studentBingo.player?.boardCells ?? []}
+            currentWordId={studentBingo.session?.activeWordId ?? ""}
+            currentWord={studentBingo.session?.activeWordText ?? ""}
+            currentWordSource={formatBingoCallSource(studentBingoCall)}
+            bingoCount={studentBingo.player?.bingoLines ?? 0}
+            claimedWords={studentBingo.player?.markedWordIds ?? []}
+            completedWords={[]}
+            lockedWords={[]}
+            statusMessage={
+              studentBingo.session?.status === "finished"
+                ? "선생님이 빙고 수업을 종료했습니다."
+                : (studentBingo.player?.bingoLines ?? 0) >= 3
+                  ? `${studentBingo.player?.bingoLines ?? 0}빙고! 선생님이 종료하기 전까지 계속 이어서 체크할 수 있어요.`
+                  : ""
+            }
+            errorMessage={studentBingo.error}
+            roundLabel={
+              studentBingo.session?.grade && studentBingo.session?.unit
+                ? `${studentBingo.session.grade}학년 ${studentBingo.session.unit}단원`
+                : ""
+            }
+            canContinue={studentBingo.session?.status === "live"}
+            onCheckWord={(wordId) =>
+              studentBingo.markCell({
+                sessionId: studentBingo.sessionCode,
+                playerId: studentBingo.playerId,
+                wordId,
+              })
+            }
+            onBack={() => navigateTo(APP_VIEWS.HOME)}
           />
         ) : null}
       </main>

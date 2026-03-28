@@ -42,6 +42,17 @@ import {
   evaluateEarnedBadges,
   normalizeStudentProfileName,
 } from "../utils/studentProgress.js";
+import {
+  canMarkBingoCell,
+  computeBingoLines,
+  createBingoBoard,
+  createBingoSessionCode,
+  createBingoWordId,
+  determineBingoBoardSize,
+  normalizeBingoItems,
+  normalizeBingoText,
+  selectNextBingoWord,
+} from "../utils/bingo.js";
 
 function getEnvValue(name) {
   return String(import.meta.env[name] ?? "").trim();
@@ -1402,4 +1413,672 @@ export async function saveMatchingLeaderboardScore({
     skippedPeriods,
     failedPeriods,
   };
+}
+
+function createBingoSessionRef(firestore, sessionId) {
+  return doc(firestore, "bingoSessions", String(sessionId ?? "").trim());
+}
+
+function createBingoPlayerRef(firestore, sessionId, playerId) {
+  return doc(
+    firestore,
+    "bingoSessions",
+    String(sessionId ?? "").trim(),
+    "players",
+    String(playerId ?? "").trim(),
+  );
+}
+
+function normalizeBingoSessionItems(items) {
+  return normalizeBingoItems(items).map((item) => ({
+    id: item.id,
+    word: item.word,
+    meaning: item.meaning,
+    imageHint: item.imageHint,
+    exampleSentence: item.exampleSentence,
+  }));
+}
+
+function normalizeBingoPlayerName(studentName) {
+  return normalizeBingoText(studentName);
+}
+
+function createBingoPlayerId(studentName) {
+  return normalizeBingoPlayerName(studentName)
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣]+/gi, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizeBingoBoardCells(boardCells) {
+  return (Array.isArray(boardCells) ? boardCells : []).map((cell, index) => ({
+    index: Number.isFinite(Number(cell?.index)) ? Number(cell.index) : index,
+    row: Number.isFinite(Number(cell?.row)) ? Number(cell.row) : 0,
+    column: Number.isFinite(Number(cell?.column)) ? Number(cell.column) : 0,
+    wordId: String(cell?.wordId ?? "").trim(),
+    word: String(cell?.word ?? "").trim(),
+    meaning: String(cell?.meaning ?? "").trim(),
+    imageHint: String(cell?.imageHint ?? "").trim(),
+    exampleSentence: String(cell?.exampleSentence ?? "").trim(),
+  }));
+}
+
+function normalizeBingoSessionDocument(snapshotData, fallback = {}) {
+  const cleanFallback = fallback ?? {};
+  const sessionCode = String(snapshotData?.sessionCode ?? cleanFallback.sessionCode ?? "").trim();
+  const boardSize = Number(snapshotData?.boardSize ?? cleanFallback.boardSize ?? 0);
+
+  return {
+    sessionCode,
+    teacherUserId: String(snapshotData?.teacherUserId ?? cleanFallback.teacherUserId ?? "").trim(),
+    teacherName: String(snapshotData?.teacherName ?? cleanFallback.teacherName ?? "").trim(),
+    schoolId: String(snapshotData?.schoolId ?? cleanFallback.schoolId ?? "").trim(),
+    schoolName: String(snapshotData?.schoolName ?? cleanFallback.schoolName ?? "").trim(),
+    grade: String(snapshotData?.grade ?? cleanFallback.grade ?? "").trim(),
+    unit: String(snapshotData?.unit ?? cleanFallback.unit ?? "").trim(),
+    publisher: String(snapshotData?.publisher ?? cleanFallback.publisher ?? "").trim(),
+    mode: String(snapshotData?.mode ?? cleanFallback.mode ?? "manual").trim(),
+    boardSize: Number.isFinite(boardSize) ? boardSize : 0,
+    status: String(snapshotData?.status ?? cleanFallback.status ?? "waiting").trim(),
+    activeWordId: String(snapshotData?.activeWordId ?? cleanFallback.activeWordId ?? "").trim(),
+    activeWordText: String(snapshotData?.activeWordText ?? cleanFallback.activeWordText ?? "").trim(),
+    activeWordMeaning: String(snapshotData?.activeWordMeaning ?? cleanFallback.activeWordMeaning ?? "").trim(),
+    callSequence: Array.isArray(snapshotData?.callSequence)
+      ? snapshotData.callSequence
+      : Array.isArray(cleanFallback.callSequence)
+        ? cleanFallback.callSequence
+        : [],
+    calledWordIds: Array.isArray(snapshotData?.calledWordIds)
+      ? snapshotData.calledWordIds.map((value) => String(value ?? "").trim()).filter(Boolean)
+      : Array.isArray(cleanFallback.calledWordIds)
+        ? cleanFallback.calledWordIds.map((value) => String(value ?? "").trim()).filter(Boolean)
+        : [],
+    vocabularyItems: normalizeBingoSessionItems(
+      snapshotData?.vocabularyItems ?? cleanFallback.vocabularyItems ?? [],
+    ),
+    createdAt: snapshotData?.createdAt ?? cleanFallback.createdAt ?? null,
+    updatedAt: snapshotData?.updatedAt ?? cleanFallback.updatedAt ?? null,
+    finishedAt: snapshotData?.finishedAt ?? cleanFallback.finishedAt ?? null,
+    finishedBy: String(snapshotData?.finishedBy ?? cleanFallback.finishedBy ?? "").trim(),
+  };
+}
+
+function normalizeBingoPlayerDocument(snapshotData, fallback = {}) {
+  const cleanFallback = fallback ?? {};
+  const studentName = normalizeBingoPlayerName(
+    snapshotData?.studentName ?? cleanFallback.studentName,
+  );
+  const boardCells = normalizeBingoBoardCells(
+    snapshotData?.boardCells ?? cleanFallback.boardCells ?? [],
+  );
+  const boardSize = Number(snapshotData?.boardSize ?? cleanFallback.boardSize ?? 0);
+  const markedWordIds = Array.isArray(snapshotData?.markedWordIds)
+    ? snapshotData.markedWordIds.map((value) => String(value ?? "").trim()).filter(Boolean)
+    : Array.isArray(cleanFallback.markedWordIds)
+      ? cleanFallback.markedWordIds.map((value) => String(value ?? "").trim()).filter(Boolean)
+      : [];
+  const bingoLinesResult = computeBingoLines(markedWordIds, boardCells, boardSize);
+
+  return {
+    studentName,
+    studentNameNormalized: createBingoPlayerId(studentName),
+    boardSize: Number.isFinite(boardSize) ? boardSize : 0,
+    boardCells,
+    boardWordIds: Array.isArray(snapshotData?.boardWordIds)
+      ? snapshotData.boardWordIds.map((value) => String(value ?? "").trim()).filter(Boolean)
+      : boardCells.map((cell) => cell.wordId).filter(Boolean),
+    markedWordIds,
+    bingoLines: bingoLinesResult.bingoLines,
+    completedLineKeys: bingoLinesResult.completedLineKeys,
+    hasBingo: Boolean(snapshotData?.hasBingo ?? cleanFallback.hasBingo ?? bingoLinesResult.bingoLines > 0),
+    bingoRank: Number.isFinite(Number(snapshotData?.bingoRank))
+      ? Number(snapshotData.bingoRank)
+      : Number.isFinite(Number(cleanFallback.bingoRank))
+        ? Number(cleanFallback.bingoRank)
+        : null,
+    joinedAt: snapshotData?.joinedAt ?? cleanFallback.joinedAt ?? null,
+    updatedAt: snapshotData?.updatedAt ?? cleanFallback.updatedAt ?? null,
+  };
+}
+
+function createBingoSessionPayload({
+  teacherUserId,
+  teacherName,
+  schoolId,
+  schoolName,
+  grade,
+  unit,
+  publisher,
+  mode,
+  items,
+  boardSize,
+  sessionCode,
+}) {
+  const normalizedItems = normalizeBingoSessionItems(items);
+  const safeBoardSize = boardSize ?? determineBingoBoardSize(normalizedItems.length);
+  const board = createBingoBoard(normalizedItems, safeBoardSize);
+  const cleanMode = normalizeBingoText(mode).toLowerCase() || "manual";
+  const cleanTeacherUserId = normalizeBingoText(teacherUserId);
+  const cleanTeacherName = normalizeBingoText(teacherName);
+
+  return {
+    sessionCode,
+    teacherUserId: cleanTeacherUserId,
+    teacherName: cleanTeacherName,
+    schoolId: normalizeBingoText(schoolId),
+    schoolName: normalizeBingoText(schoolName),
+    grade: normalizeBingoText(grade),
+    unit: normalizeBingoText(unit),
+    publisher: normalizeBingoText(publisher),
+    mode: cleanMode === "tts" ? "tts" : "manual",
+    boardSize: board.boardSize,
+    status: "live",
+    activeWordId: "",
+    activeWordText: "",
+    activeWordMeaning: "",
+    callSequence: [],
+    calledWordIds: [],
+    vocabularyItems: normalizedItems,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    finishedAt: null,
+    finishedBy: "",
+  };
+}
+
+export async function createBingoSession({
+  teacherUserId,
+  teacherName,
+  schoolId,
+  schoolName,
+  grade,
+  unit,
+  publisher,
+  mode = "manual",
+  items,
+  boardSize,
+  sessionCode = createBingoSessionCode(),
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSessionCode = String(sessionCode ?? "").trim().toUpperCase();
+  const cleanTeacherUserId = String(teacherUserId ?? "").trim();
+  const cleanTeacherName = String(teacherName ?? "").trim();
+  const cleanSchoolId = String(schoolId ?? "").trim();
+  const cleanSchoolName = String(schoolName ?? "").trim();
+  const cleanGrade = String(grade ?? "").trim();
+  const cleanUnit = String(unit ?? "").trim();
+  const cleanPublisher = String(publisher ?? "").trim();
+  const normalizedItems = normalizeBingoSessionItems(items);
+
+  if (!cleanSessionCode) {
+    throw new Error("Bingo session code is required.");
+  }
+
+  if (!cleanTeacherUserId) {
+    throw new Error("Teacher user id is required.");
+  }
+
+  if (!cleanTeacherName) {
+    throw new Error("Teacher name is required.");
+  }
+
+  if (!cleanSchoolId) {
+    throw new Error("School id is required.");
+  }
+
+  if (!cleanSchoolName) {
+    throw new Error("School name is required.");
+  }
+
+  if (!cleanGrade) {
+    throw new Error("Grade is required.");
+  }
+
+  if (!cleanUnit) {
+    throw new Error("Unit is required.");
+  }
+
+  if (normalizedItems.length < 9) {
+    throw new Error("Bingo requires at least 9 unique words.");
+  }
+
+  const sessionRef = createBingoSessionRef(firestore, cleanSessionCode);
+  const existingSession = await getDoc(sessionRef);
+
+  if (existingSession.exists()) {
+    throw new Error("이미 사용 중인 빙고 참여 코드입니다.");
+  }
+
+  const payload = createBingoSessionPayload({
+    teacherUserId: cleanTeacherUserId,
+    teacherName: cleanTeacherName,
+    schoolId: cleanSchoolId,
+    schoolName: cleanSchoolName,
+    grade: cleanGrade,
+    unit: cleanUnit,
+    publisher: cleanPublisher,
+    mode,
+    items: normalizedItems,
+    boardSize,
+    sessionCode: cleanSessionCode,
+  });
+
+  await setDoc(sessionRef, payload);
+
+  return {
+    sessionId: cleanSessionCode,
+    sessionCode: cleanSessionCode,
+    session: {
+      id: cleanSessionCode,
+      ...normalizeBingoSessionDocument(payload),
+    },
+  };
+}
+
+export async function joinBingoSession({ sessionCode, studentName }) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSessionCode = String(sessionCode ?? "").trim().toUpperCase();
+  const cleanStudentName = normalizeBingoPlayerName(studentName);
+  const playerId = createBingoPlayerId(cleanStudentName);
+
+  if (!cleanSessionCode) {
+    throw new Error("Bingo session code is required.");
+  }
+
+  if (!cleanStudentName) {
+    throw new Error("Student name is required.");
+  }
+
+  if (!playerId) {
+    throw new Error("Student name must contain letters or numbers.");
+  }
+
+  const sessionRef = createBingoSessionRef(firestore, cleanSessionCode);
+  const playerRef = createBingoPlayerRef(firestore, cleanSessionCode, playerId);
+
+  return runTransaction(firestore, async (transaction) => {
+    const sessionSnapshot = await transaction.get(sessionRef);
+
+    if (!sessionSnapshot.exists()) {
+      throw new Error("빙고 참여 코드를 찾을 수 없습니다.");
+    }
+
+    const sessionData = normalizeBingoSessionDocument(sessionSnapshot.data(), {
+      sessionCode: cleanSessionCode,
+    });
+
+    if (sessionData.status === "finished") {
+      throw new Error("이미 종료된 빙고 세션입니다.");
+    }
+
+    const playerSnapshot = await transaction.get(playerRef);
+
+    if (playerSnapshot.exists()) {
+      throw new Error("같은 이름의 학생이 이미 참여했습니다.");
+    }
+
+    const board = createBingoBoard(sessionData.vocabularyItems, sessionData.boardSize);
+    const playerPayload = {
+      studentName: cleanStudentName,
+      studentNameNormalized: playerId,
+      boardSize: board.boardSize,
+      boardCells: board.boardCells,
+      boardWordIds: board.boardWordIds,
+      markedWordIds: [],
+      bingoLines: 0,
+      completedLineKeys: [],
+      hasBingo: false,
+      bingoRank: null,
+      joinedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    transaction.set(playerRef, playerPayload);
+
+    return {
+      sessionId: cleanSessionCode,
+      sessionCode: cleanSessionCode,
+      playerId,
+      session: {
+        id: sessionSnapshot.id,
+        ...sessionData,
+      },
+      player: {
+        id: playerId,
+        playerId,
+        ...normalizeBingoPlayerDocument(playerPayload, {
+          studentName: cleanStudentName,
+          boardSize: board.boardSize,
+          boardCells: board.boardCells,
+        }),
+      },
+    };
+  });
+}
+
+export async function callBingoWord({
+  sessionId,
+  wordId,
+  teacherUserId,
+  mode,
+  word,
+  meaning,
+  random = Math.random,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSessionId = String(sessionId ?? "").trim().toUpperCase();
+  const sessionRef = createBingoSessionRef(firestore, cleanSessionId);
+  const cleanWordId = String(wordId ?? "").trim();
+  const cleanWord = normalizeBingoText(word);
+  const cleanMeaning = normalizeBingoText(meaning);
+  const cleanTeacherUserId = normalizeBingoText(teacherUserId);
+  const cleanMode = normalizeBingoText(mode).toLowerCase();
+
+  return runTransaction(firestore, async (transaction) => {
+    const snapshot = await transaction.get(sessionRef);
+
+    if (!snapshot.exists()) {
+      throw new Error("빙고 세션을 찾을 수 없습니다.");
+    }
+
+    const currentSession = normalizeBingoSessionDocument(snapshot.data(), {
+      sessionCode: cleanSessionId,
+    });
+
+    if (
+      cleanTeacherUserId
+      && currentSession.teacherUserId
+      && currentSession.teacherUserId !== cleanTeacherUserId
+    ) {
+      throw new Error("이 빙고 세션의 교사가 아닙니다.");
+    }
+
+    const selectedItem = (() => {
+      if (cleanWordId || cleanWord) {
+        const matchedItem = currentSession.vocabularyItems.find((item) => {
+          const itemId = normalizeBingoText(item.id);
+          const itemWord = normalizeBingoText(item.word);
+          return (
+            (cleanWordId && itemId === cleanWordId)
+            || (cleanWord && itemWord === cleanWord)
+          );
+        });
+
+        if (!matchedItem) {
+          throw new Error("세션 단어 목록에 없는 단어입니다.");
+        }
+
+        return matchedItem;
+      }
+
+      return selectNextBingoWord(
+        currentSession.vocabularyItems,
+        currentSession.calledWordIds,
+        random,
+      );
+    })();
+
+    if (!selectedItem) {
+      throw new Error("호출할 단어가 더 이상 없습니다.");
+    }
+
+    const normalizedSelectedItem = {
+      id: createBingoWordId(selectedItem),
+      word: normalizeBingoText(selectedItem.word),
+      meaning: normalizeBingoText(selectedItem.meaning),
+      imageHint: normalizeBingoText(selectedItem.imageHint),
+      exampleSentence: normalizeBingoText(selectedItem.exampleSentence),
+    };
+    const callRecord = {
+      wordId: normalizedSelectedItem.id,
+      word: normalizedSelectedItem.word,
+      meaning: normalizedSelectedItem.meaning,
+      mode: cleanMode === "tts" ? "tts" : currentSession.mode,
+      calledAt: serverTimestamp(),
+      calledBy: cleanTeacherUserId || currentSession.teacherUserId,
+    };
+    const nextCalledWordIds = Array.from(
+      new Set([...currentSession.calledWordIds, normalizedSelectedItem.id]),
+    );
+
+    transaction.update(sessionRef, {
+      activeWordId: normalizedSelectedItem.id,
+      activeWordText: normalizedSelectedItem.word,
+      activeWordMeaning: normalizedSelectedItem.meaning,
+      callSequence: [...currentSession.callSequence, callRecord],
+      calledWordIds: nextCalledWordIds,
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      sessionId: cleanSessionId,
+      sessionCode: cleanSessionId,
+      activeWord: normalizedSelectedItem,
+      callRecord,
+    };
+  });
+}
+
+export async function drawNextBingoWord({
+  sessionId,
+  teacherUserId,
+  mode,
+  random = Math.random,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSessionId = String(sessionId ?? "").trim().toUpperCase();
+  const sessionRef = createBingoSessionRef(firestore, cleanSessionId);
+  const cleanTeacherUserId = normalizeBingoText(teacherUserId);
+  const cleanMode = normalizeBingoText(mode).toLowerCase();
+
+  return runTransaction(firestore, async (transaction) => {
+    const snapshot = await transaction.get(sessionRef);
+
+    if (!snapshot.exists()) {
+      throw new Error("빙고 세션을 찾을 수 없습니다.");
+    }
+
+    const currentSession = normalizeBingoSessionDocument(snapshot.data(), {
+      sessionCode: cleanSessionId,
+    });
+
+    if (
+      cleanTeacherUserId
+      && currentSession.teacherUserId
+      && currentSession.teacherUserId !== cleanTeacherUserId
+    ) {
+      throw new Error("이 빙고 세션의 교사가 아닙니다.");
+    }
+
+    const nextWord = selectNextBingoWord(
+      currentSession.vocabularyItems,
+      currentSession.calledWordIds,
+      random,
+    );
+
+    if (!nextWord) {
+      throw new Error("호출할 단어가 더 이상 없습니다.");
+    }
+
+    const nextWordId = createBingoWordId(nextWord);
+    const callRecord = {
+      wordId: nextWordId,
+      word: normalizeBingoText(nextWord.word),
+      meaning: normalizeBingoText(nextWord.meaning),
+      mode: cleanMode === "tts" ? "tts" : currentSession.mode,
+      calledAt: serverTimestamp(),
+      calledBy: currentSession.teacherUserId,
+      isRandomDraw: true,
+    };
+    const nextCalledWordIds = Array.from(
+      new Set([...currentSession.calledWordIds, nextWordId]),
+    );
+
+    transaction.update(sessionRef, {
+      activeWordId: nextWordId,
+      activeWordText: normalizeBingoText(nextWord.word),
+      activeWordMeaning: normalizeBingoText(nextWord.meaning),
+      callSequence: [...currentSession.callSequence, callRecord],
+      calledWordIds: nextCalledWordIds,
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      sessionId: cleanSessionId,
+      sessionCode: cleanSessionId,
+      activeWord: {
+        id: nextWordId,
+        word: normalizeBingoText(nextWord.word),
+        meaning: normalizeBingoText(nextWord.meaning),
+      },
+      callRecord,
+    };
+  });
+}
+
+export async function markBingoCell({
+  sessionId,
+  playerId,
+  wordId,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSessionId = String(sessionId ?? "").trim().toUpperCase();
+  const cleanPlayerId = String(playerId ?? "").trim();
+  const cleanWordId = String(wordId ?? "").trim();
+  const sessionRef = createBingoSessionRef(firestore, cleanSessionId);
+  const playerRef = createBingoPlayerRef(firestore, cleanSessionId, cleanPlayerId);
+
+  return runTransaction(firestore, async (transaction) => {
+    const [sessionSnapshot, playerSnapshot] = await Promise.all([
+      transaction.get(sessionRef),
+      transaction.get(playerRef),
+    ]);
+
+    if (!sessionSnapshot.exists()) {
+      throw new Error("빙고 세션을 찾을 수 없습니다.");
+    }
+
+    if (!playerSnapshot.exists()) {
+      throw new Error("빙고 참가자를 찾을 수 없습니다.");
+    }
+
+    const sessionData = normalizeBingoSessionDocument(sessionSnapshot.data(), {
+      sessionCode: cleanSessionId,
+    });
+    const playerData = normalizeBingoPlayerDocument(playerSnapshot.data(), {
+      studentName: playerSnapshot.data()?.studentName,
+      boardSize: playerSnapshot.data()?.boardSize,
+      boardCells: playerSnapshot.data()?.boardCells,
+      markedWordIds: playerSnapshot.data()?.markedWordIds,
+      bingoRank: playerSnapshot.data()?.bingoRank,
+      hasBingo: playerSnapshot.data()?.hasBingo,
+    });
+    const activeWordId = normalizeBingoText(sessionData.activeWordId);
+
+    if (!activeWordId) {
+      throw new Error("현재 호출된 단어가 없습니다.");
+    }
+
+    if (!canMarkBingoCell({
+      activeWordId,
+      cellWordId: cleanWordId,
+      alreadyMarked: playerData.markedWordIds.includes(cleanWordId),
+    })) {
+      throw new Error("현재 호출된 단어만 체크할 수 있습니다.");
+    }
+
+    const boardCell = playerData.boardCells.find(
+      (cell) => cell.wordId === cleanWordId,
+    );
+
+    if (!boardCell) {
+      throw new Error("빙고판에 없는 단어입니다.");
+    }
+
+    const nextMarkedWordIds = Array.from(
+      new Set([...playerData.markedWordIds, cleanWordId]),
+    );
+    const bingoLinesResult = computeBingoLines(
+      nextMarkedWordIds,
+      playerData.boardCells,
+      playerData.boardSize,
+    );
+    const nextBingoLines = bingoLinesResult.bingoLines;
+    const nextHasBingo = nextBingoLines >= 3;
+
+    transaction.update(playerRef, {
+      markedWordIds: nextMarkedWordIds,
+      bingoLines: nextBingoLines,
+      completedLineKeys: bingoLinesResult.completedLineKeys,
+      hasBingo: nextHasBingo,
+      bingoRank: playerData.bingoRank ?? (nextHasBingo ? 1 : null),
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      sessionId: cleanSessionId,
+      playerId: cleanPlayerId,
+      markedWordId: cleanWordId,
+      bingoLines: nextBingoLines,
+      completedLineKeys: bingoLinesResult.completedLineKeys,
+      hasBingo: nextHasBingo,
+      isBingo: nextHasBingo && !playerData.hasBingo,
+      session: {
+        id: sessionSnapshot.id,
+        ...sessionData,
+      },
+      player: {
+        id: playerSnapshot.id,
+        ...playerData,
+        markedWordIds: nextMarkedWordIds,
+        bingoLines: nextBingoLines,
+        completedLineKeys: bingoLinesResult.completedLineKeys,
+        hasBingo: nextHasBingo,
+        bingoRank: playerData.bingoRank ?? (nextHasBingo ? 1 : null),
+      },
+    };
+  });
+}
+
+export async function endBingoSession({
+  sessionId,
+  teacherUserId,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSessionId = String(sessionId ?? "").trim().toUpperCase();
+  const cleanTeacherUserId = normalizeBingoText(teacherUserId);
+  const sessionRef = createBingoSessionRef(firestore, cleanSessionId);
+
+  return runTransaction(firestore, async (transaction) => {
+    const snapshot = await transaction.get(sessionRef);
+
+    if (!snapshot.exists()) {
+      throw new Error("빙고 세션을 찾을 수 없습니다.");
+    }
+
+    const currentSession = normalizeBingoSessionDocument(snapshot.data(), {
+      sessionCode: cleanSessionId,
+    });
+
+    if (
+      cleanTeacherUserId
+      && currentSession.teacherUserId
+      && currentSession.teacherUserId !== cleanTeacherUserId
+    ) {
+      throw new Error("이 빙고 세션의 교사가 아닙니다.");
+    }
+
+    transaction.update(sessionRef, {
+      status: "finished",
+      finishedAt: serverTimestamp(),
+      finishedBy: cleanTeacherUserId || currentSession.teacherUserId,
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      sessionId: cleanSessionId,
+      sessionCode: cleanSessionId,
+      status: "finished",
+    };
+  });
 }

@@ -58,6 +58,8 @@ export function TeacherWorkspace({
   onUpdateItem,
   onRemoveItem,
   onClearItems,
+  onOpenBingoHost,
+  canStartBingo = false,
   onBack,
 }) {
   const [formValues, setFormValues] = useState(EMPTY_FORM);
@@ -1059,13 +1061,21 @@ export function TeacherWorkspace({
       <div className="launch-card">
         <div>
           <p className="mode-label">Student Access</p>
-          <h3>학생 공개 확인</h3>
+          <h3>학생 공개와 학급 빙고</h3>
           <p>
             학생은 홈 화면에서 학교, 선생님, 학년, 단원을 순서대로 선택한 뒤
-            공개된 단어 세트를 불러와 활동을 시작합니다.
+            공개된 단어 세트를 불러와 활동을 시작합니다. 학급 빙고는 현재
+            단원에 9개 이상 단어가 있어야 시작할 수 있습니다.
           </p>
         </div>
         <div className="stack-actions">
+          <button
+            className="secondary-button"
+            onClick={onOpenBingoHost}
+            disabled={!canStartBingo}
+          >
+            학급 빙고 수업 시작
+          </button>
           <button className="primary-button" onClick={onBack}>
             홈으로 돌아가기
           </button>

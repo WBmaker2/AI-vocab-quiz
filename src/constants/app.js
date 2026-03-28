@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.7.0",
+    date: "2026-03-28",
+    summary: [
+      "학급 빙고 게임을 학생 화면과 교사 화면에 연결해 수업용 실시간 참여 흐름을 추가했습니다.",
+      "교사가 직접 고르거나 TTS와 랜덤 뽑기로 부른 단어도 학생이 빙고판 칸을 직접 눌러야만 체크되도록 고정했습니다.",
+      "빙고 승리 기준을 3빙고로 두고, 교사가 종료하기 전까지 4빙고와 5빙고도 계속 이어갈 수 있게 했습니다.",
+    ],
+  },
+  {
     version: "v1.6.1",
     date: "2026-03-26",
     summary: [

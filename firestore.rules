@@ -344,5 +344,252 @@ service cloud.firestore {
         allow delete: if isMatchingLeaderboardTeacherDelete();
       }
     }
+
+    function bingoSessionDoc(sessionId) {
+      return get(/databases/$(database)/documents/bingoSessions/$(sessionId));
+    }
+
+    function bingoSessionExists(sessionId) {
+      return exists(/databases/$(database)/documents/bingoSessions/$(sessionId));
+    }
+
+    function isBingoBoardSize(boardSize) {
+      return boardSize == 3 || boardSize == 4;
+    }
+
+    function isBingoSessionMode(mode) {
+      return mode == 'manual' || mode == 'tts';
+    }
+
+    function isBingoSessionStatus(status) {
+      return status == 'waiting' || status == 'live' || status == 'finished';
+    }
+
+    function isBingoSessionDocument(data) {
+      return data.keys().hasOnly([
+          'sessionCode',
+          'teacherUserId',
+          'teacherName',
+          'schoolId',
+          'schoolName',
+          'grade',
+          'unit',
+          'publisher',
+          'mode',
+          'boardSize',
+          'status',
+          'activeWordId',
+          'activeWordText',
+          'activeWordMeaning',
+          'callSequence',
+          'calledWordIds',
+          'vocabularyItems',
+          'createdAt',
+          'updatedAt',
+          'finishedAt',
+          'finishedBy'
+        ])
+        && data.sessionCode is string
+        && data.sessionCode.size() > 0
+        && data.teacherUserId is string
+        && data.teacherUserId.size() > 0
+        && data.teacherName is string
+        && data.teacherName.size() > 0
+        && data.schoolId is string
+        && data.schoolId.size() > 0
+        && data.schoolName is string
+        && data.schoolName.size() > 0
+        && data.grade is string
+        && data.grade.size() > 0
+        && data.unit is string
+        && data.unit.size() > 0
+        && data.publisher is string
+        && data.mode is string
+        && isBingoSessionMode(data.mode)
+        && isBingoBoardSize(data.boardSize)
+        && data.status is string
+        && isBingoSessionStatus(data.status)
+        && data.activeWordId is string
+        && data.activeWordText is string
+        && data.activeWordMeaning is string
+        && data.callSequence is list
+        && data.calledWordIds is list
+        && data.vocabularyItems is list
+        && data.vocabularyItems.size() >= 9
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (data.finishedAt == null || data.finishedAt is timestamp)
+        && data.finishedBy is string;
+    }
+
+    function isBingoSessionCreate(sessionId) {
+      return isSignedIn()
+        && request.resource.data.sessionCode == sessionId
+        && request.resource.data.teacherUserId == request.auth.uid
+        && isTeacherForSchool(request.resource.data.schoolId)
+        && isBingoSessionDocument(request.resource.data)
+        && request.resource.data.status == 'live'
+        && request.resource.data.activeWordId == ''
+        && request.resource.data.activeWordText == ''
+        && request.resource.data.activeWordMeaning == ''
+        && request.resource.data.callSequence.size() == 0
+        && request.resource.data.calledWordIds.size() == 0
+        && request.resource.data.finishedAt == null
+        && request.resource.data.finishedBy == '';
+    }
+
+    function isBingoSessionUpdate(sessionId) {
+      return isSignedIn()
+        && bingoSessionExists(sessionId)
+        && bingoSessionDoc(sessionId).data.teacherUserId == request.auth.uid
+        && isTeacherForSchool(request.resource.data.schoolId)
+        && isBingoSessionDocument(request.resource.data)
+        && request.resource.data.sessionCode == sessionId
+        && request.resource.data.teacherUserId == resource.data.teacherUserId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.schoolId == resource.data.schoolId
+        && request.resource.data.schoolName == resource.data.schoolName
+        && request.resource.data.grade == resource.data.grade
+        && request.resource.data.unit == resource.data.unit
+        && request.resource.data.publisher == resource.data.publisher
+        && request.resource.data.mode == resource.data.mode
+        && request.resource.data.boardSize == resource.data.boardSize
+        && request.resource.data.vocabularyItems == resource.data.vocabularyItems
+        && request.resource.data.activeWordId is string
+        && request.resource.data.activeWordText is string
+        && request.resource.data.activeWordMeaning is string
+        && request.resource.data.callSequence is list
+        && request.resource.data.calledWordIds is list
+        && isBingoSessionStatus(request.resource.data.status);
+    }
+
+    function isBingoPlayerDocument(data) {
+      return data.keys().hasOnly([
+          'studentName',
+          'studentNameNormalized',
+          'boardSize',
+          'boardCells',
+          'boardWordIds',
+          'markedWordIds',
+          'bingoLines',
+          'completedLineKeys',
+          'hasBingo',
+          'bingoRank',
+          'joinedAt',
+          'updatedAt'
+        ])
+        && data.studentName is string
+        && data.studentName.size() > 0
+        && data.studentNameNormalized is string
+        && data.studentNameNormalized.size() > 0
+        && isBingoBoardSize(data.boardSize)
+        && data.boardCells is list
+        && data.boardWordIds is list
+        && data.boardCells.size() == data.boardSize * data.boardSize
+        && data.boardWordIds.size() == data.boardSize * data.boardSize
+        && data.markedWordIds is list
+        && data.bingoLines is int
+        && data.bingoLines >= 0
+        && data.completedLineKeys is list
+        && data.hasBingo is bool
+        && (data.bingoRank == null || data.bingoRank is int)
+        && data.joinedAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function bingoCellMarked(boardCells, markedWordIds, index) {
+      return boardCells[index].wordId is string
+        && markedWordIds.hasAny([boardCells[index].wordId]);
+    }
+
+    function bingoLineCount3(boardCells, markedWordIds) {
+      return (
+        (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 1) && bingoCellMarked(boardCells, markedWordIds, 2) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 3) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 5) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 6) && bingoCellMarked(boardCells, markedWordIds, 7) && bingoCellMarked(boardCells, markedWordIds, 8) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 3) && bingoCellMarked(boardCells, markedWordIds, 6) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 1) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 7) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 2) && bingoCellMarked(boardCells, markedWordIds, 5) && bingoCellMarked(boardCells, markedWordIds, 8) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 8) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 2) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 6) ? 1 : 0)
+      );
+    }
+
+    function bingoLineCount4(boardCells, markedWordIds) {
+      return (
+        (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 1) && bingoCellMarked(boardCells, markedWordIds, 2) && bingoCellMarked(boardCells, markedWordIds, 3) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 5) && bingoCellMarked(boardCells, markedWordIds, 6) && bingoCellMarked(boardCells, markedWordIds, 7) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 8) && bingoCellMarked(boardCells, markedWordIds, 9) && bingoCellMarked(boardCells, markedWordIds, 10) && bingoCellMarked(boardCells, markedWordIds, 11) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 12) && bingoCellMarked(boardCells, markedWordIds, 13) && bingoCellMarked(boardCells, markedWordIds, 14) && bingoCellMarked(boardCells, markedWordIds, 15) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 8) && bingoCellMarked(boardCells, markedWordIds, 12) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 1) && bingoCellMarked(boardCells, markedWordIds, 5) && bingoCellMarked(boardCells, markedWordIds, 9) && bingoCellMarked(boardCells, markedWordIds, 13) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 2) && bingoCellMarked(boardCells, markedWordIds, 6) && bingoCellMarked(boardCells, markedWordIds, 10) && bingoCellMarked(boardCells, markedWordIds, 14) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 3) && bingoCellMarked(boardCells, markedWordIds, 7) && bingoCellMarked(boardCells, markedWordIds, 11) && bingoCellMarked(boardCells, markedWordIds, 15) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 5) && bingoCellMarked(boardCells, markedWordIds, 10) && bingoCellMarked(boardCells, markedWordIds, 15) ? 1 : 0)
+        + (bingoCellMarked(boardCells, markedWordIds, 3) && bingoCellMarked(boardCells, markedWordIds, 6) && bingoCellMarked(boardCells, markedWordIds, 9) && bingoCellMarked(boardCells, markedWordIds, 12) ? 1 : 0)
+      );
+    }
+
+    function bingoLineCount(boardCells, markedWordIds, boardSize) {
+      return boardSize == 3 ? bingoLineCount3(boardCells, markedWordIds)
+        : boardSize == 4 ? bingoLineCount4(boardCells, markedWordIds)
+        : 0;
+    }
+
+    function isBingoPlayerCreate(sessionId, playerId) {
+      return bingoSessionExists(sessionId)
+        && bingoSessionDoc(sessionId).data.status == 'live'
+        && request.resource.data.studentNameNormalized == playerId
+        && request.resource.data.studentNameNormalized == playerId
+        && request.resource.data.boardSize == bingoSessionDoc(sessionId).data.boardSize
+        && isBingoPlayerDocument(request.resource.data)
+        && request.resource.data.markedWordIds.size() == 0
+        && request.resource.data.bingoLines == 0
+        && request.resource.data.completedLineKeys.size() == 0
+        && request.resource.data.hasBingo == false
+        && request.resource.data.bingoRank == null;
+    }
+
+    function isBingoPlayerUpdate(sessionId, playerId) {
+      return bingoSessionExists(sessionId)
+        && bingoSessionDoc(sessionId).data.status == 'live'
+        && request.resource.data.studentNameNormalized == playerId
+        && request.resource.data.boardSize == resource.data.boardSize
+        && request.resource.data.boardCells == resource.data.boardCells
+        && request.resource.data.boardWordIds == resource.data.boardWordIds
+        && request.resource.data.joinedAt == resource.data.joinedAt
+        && request.resource.data.markedWordIds.hasAll(resource.data.markedWordIds)
+        && request.resource.data.markedWordIds.size() == resource.data.markedWordIds.size() + 1
+        && request.resource.data.markedWordIds.hasAny([bingoSessionDoc(sessionId).data.activeWordId])
+        && request.resource.data.boardWordIds.hasAny([bingoSessionDoc(sessionId).data.activeWordId])
+        && isBingoPlayerDocument(request.resource.data)
+        && request.resource.data.bingoLines == bingoLineCount(
+          resource.data.boardCells,
+          request.resource.data.markedWordIds,
+          resource.data.boardSize
+        )
+        && request.resource.data.completedLineKeys.size() == request.resource.data.bingoLines
+        && request.resource.data.hasBingo == (request.resource.data.bingoLines >= 3)
+        && (
+          request.resource.data.bingoRank == resource.data.bingoRank
+          || (resource.data.bingoRank == null && request.resource.data.bingoRank is int && request.resource.data.bingoRank > 0)
+        );
+    }
+
+    match /bingoSessions/{sessionId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isBingoSessionCreate(sessionId);
+      allow update: if isBingoSessionUpdate(sessionId);
+      allow delete: if false;
+
+      match /players/{playerId} {
+        allow get: if true;
+        allow list: if bingoSessionExists(sessionId);
+        allow create: if isBingoPlayerCreate(sessionId, playerId);
+        allow update: if isBingoPlayerUpdate(sessionId, playerId);
+        allow delete: if false;
+      }
+    }
   }
 }

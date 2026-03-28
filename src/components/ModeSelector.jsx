@@ -37,6 +37,7 @@ export function ModeSelector({
   onOpenListening,
   onOpenSpeaking,
   onOpenMatching,
+  onOpenBingo,
 }) {
   const [matchingPanelOpen, setMatchingPanelOpen] = useState(false);
   const showingSearchResults = schoolBrowseMode === "search";
@@ -317,6 +318,13 @@ export function ModeSelector({
             disabled={!remoteConfigured || !selectedTeacher || unitsLoading}
           >
             단어 짝 맞추기
+          </button>
+          <button
+            className="ghost-button"
+            onClick={onOpenBingo}
+            disabled={!remoteConfigured}
+          >
+            학급 빙고 게임
           </button>
         </div>
 
