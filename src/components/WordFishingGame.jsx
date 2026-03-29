@@ -191,14 +191,14 @@ export function WordFishingGame({
     setFeedbackTone("idle");
     setSelectedCandidateId("");
     setReactionTotalMs(0);
-  }, [items, speech]);
+  }, [items, speech.cancel]);
 
   useEffect(() => {
     return () => {
       speech.cancel();
       window.clearTimeout(transitionTimerRef.current);
     };
-  }, [speech]);
+  }, [speech.cancel]);
 
   const queueRound = useEffectEvent((nextUsedWordIds, nextRoundIndex) => {
     const nextRound = createFishingRound(fishingItems, nextUsedWordIds, 6);
@@ -504,10 +504,12 @@ export function WordFishingGame({
                     onClick={() => handleSelectCandidate(candidate.id)}
                     disabled={roundLockRef.current}
                     style={{
+                      "--fishing-left": `${candidate.motion.left}%`,
                       "--fishing-top": `${candidate.motion.top}%`,
                       "--fishing-duration": `${candidate.motion.duration}s`,
                       "--fishing-delay": `${candidate.motion.delay}s`,
-                      "--fishing-drift": `${candidate.motion.drift}px`,
+                      "--fishing-range-x": `${candidate.motion.rangeX}%`,
+                      "--fishing-drift-y": `${candidate.motion.driftY}px`,
                       "--fishing-scale": candidate.motion.scale,
                     }}
                     role="listitem"

@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.8.1",
+    date: "2026-03-29",
+    summary: [
+      "단어 낚시 시작 버튼을 눌렀을 때 즉시 게임 플레이 화면으로 넘어가도록 TTS 상태 리셋 흐름을 바로잡았습니다.",
+      "TTS 훅 반환값을 안정화해서 같은 원인으로 화면이 다시 ready 상태로 되돌아가는 회귀를 막았습니다.",
+    ],
+  },
+  {
     version: "v1.8.0",
     date: "2026-03-29",
     summary: [

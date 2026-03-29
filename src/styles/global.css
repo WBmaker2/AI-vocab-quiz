@@ -930,19 +930,21 @@ button:disabled {
 
 .word-fishing-card {
   position: absolute;
-  left: 0;
-  top: 0;
-  min-width: min(13rem, 48vw);
-  max-width: min(17rem, 52vw);
-  padding: 0.9rem 1rem;
+  left: var(--fishing-left, 8%);
+  top: var(--fishing-top, 12%);
+  width: min(13rem, 38vw);
+  min-height: 4.9rem;
+  padding: 0.85rem 1rem;
   border: 1px solid rgba(23, 50, 77, 0.1);
-  border-radius: 999px;
+  border-radius: 28px;
   background: rgba(255, 255, 255, 0.96);
   color: #17324d;
   font-size: clamp(1rem, 1.4vw, 1.18rem);
   font-weight: 800;
+  line-height: 1.28;
+  text-align: center;
   box-shadow: 0 14px 28px rgba(23, 50, 77, 0.1);
-  transform: translate(-24%, var(--fishing-top)) scale(var(--fishing-scale, 1));
+  transform: translate3d(0, 0, 0) scale(var(--fishing-scale, 1));
   animation: fishing-swim var(--fishing-duration, 12s) linear infinite;
   animation-delay: var(--fishing-delay, 0s);
 }
@@ -2028,19 +2030,28 @@ button:disabled {
 
 @keyframes fishing-swim {
   0% {
-    transform: translate(-24%, var(--fishing-top)) scale(var(--fishing-scale, 1)) rotate(-2deg);
+    transform: translate3d(0, 0, 0) scale(var(--fishing-scale, 1)) rotate(-2deg);
   }
   25% {
-    transform: translate(6vw, calc(var(--fishing-top) + var(--fishing-drift, 10px))) scale(var(--fishing-scale, 1)) rotate(1deg);
+    transform:
+      translate3d(calc(var(--fishing-range-x, 10%) * 0.6), var(--fishing-drift-y, 12px), 0)
+      scale(var(--fishing-scale, 1))
+      rotate(1deg);
   }
   50% {
-    transform: translate(38vw, calc(var(--fishing-top) - (var(--fishing-drift, 10px) * 0.5))) scale(var(--fishing-scale, 1)) rotate(-1deg);
+    transform:
+      translate3d(var(--fishing-range-x, 10%), calc(var(--fishing-drift-y, 12px) * -0.55), 0)
+      scale(var(--fishing-scale, 1))
+      rotate(-1deg);
   }
   75% {
-    transform: translate(70vw, calc(var(--fishing-top) + var(--fishing-drift, 10px))) scale(var(--fishing-scale, 1)) rotate(2deg);
+    transform:
+      translate3d(calc(var(--fishing-range-x, 10%) * 0.28), calc(var(--fishing-drift-y, 12px) * 0.7), 0)
+      scale(var(--fishing-scale, 1))
+      rotate(2deg);
   }
   100% {
-    transform: translate(110vw, var(--fishing-top)) scale(var(--fishing-scale, 1)) rotate(-2deg);
+    transform: translate3d(0, 0, 0) scale(var(--fishing-scale, 1)) rotate(-2deg);
   }
 }
 
@@ -2197,9 +2208,9 @@ button:disabled {
   }
 
   .word-fishing-card {
-    min-width: min(12rem, 72vw);
-    max-width: min(14rem, 78vw);
+    width: min(11rem, 40vw);
     padding: 0.8rem 0.9rem;
+    font-size: clamp(0.96rem, 2.9vw, 1.05rem);
   }
 
   .app-backdrop {

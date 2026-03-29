@@ -42,18 +42,38 @@ export function normalizeFishingItems(items) {
     .filter(Boolean);
 }
 
-function createCandidateMotion(index) {
-  const top = 12 + ((index * 14) % 58);
-  const duration = 10 + (index % 4) * 1.3;
-  const delay = (index % 3) * -1.25;
-  const drift = (index % 2 === 0 ? 10 : -10) + index * 1.5;
-  const scale = 0.96 + (index % 3) * 0.04;
+const WIDE_LANES = [
+  { top: 10, left: 6, rangeX: 13, driftY: 14 },
+  { top: 12, left: 56, rangeX: -12, driftY: 16 },
+  { top: 34, left: 10, rangeX: 15, driftY: 12 },
+  { top: 38, left: 58, rangeX: -14, driftY: 18 },
+  { top: 61, left: 8, rangeX: 14, driftY: 15 },
+  { top: 65, left: 54, rangeX: -13, driftY: 13 },
+];
+
+const COMPACT_LANES = [
+  { top: 12, left: 7, rangeX: 11, driftY: 12 },
+  { top: 16, left: 52, rangeX: -10, driftY: 14 },
+  { top: 42, left: 10, rangeX: 12, driftY: 12 },
+  { top: 46, left: 50, rangeX: -12, driftY: 14 },
+  { top: 68, left: 8, rangeX: 11, driftY: 11 },
+  { top: 72, left: 52, rangeX: -10, driftY: 13 },
+];
+
+function createCandidateMotion(index, totalCandidates) {
+  const lanes = totalCandidates <= 4 ? COMPACT_LANES : WIDE_LANES;
+  const lane = lanes[index % lanes.length];
+  const duration = 6.8 + (index % 3) * 0.9;
+  const delay = (index % 4) * -0.8;
+  const scale = 0.98 + (index % 2) * 0.03;
 
   return {
-    top,
+    top: lane.top,
+    left: lane.left,
+    rangeX: lane.rangeX,
     duration,
     delay,
-    drift,
+    driftY: lane.driftY,
     scale,
   };
 }
@@ -72,9 +92,10 @@ export function createFishingRound(items, usedWordIds = [], candidateCount = 6) 
   const availableDistractors = normalizedItems.filter((item) => item.id !== answer.id);
   const totalCandidates = clamp(candidateCount, 2, normalizedItems.length);
   const distractors = shuffle(availableDistractors).slice(0, totalCandidates - 1);
-  const candidates = shuffle([answer, ...distractors]).map((item, index) => ({
+  const candidatePool = shuffle([answer, ...distractors]);
+  const candidates = candidatePool.map((item, index) => ({
     ...item,
-    motion: createCandidateMotion(index),
+    motion: createCandidateMotion(index, candidatePool.length),
   }));
 
   return {

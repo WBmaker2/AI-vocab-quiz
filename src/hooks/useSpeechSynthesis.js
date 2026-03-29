@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 function getSpeechSynthesisApi() {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -20,12 +20,12 @@ export function useSpeechSynthesis() {
     };
   }, []);
 
-  function cancel() {
+  const cancel = useCallback(() => {
     synthesisRef.current?.cancel();
     setSpeaking(false);
-  }
+  }, []);
 
-  function speak(text, options = {}) {
+  const speak = useCallback((text, options = {}) => {
     const synthesis = synthesisRef.current;
     if (!synthesis || !text) {
       return false;
@@ -54,12 +54,15 @@ export function useSpeechSynthesis() {
 
     synthesis.speak(utterance);
     return true;
-  }
+  }, []);
 
-  return {
-    supported: Boolean(synthesisRef.current),
-    speaking,
-    speak,
-    cancel,
-  };
+  return useMemo(
+    () => ({
+      supported: Boolean(synthesisRef.current),
+      speaking,
+      speak,
+      cancel,
+    }),
+    [cancel, speak, speaking],
+  );
 }
