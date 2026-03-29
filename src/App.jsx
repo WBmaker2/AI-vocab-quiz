@@ -64,14 +64,13 @@ function App() {
   };
 
   const hasStudentVocabulary = library.student.items.length > 0;
-  const canStartTeacherBingo =
-    library.teacher.items.length >= 9 &&
-    Boolean(library.teacher.selection.grade) &&
-    Boolean(library.teacher.selection.unit) &&
-    Boolean(library.teacher.profile?.userId);
+  const canStartTeacherBingo = library.teacher.bingo.canStart;
+  const teacherBingoSelectedUnitLabels =
+    library.teacher.bingo.selectedUnitLabels ?? [];
   const teacherBingoSessionTitle =
-    library.teacher.selection.grade && library.teacher.selection.unit
-      ? `${library.teacher.selection.grade}학년 ${library.teacher.selection.unit}단원 학급 빙고`
+    (teacherBingo.session?.grade || library.teacher.selection.grade) &&
+    (teacherBingo.session?.selectedUnitLabels?.length ?? teacherBingoSelectedUnitLabels.length) > 0
+      ? `${teacherBingo.session?.selectedUnitLabels?.join(", ") ?? teacherBingoSelectedUnitLabels.join(", ")} 학급 빙고`
       : "학급 빙고 수업";
   const studentBingoCall =
     studentBingo.session?.callSequence?.[studentBingo.session.callSequence.length - 1] ??
@@ -104,16 +103,10 @@ function App() {
     }
 
     try {
+      const sessionPayload = await library.teacher.bingo.prepareSession();
       const result = await teacherBingo.startSession({
-        teacherUserId: library.teacher.profile.userId,
-        teacherName: library.teacher.profile.teacherName,
-        schoolId: library.teacher.profile.schoolId,
-        schoolName: library.teacher.profile.schoolName,
-        grade: library.teacher.selection.grade,
-        unit: library.teacher.selection.unit,
-        publisher: library.teacher.publisher,
+        ...sessionPayload,
         mode: bingoTeacherMode === "tts" ? "tts" : "manual",
-        items: library.teacher.items,
       });
 
       setBingoTeacherMode(
@@ -241,6 +234,7 @@ function App() {
             dirty={library.teacher.dirty}
             items={library.teacher.items}
             speech={speechSynthesis}
+            bingo={library.teacher.bingo}
             onSelectionChange={library.teacher.updateSelection}
             onPublisherChange={library.teacher.updatePublisher}
             onPublishedChange={library.teacher.setPublished}
@@ -258,8 +252,8 @@ function App() {
             onSearchCopySources={library.teacher.searchCopySources}
             onSelectCopySource={library.teacher.selectCopySource}
             onCopySource={library.teacher.copySource}
-          onAddItem={library.teacher.addItem}
-          onUpdateItem={library.teacher.updateItem}
+            onAddItem={library.teacher.addItem}
+            onUpdateItem={library.teacher.updateItem}
             onRemoveItem={library.teacher.removeItem}
             onClearItems={library.teacher.clearItems}
             onOpenBingoHost={handleOpenTeacherBingoHost}
@@ -326,8 +320,11 @@ function App() {
             sessionTitle={teacherBingoSessionTitle}
             teacherName={library.teacher.profile?.teacherName ?? ""}
             classLabel={
-              library.teacher.selection.grade && library.teacher.selection.unit
-                ? `${library.teacher.selection.grade}학년 · ${library.teacher.selection.unit}단원`
+              teacherBingo.session?.grade &&
+              (teacherBingo.session?.selectedUnitLabels?.length ?? 0) > 0
+                ? `${teacherBingo.session.grade}학년 · ${teacherBingo.session.selectedUnitLabels.join(", ")}`
+                : teacherBingoSelectedUnitLabels.length > 0
+                  ? `${library.teacher.selection.grade}학년 · ${teacherBingoSelectedUnitLabels.join(", ")}`
                 : ""
             }
             roomLabel={library.teacher.publisher ? `출판사 ${library.teacher.publisher}` : ""}
@@ -435,11 +432,18 @@ function App() {
             sessionCode={studentBingo.sessionCode}
             playerName={studentBingo.player?.studentName ?? library.student.nameDraft}
             boardTitle={
-              studentBingo.session?.schoolName && studentBingo.session?.unit
-                ? `${studentBingo.session.schoolName} · ${studentBingo.session.unit}단원 빙고`
+              studentBingo.session?.schoolName &&
+              (studentBingo.session?.selectedUnitLabels?.length ?? 0) > 0
+                ? `${studentBingo.session.schoolName} · ${studentBingo.session.selectedUnitLabels.join(", ")} 빙고`
                 : "영어 단어 빙고 보드"
             }
             boardWords={studentBingo.player?.boardCells ?? []}
+            setupStatus={studentBingo.player?.setupStatus ?? "arranging"}
+            availableWords={studentBingo.player?.availableWords ?? []}
+            requiredCellCount={studentBingo.player?.requiredCellCount ?? 0}
+            setupStartedAt={studentBingo.player?.setupStartedAt ?? null}
+            setupCompletedAt={studentBingo.player?.setupCompletedAt ?? null}
+            playerId={studentBingo.playerId}
             currentWordId={studentBingo.session?.activeWordId ?? ""}
             currentWord={studentBingo.session?.activeWordText ?? ""}
             currentWordSource={formatBingoCallSource(studentBingoCall)}
@@ -456,11 +460,28 @@ function App() {
             }
             errorMessage={studentBingo.error}
             roundLabel={
-              studentBingo.session?.grade && studentBingo.session?.unit
-                ? `${studentBingo.session.grade}학년 ${studentBingo.session.unit}단원`
+              studentBingo.session?.grade &&
+              (studentBingo.session?.selectedUnitLabels?.length ?? 0) > 0
+                ? `${studentBingo.session.grade}학년 ${studentBingo.session.selectedUnitLabels.join(", ")}`
                 : ""
             }
+            actionLoading={studentBingo.actionLoading}
             canContinue={studentBingo.session?.status === "live"}
+            onSaveSetupDraft={({ boardCells }) =>
+              studentBingo.saveBoardSetup({
+                sessionId: studentBingo.sessionCode,
+                playerId: studentBingo.playerId,
+                boardCells,
+              })
+            }
+            onFinalizeSetup={({ boardCells, autoFillRemaining }) =>
+              studentBingo.finalizeBoardSetup({
+                sessionId: studentBingo.sessionCode,
+                playerId: studentBingo.playerId,
+                boardCells,
+                autoFillRemaining,
+              })
+            }
             onCheckWord={(wordId) =>
               studentBingo.markCell({
                 sessionId: studentBingo.sessionCode,

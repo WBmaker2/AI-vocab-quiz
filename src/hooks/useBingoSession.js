@@ -13,6 +13,8 @@ import {
   endBingoSession,
   joinBingoSession,
   markBingoCell,
+  saveBingoBoardSetupDraft,
+  finalizeBingoBoardSetup,
   callBingoWord,
 } from "../lib/firebase.js";
 import {
@@ -249,6 +251,34 @@ export function useBingoSession({
     }
   }
 
+  async function saveBoardSetup(payload) {
+    setActionLoading(true);
+    setError("");
+
+    try {
+      return await saveBingoBoardSetupDraft(payload);
+    } catch (sessionError) {
+      setError(sessionError.message || "빙고판 배치 상태를 저장하지 못했습니다.");
+      throw sessionError;
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function finalizeBoardSetup(payload) {
+    setActionLoading(true);
+    setError("");
+
+    try {
+      return await finalizeBingoBoardSetup(payload);
+    } catch (sessionError) {
+      setError(sessionError.message || "빙고판 배치를 완료하지 못했습니다.");
+      throw sessionError;
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function endSession(payload) {
     setActionLoading(true);
     setError("");
@@ -281,6 +311,8 @@ export function useBingoSession({
     callWord,
     drawWord,
     markCell,
+    saveBoardSetup,
+    finalizeBoardSetup,
     endSession,
   };
 }

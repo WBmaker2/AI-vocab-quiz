@@ -47,9 +47,12 @@ import {
   canMarkBingoCell,
   computeBingoLines,
   createBingoBoard,
+  createBingoSetupBoard,
   createBingoSessionCode,
   createBingoWordId,
   determineBingoBoardSize,
+  finalizeBingoBoardPlacements,
+  createEmptyBingoBoardCells,
   normalizeBingoItems,
   normalizeBingoText,
   selectNextBingoWord,
@@ -1444,6 +1447,16 @@ function normalizeBingoPlayerName(studentName) {
   return normalizeBingoText(studentName);
 }
 
+function normalizeBingoSelectionList(values) {
+  return Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map((value) => normalizeBingoText(value))
+        .filter(Boolean),
+    ),
+  );
+}
+
 function createBingoPlayerId(studentName) {
   return normalizeBingoPlayerName(studentName)
     .toLowerCase()
@@ -1468,6 +1481,22 @@ function normalizeBingoSessionDocument(snapshotData, fallback = {}) {
   const cleanFallback = fallback ?? {};
   const sessionCode = String(snapshotData?.sessionCode ?? cleanFallback.sessionCode ?? "").trim();
   const boardSize = Number(snapshotData?.boardSize ?? cleanFallback.boardSize ?? 0);
+  const requiredCellCount = Number(
+    snapshotData?.requiredCellCount
+      ?? cleanFallback.requiredCellCount
+      ?? (Number.isFinite(boardSize) && boardSize > 0 ? boardSize * boardSize : 0),
+  );
+  const fallbackUnit = String(cleanFallback.unit ?? "").trim();
+  const selectedUnits = normalizeBingoSelectionList(
+    snapshotData?.selectedUnits
+      ?? cleanFallback.selectedUnits
+      ?? (fallbackUnit ? [fallbackUnit] : []),
+  );
+  const selectedUnitLabels = normalizeBingoSelectionList(
+    snapshotData?.selectedUnitLabels
+      ?? cleanFallback.selectedUnitLabels
+      ?? (fallbackUnit ? [fallbackUnit] : []),
+  );
 
   return {
     sessionCode,
@@ -1478,6 +1507,9 @@ function normalizeBingoSessionDocument(snapshotData, fallback = {}) {
     grade: String(snapshotData?.grade ?? cleanFallback.grade ?? "").trim(),
     unit: String(snapshotData?.unit ?? cleanFallback.unit ?? "").trim(),
     publisher: String(snapshotData?.publisher ?? cleanFallback.publisher ?? "").trim(),
+    selectedUnits,
+    selectedUnitLabels,
+    requiredCellCount: Number.isFinite(requiredCellCount) ? requiredCellCount : 0,
     mode: String(snapshotData?.mode ?? cleanFallback.mode ?? "manual").trim(),
     boardSize: Number.isFinite(boardSize) ? boardSize : 0,
     status: String(snapshotData?.status ?? cleanFallback.status ?? "waiting").trim(),
@@ -1513,17 +1545,51 @@ function normalizeBingoPlayerDocument(snapshotData, fallback = {}) {
     snapshotData?.boardCells ?? cleanFallback.boardCells ?? [],
   );
   const boardSize = Number(snapshotData?.boardSize ?? cleanFallback.boardSize ?? 0);
+  const setupStatus = String(snapshotData?.setupStatus ?? cleanFallback.setupStatus ?? "ready").trim();
+  const requiredCellCount = Number(
+    snapshotData?.requiredCellCount
+      ?? cleanFallback.requiredCellCount
+      ?? (Number.isFinite(boardSize) && boardSize > 0 ? boardSize * boardSize : 0),
+  );
   const markedWordIds = Array.isArray(snapshotData?.markedWordIds)
     ? snapshotData.markedWordIds.map((value) => String(value ?? "").trim()).filter(Boolean)
     : Array.isArray(cleanFallback.markedWordIds)
       ? cleanFallback.markedWordIds.map((value) => String(value ?? "").trim()).filter(Boolean)
       : [];
+  const availableWords = normalizeBingoSessionItems(
+    snapshotData?.availableWords
+      ?? cleanFallback.availableWords
+      ?? boardCells.map((cell) => ({
+        id: cell.wordId,
+        word: cell.word,
+        meaning: cell.meaning,
+        imageHint: cell.imageHint,
+        exampleSentence: cell.exampleSentence,
+      })),
+  );
+  const setupStartedAt = snapshotData?.setupStartedAt
+    ?? cleanFallback.setupStartedAt
+    ?? snapshotData?.joinedAt
+    ?? cleanFallback.joinedAt
+    ?? snapshotData?.updatedAt
+    ?? cleanFallback.updatedAt
+    ?? null;
+  const setupCompletedAt = snapshotData?.setupCompletedAt
+    ?? cleanFallback.setupCompletedAt
+    ?? snapshotData?.updatedAt
+    ?? cleanFallback.updatedAt
+    ?? snapshotData?.joinedAt
+    ?? cleanFallback.joinedAt
+    ?? null;
   const bingoLinesResult = computeBingoLines(markedWordIds, boardCells, boardSize);
 
   return {
     studentName,
     studentNameNormalized: createBingoPlayerId(studentName),
     boardSize: Number.isFinite(boardSize) ? boardSize : 0,
+    setupStatus,
+    requiredCellCount: Number.isFinite(requiredCellCount) ? requiredCellCount : 0,
+    availableWords,
     boardCells,
     boardWordIds: Array.isArray(snapshotData?.boardWordIds)
       ? snapshotData.boardWordIds.map((value) => String(value ?? "").trim()).filter(Boolean)
@@ -1537,6 +1603,8 @@ function normalizeBingoPlayerDocument(snapshotData, fallback = {}) {
       : Number.isFinite(Number(cleanFallback.bingoRank))
         ? Number(cleanFallback.bingoRank)
         : null,
+    setupStartedAt,
+    setupCompletedAt,
     joinedAt: snapshotData?.joinedAt ?? cleanFallback.joinedAt ?? null,
     updatedAt: snapshotData?.updatedAt ?? cleanFallback.updatedAt ?? null,
   };
@@ -1550,6 +1618,8 @@ function createBingoSessionPayload({
   grade,
   unit,
   publisher,
+  selectedUnits,
+  selectedUnitLabels,
   mode,
   items,
   boardSize,
@@ -1558,6 +1628,12 @@ function createBingoSessionPayload({
   const normalizedItems = normalizeBingoSessionItems(items);
   const safeBoardSize = boardSize ?? determineBingoBoardSize(normalizedItems.length);
   const board = createBingoBoard(normalizedItems, safeBoardSize);
+  const cleanSelectedUnits = normalizeBingoSelectionList(
+    selectedUnits ?? [unit],
+  );
+  const cleanSelectedUnitLabels = normalizeBingoSelectionList(
+    selectedUnitLabels ?? [unit],
+  );
   const cleanMode = normalizeBingoText(mode).toLowerCase() || "manual";
   const cleanTeacherUserId = normalizeBingoText(teacherUserId);
   const cleanTeacherName = normalizeBingoText(teacherName);
@@ -1569,8 +1645,11 @@ function createBingoSessionPayload({
     schoolId: normalizeBingoText(schoolId),
     schoolName: normalizeBingoText(schoolName),
     grade: normalizeBingoText(grade),
-    unit: normalizeBingoText(unit),
+    unit: normalizeBingoText(cleanSelectedUnitLabels[0] ?? unit),
     publisher: normalizeBingoText(publisher),
+    selectedUnits: cleanSelectedUnits,
+    selectedUnitLabels: cleanSelectedUnitLabels,
+    requiredCellCount: board.boardSize * board.boardSize,
     mode: cleanMode === "tts" ? "tts" : "manual",
     boardSize: board.boardSize,
     status: "live",
@@ -1595,6 +1674,8 @@ export async function createBingoSession({
   grade,
   unit,
   publisher,
+  selectedUnits = [],
+  selectedUnitLabels = [],
   mode = "manual",
   items,
   boardSize,
@@ -1609,6 +1690,12 @@ export async function createBingoSession({
   const cleanGrade = String(grade ?? "").trim();
   const cleanUnit = String(unit ?? "").trim();
   const cleanPublisher = String(publisher ?? "").trim();
+  const cleanSelectedUnits = normalizeBingoSelectionList(
+    selectedUnits.length ? selectedUnits : [cleanUnit],
+  );
+  const cleanSelectedUnitLabels = normalizeBingoSelectionList(
+    selectedUnitLabels.length ? selectedUnitLabels : [cleanUnit],
+  );
   const normalizedItems = normalizeBingoSessionItems(items);
 
   if (!cleanSessionCode) {
@@ -1658,6 +1745,8 @@ export async function createBingoSession({
     grade: cleanGrade,
     unit: cleanUnit,
     publisher: cleanPublisher,
+    selectedUnits: cleanSelectedUnits,
+    selectedUnitLabels: cleanSelectedUnitLabels,
     mode,
     items: normalizedItems,
     boardSize,
@@ -1718,18 +1807,26 @@ export async function joinBingoSession({ sessionCode, studentName }) {
       throw new Error("같은 이름의 학생이 이미 참여했습니다.");
     }
 
-    const board = createBingoBoard(sessionData.vocabularyItems, sessionData.boardSize);
+    const setupBoard = createBingoSetupBoard(
+      sessionData.vocabularyItems,
+      sessionData.boardSize,
+    );
     const playerPayload = {
       studentName: cleanStudentName,
       studentNameNormalized: playerId,
-      boardSize: board.boardSize,
-      boardCells: board.boardCells,
-      boardWordIds: board.boardWordIds,
+      boardSize: setupBoard.boardSize,
+      requiredCellCount: setupBoard.requiredCellCount,
+      setupStatus: "arranging",
+      availableWords: setupBoard.availableWords,
+      boardCells: setupBoard.boardCells,
+      boardWordIds: setupBoard.boardWordIds,
       markedWordIds: [],
       bingoLines: 0,
       completedLineKeys: [],
       hasBingo: false,
       bingoRank: null,
+      setupStartedAt: serverTimestamp(),
+      setupCompletedAt: null,
       joinedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -1749,9 +1846,242 @@ export async function joinBingoSession({ sessionCode, studentName }) {
         playerId,
         ...normalizeBingoPlayerDocument(playerPayload, {
           studentName: cleanStudentName,
-          boardSize: board.boardSize,
-          boardCells: board.boardCells,
+          boardSize: setupBoard.boardSize,
+          requiredCellCount: setupBoard.requiredCellCount,
+          setupStatus: "arranging",
+          boardCells: setupBoard.boardCells,
+          availableWords: setupBoard.availableWords,
         }),
+      },
+    };
+  });
+}
+
+function normalizeBingoBoardSetupDraft(boardCells, boardSize, availableWords = []) {
+  const safeBoardSize = Number(boardSize);
+  const requiredCellCount = safeBoardSize * safeBoardSize;
+  const normalizedCells = createEmptyBingoBoardCells(safeBoardSize);
+  const seenWordIds = new Set();
+  const availableWordMap = new Map(
+    normalizeBingoSessionItems(availableWords).map((item) => [item.id, item]),
+  );
+  const incomingCells = Array.isArray(boardCells) ? boardCells : [];
+
+  incomingCells.forEach((cell, index) => {
+    const cellIndex = Number.isFinite(Number(cell?.index))
+      ? Number(cell.index)
+      : index;
+
+    if (cellIndex < 0 || cellIndex >= requiredCellCount) {
+      return;
+    }
+
+    const wordId = normalizeBingoText(cell?.wordId);
+    const word = normalizeBingoText(cell?.word);
+    const meaning = normalizeBingoText(cell?.meaning);
+    const imageHint = normalizeBingoText(cell?.imageHint);
+    const exampleSentence = normalizeBingoText(cell?.exampleSentence);
+
+    if (!wordId) {
+      return;
+    }
+
+    if (seenWordIds.has(wordId)) {
+      throw new Error("같은 단어는 한 번만 배치할 수 있습니다.");
+    }
+
+    seenWordIds.add(wordId);
+    const selectedItem = availableWordMap.get(wordId) ?? {
+      id: wordId,
+      word,
+      meaning,
+      imageHint,
+      exampleSentence,
+    };
+    normalizedCells[cellIndex] = {
+      index: cellIndex,
+      row: Math.floor(cellIndex / safeBoardSize),
+      column: cellIndex % safeBoardSize,
+      wordId: selectedItem.id,
+      word: normalizeBingoText(selectedItem.word) || word,
+      meaning: normalizeBingoText(selectedItem.meaning) || meaning,
+      imageHint: normalizeBingoText(selectedItem.imageHint) || imageHint,
+      exampleSentence:
+        normalizeBingoText(selectedItem.exampleSentence) || exampleSentence,
+    };
+  });
+
+  return normalizedCells;
+}
+
+export async function saveBingoBoardSetupDraft({
+  sessionId,
+  playerId,
+  boardCells,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSessionId = String(sessionId ?? "").trim().toUpperCase();
+  const cleanPlayerId = String(playerId ?? "").trim();
+  const sessionRef = createBingoSessionRef(firestore, cleanSessionId);
+  const playerRef = createBingoPlayerRef(firestore, cleanSessionId, cleanPlayerId);
+
+  return runTransaction(firestore, async (transaction) => {
+    const [sessionSnapshot, playerSnapshot] = await Promise.all([
+      transaction.get(sessionRef),
+      transaction.get(playerRef),
+    ]);
+
+    if (!sessionSnapshot.exists()) {
+      throw new Error("빙고 세션을 찾을 수 없습니다.");
+    }
+
+    if (!playerSnapshot.exists()) {
+      throw new Error("빙고 참가자를 찾을 수 없습니다.");
+    }
+
+    const sessionData = normalizeBingoSessionDocument(sessionSnapshot.data(), {
+      sessionCode: cleanSessionId,
+    });
+    const playerData = normalizeBingoPlayerDocument(playerSnapshot.data(), {
+      studentName: playerSnapshot.data()?.studentName,
+      boardSize: playerSnapshot.data()?.boardSize,
+      setupStatus: playerSnapshot.data()?.setupStatus,
+      requiredCellCount: playerSnapshot.data()?.requiredCellCount,
+      availableWords: playerSnapshot.data()?.availableWords,
+      boardCells: playerSnapshot.data()?.boardCells,
+      boardWordIds: playerSnapshot.data()?.boardWordIds,
+      markedWordIds: playerSnapshot.data()?.markedWordIds,
+      bingoRank: playerSnapshot.data()?.bingoRank,
+      hasBingo: playerSnapshot.data()?.hasBingo,
+    });
+
+    if (sessionData.status !== "live") {
+      throw new Error("이미 종료된 빙고 세션입니다.");
+    }
+
+    if (playerData.setupStatus !== "arranging") {
+      throw new Error("이미 빙고판 배치가 완료되었습니다.");
+    }
+
+    const availableWordMap = new Map(
+      playerData.availableWords.map((item) => [item.id, item]),
+    );
+    const draftCells = normalizeBingoBoardSetupDraft(
+      boardCells ?? playerData.boardCells,
+      playerData.boardSize,
+      playerData.availableWords,
+    );
+    const draftWordIds = draftCells
+      .map((cell) => normalizeBingoText(cell.wordId))
+      .filter(Boolean);
+
+    draftWordIds.forEach((wordId) => {
+      if (!availableWordMap.has(wordId)) {
+        throw new Error("빙고판에 없는 단어는 배치할 수 없습니다.");
+      }
+    });
+
+    transaction.update(playerRef, {
+      boardCells: draftCells,
+      boardWordIds: draftWordIds,
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      sessionId: cleanSessionId,
+      playerId: cleanPlayerId,
+      boardCells: draftCells,
+      boardWordIds: draftWordIds,
+      player: {
+        id: playerSnapshot.id,
+        ...playerData,
+        boardCells: draftCells,
+        boardWordIds: draftWordIds,
+      },
+    };
+  });
+}
+
+export async function finalizeBingoBoardSetup({
+  sessionId,
+  playerId,
+  boardCells,
+  autoFillRemaining = false,
+  random = Math.random,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSessionId = String(sessionId ?? "").trim().toUpperCase();
+  const cleanPlayerId = String(playerId ?? "").trim();
+  const sessionRef = createBingoSessionRef(firestore, cleanSessionId);
+  const playerRef = createBingoPlayerRef(firestore, cleanSessionId, cleanPlayerId);
+
+  return runTransaction(firestore, async (transaction) => {
+    const [sessionSnapshot, playerSnapshot] = await Promise.all([
+      transaction.get(sessionRef),
+      transaction.get(playerRef),
+    ]);
+
+    if (!sessionSnapshot.exists()) {
+      throw new Error("빙고 세션을 찾을 수 없습니다.");
+    }
+
+    if (!playerSnapshot.exists()) {
+      throw new Error("빙고 참가자를 찾을 수 없습니다.");
+    }
+
+    const sessionData = normalizeBingoSessionDocument(sessionSnapshot.data(), {
+      sessionCode: cleanSessionId,
+    });
+    const playerData = normalizeBingoPlayerDocument(playerSnapshot.data(), {
+      studentName: playerSnapshot.data()?.studentName,
+      boardSize: playerSnapshot.data()?.boardSize,
+      setupStatus: playerSnapshot.data()?.setupStatus,
+      requiredCellCount: playerSnapshot.data()?.requiredCellCount,
+      availableWords: playerSnapshot.data()?.availableWords,
+      boardCells: playerSnapshot.data()?.boardCells,
+      boardWordIds: playerSnapshot.data()?.boardWordIds,
+      markedWordIds: playerSnapshot.data()?.markedWordIds,
+      bingoRank: playerSnapshot.data()?.bingoRank,
+      hasBingo: playerSnapshot.data()?.hasBingo,
+    });
+
+    if (sessionData.status !== "live") {
+      throw new Error("이미 종료된 빙고 세션입니다.");
+    }
+
+    if (playerData.setupStatus !== "arranging") {
+      throw new Error("이미 빙고판 배치가 완료되었습니다.");
+    }
+
+    const finalizedBoard = finalizeBingoBoardPlacements({
+      boardCells: boardCells ?? playerData.boardCells,
+      availableWords: playerData.availableWords,
+      boardSize: playerData.boardSize,
+      autoFillRemaining,
+      random,
+    });
+
+    transaction.update(playerRef, {
+      setupStatus: "ready",
+      boardCells: finalizedBoard.boardCells,
+      boardWordIds: finalizedBoard.boardWordIds,
+      requiredCellCount: finalizedBoard.requiredCellCount,
+      setupCompletedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      sessionId: cleanSessionId,
+      playerId: cleanPlayerId,
+      boardCells: finalizedBoard.boardCells,
+      boardWordIds: finalizedBoard.boardWordIds,
+      player: {
+        id: playerSnapshot.id,
+        ...playerData,
+        setupStatus: "ready",
+        boardCells: finalizedBoard.boardCells,
+        boardWordIds: finalizedBoard.boardWordIds,
+        requiredCellCount: finalizedBoard.requiredCellCount,
       },
     };
   });
@@ -1844,6 +2174,9 @@ export async function callBingoWord({
     );
 
     transaction.update(sessionRef, {
+      selectedUnits: currentSession.selectedUnits,
+      selectedUnitLabels: currentSession.selectedUnitLabels,
+      requiredCellCount: currentSession.requiredCellCount || currentSession.boardSize * currentSession.boardSize,
       activeWordId: normalizedSelectedItem.id,
       activeWordText: normalizedSelectedItem.word,
       activeWordMeaning: normalizedSelectedItem.meaning,
@@ -1918,6 +2251,9 @@ export async function drawNextBingoWord({
     );
 
     transaction.update(sessionRef, {
+      selectedUnits: currentSession.selectedUnits,
+      selectedUnitLabels: currentSession.selectedUnitLabels,
+      requiredCellCount: currentSession.requiredCellCount || currentSession.boardSize * currentSession.boardSize,
       activeWordId: nextWordId,
       activeWordText: normalizeBingoText(nextWord.word),
       activeWordMeaning: normalizeBingoText(nextWord.meaning),
@@ -1971,8 +2307,11 @@ export async function markBingoCell({
     const playerData = normalizeBingoPlayerDocument(playerSnapshot.data(), {
       studentName: playerSnapshot.data()?.studentName,
       boardSize: playerSnapshot.data()?.boardSize,
+      setupStatus: playerSnapshot.data()?.setupStatus,
       boardCells: playerSnapshot.data()?.boardCells,
       markedWordIds: playerSnapshot.data()?.markedWordIds,
+      availableWords: playerSnapshot.data()?.availableWords,
+      requiredCellCount: playerSnapshot.data()?.requiredCellCount,
       bingoRank: playerSnapshot.data()?.bingoRank,
       hasBingo: playerSnapshot.data()?.hasBingo,
     });
@@ -1980,6 +2319,10 @@ export async function markBingoCell({
 
     if (!activeWordId) {
       throw new Error("현재 호출된 단어가 없습니다.");
+    }
+
+    if (playerData.setupStatus !== "ready") {
+      throw new Error("빙고판 배치가 완료된 후에만 체크할 수 있습니다.");
     }
 
     if (!canMarkBingoCell({
@@ -2010,6 +2353,11 @@ export async function markBingoCell({
     const nextHasBingo = nextBingoLines >= 3;
 
     transaction.update(playerRef, {
+      setupStatus: playerData.setupStatus,
+      requiredCellCount: playerData.requiredCellCount || (playerData.boardSize * playerData.boardSize),
+      availableWords: playerData.availableWords,
+      setupStartedAt: playerData.setupStartedAt ?? playerSnapshot.data()?.joinedAt ?? Timestamp.now(),
+      setupCompletedAt: playerData.setupCompletedAt ?? playerSnapshot.data()?.joinedAt ?? Timestamp.now(),
       markedWordIds: nextMarkedWordIds,
       bingoLines: nextBingoLines,
       completedLineKeys: bingoLinesResult.completedLineKeys,
@@ -2075,6 +2423,9 @@ export async function endBingoSession({
       status: "finished",
       finishedAt: serverTimestamp(),
       finishedBy: cleanTeacherUserId || currentSession.teacherUserId,
+      selectedUnits: currentSession.selectedUnits,
+      selectedUnitLabels: currentSession.selectedUnitLabels,
+      requiredCellCount: currentSession.requiredCellCount || currentSession.boardSize * currentSession.boardSize,
       updatedAt: serverTimestamp(),
     });
 

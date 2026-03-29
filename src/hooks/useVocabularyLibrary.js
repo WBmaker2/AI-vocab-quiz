@@ -38,6 +38,7 @@ import {
   groupPublisherSourcesByTeacherAndSchool,
   summarizePublisherCopyResult,
 } from "../utils/publisherCopy.js";
+import { determineBingoBoardSize } from "../utils/bingo.js";
 import { LEADERBOARD_PERIOD_DEFINITIONS } from "../utils/leaderboard.js";
 import { mergeVocabularyItems } from "../utils/vocabularyMerge.js";
 import { parseVocabularyWorkbook } from "../utils/xlsxImport.js";
@@ -87,6 +88,38 @@ function clearTeacherAutoSaveTimer(timerRef) {
   }
 }
 
+function buildTeacherBingoItemsFromCatalog(catalog, grade, selectedUnits) {
+  const cleanGrade = String(grade ?? "").trim();
+  const cleanSelectedUnits = Array.from(
+    new Set(
+      (Array.isArray(selectedUnits) ? selectedUnits : [])
+        .map((unit) => String(unit ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (!cleanGrade || cleanSelectedUnits.length === 0) {
+    return [];
+  }
+
+  const selectedEntries = cleanSelectedUnits
+    .map((unit) =>
+      (Array.isArray(catalog) ? catalog : []).find(
+        (entry) =>
+          String(entry.grade ?? "").trim() === cleanGrade &&
+          String(entry.unit ?? "").trim() === unit,
+      ),
+    )
+    .filter(Boolean);
+
+  const mergedItems = selectedEntries.reduce(
+    (items, entry) => mergeVocabularyItems(items, entry.items ?? []).mergedItems,
+    [],
+  );
+
+  return normalizeDraftVocabulary(mergedItems);
+}
+
 export function useVocabularyLibrary() {
   const [authLoading, setAuthLoading] = useState(isFirebaseConfigured);
   const [authError, setAuthError] = useState("");
@@ -130,6 +163,7 @@ export function useVocabularyLibrary() {
     useState("");
   const [teacherLeaderboardSaving, setTeacherLeaderboardSaving] =
     useState(false);
+  const [teacherBingoUnits, setTeacherBingoUnits] = useState([]);
   const [teacherAutoSaveStatus, setTeacherAutoSaveStatus] = useState("");
   const [teacherAutoSaveToken, setTeacherAutoSaveToken] = useState(0);
 
@@ -1894,6 +1928,162 @@ export function useVocabularyLibrary() {
     [teacherCatalog, teacherSelection.grade],
   );
 
+  useEffect(() => {
+    if (!teacherSelection.grade) {
+      setTeacherBingoUnits([]);
+      return;
+    }
+
+    if (teacherUnits.length === 0) {
+      setTeacherBingoUnits([]);
+      return;
+    }
+
+    setTeacherBingoUnits((current) => {
+      const normalizedCurrent = Array.from(
+        new Set(
+          (Array.isArray(current) ? current : [])
+            .map((unit) => String(unit ?? "").trim())
+            .filter((unit) => teacherUnits.includes(unit)),
+        ),
+      ).sort((left, right) =>
+        String(left).localeCompare(String(right), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
+
+      if (normalizedCurrent.length > 0) {
+        return normalizedCurrent;
+      }
+
+      const seededUnit = teacherUnits.includes(teacherSelection.unit)
+        ? teacherSelection.unit
+        : teacherUnits[0];
+
+      return seededUnit ? [seededUnit] : [];
+    });
+  }, [teacherSelection.grade, teacherSelection.unit, teacherUnits]);
+
+  function toggleTeacherBingoUnit(unit) {
+    const cleanUnit = String(unit ?? "").trim();
+    if (!cleanUnit || !teacherUnits.includes(cleanUnit)) {
+      return;
+    }
+
+    setTeacherBingoUnits((current) => {
+      const hasUnit = current.includes(cleanUnit);
+      const nextUnits = hasUnit
+        ? current.filter((entry) => entry !== cleanUnit)
+        : [...current, cleanUnit];
+
+      return nextUnits.sort((left, right) =>
+        String(left).localeCompare(String(right), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
+    });
+  }
+
+  const teacherBingoSelectedCatalogEntries = useMemo(() => {
+    if (!teacherSelection.grade || teacherBingoUnits.length === 0) {
+      return [];
+    }
+
+    return teacherBingoUnits
+      .map((unit) =>
+        teacherCatalog.find(
+          (entry) =>
+            String(entry.grade ?? "").trim() === teacherSelection.grade &&
+            String(entry.unit ?? "").trim() === unit,
+        ),
+      )
+      .filter(Boolean);
+  }, [teacherCatalog, teacherBingoUnits, teacherSelection.grade]);
+
+  const teacherBingoItems = useMemo(() => {
+    return buildTeacherBingoItemsFromCatalog(
+      teacherCatalog,
+      teacherSelection.grade,
+      teacherBingoUnits,
+    );
+  }, [teacherCatalog, teacherBingoUnits, teacherSelection.grade]);
+
+  const teacherBingoBoardSize = useMemo(() => {
+    if (teacherBingoItems.length < 9) {
+      return 0;
+    }
+
+    return determineBingoBoardSize(teacherBingoItems.length);
+  }, [teacherBingoItems.length]);
+
+  const teacherBingoCanStart = Boolean(
+    teacherProfile?.userId &&
+      teacherSelection.grade &&
+      teacherBingoUnits.length > 0 &&
+      teacherBingoItems.length >= 9,
+  );
+
+  async function prepareTeacherBingoSession() {
+    if (!isFirebaseConfigured || !teacherProfile || !userId) {
+      throw new Error("Google 로그인과 선생님 정보 등록이 필요합니다.");
+    }
+
+    if (!teacherSelection.grade || teacherBingoUnits.length === 0) {
+      throw new Error("빙고에 사용할 학년과 단원을 먼저 선택하세요.");
+    }
+
+    const snapshot = teacherAutoSaveSnapshotRef.current;
+    const currentUnitIncluded = teacherBingoUnits.includes(
+      String(teacherSelection.unit ?? "").trim(),
+    );
+
+    if (snapshot?.dirty && currentUnitIncluded) {
+      clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
+      setTeacherAutoSaveToken(0);
+      setTeacherAutoSaveStatus("빙고 시작 전 자동 저장 중...");
+      await persistTeacherSetSnapshot(snapshot, "manual");
+      setTeacherDirty(false);
+      setTeacherAutoSaveStatus("자동 저장됨");
+    }
+
+    const latestCatalog = await listTeacherSetCatalog(userId);
+    setTeacherCatalog(latestCatalog);
+
+    const mergedItems = buildTeacherBingoItemsFromCatalog(
+      latestCatalog,
+      teacherSelection.grade,
+      teacherBingoUnits,
+    );
+
+    if (mergedItems.length < 9) {
+      throw new Error("빙고를 시작하려면 선택 단원에 단어가 9개 이상 있어야 합니다.");
+    }
+
+    const boardSize = determineBingoBoardSize(mergedItems.length);
+    const selectedUnitLabels = teacherBingoUnits.map((unit) => `${unit}단원`);
+
+    return {
+      teacherUserId: teacherProfile.userId,
+      teacherName: teacherProfile.teacherName,
+      schoolId: teacherProfile.schoolId,
+      schoolName: teacherProfile.schoolName,
+      grade: teacherSelection.grade,
+      unit: teacherBingoUnits[0],
+      publisher: teacherPublisherDraft,
+      selectedUnits: teacherBingoUnits,
+      selectedUnitLabels,
+      items: mergedItems,
+      boardSize,
+    };
+  }
+
+  const teacherBingoSelectedUnitLabels = useMemo(
+    () => teacherBingoUnits.map((unit) => `${unit}단원`),
+    [teacherBingoUnits],
+  );
+
   const currentTeacherCatalogEntry = useMemo(
     () =>
       teacherCatalog.find(
@@ -1954,6 +2144,7 @@ export function useVocabularyLibrary() {
       saving: teacherSaving,
       importing: teacherImporting,
       status: teacherStatus,
+      autoSaveStatus: teacherAutoSaveStatus,
       error: teacherError,
       copySources: teacherCopySources,
       selectedCopySourceId: teacherSelectedCopySourceId,
@@ -1977,6 +2168,16 @@ export function useVocabularyLibrary() {
         setDraftName: setTeacherLeaderboardDraftName,
         renameStudent: renameTeacherLeaderboardStudent,
         deleteStudent: deleteTeacherLeaderboardStudent,
+      },
+      bingo: {
+        availableUnits: teacherUnits,
+        selectedUnits: teacherBingoUnits,
+        selectedUnitLabels: teacherBingoSelectedUnitLabels,
+        items: teacherBingoItems,
+        boardSize: teacherBingoBoardSize,
+        canStart: teacherBingoCanStart,
+        toggleUnit: toggleTeacherBingoUnit,
+        prepareSession: prepareTeacherBingoSession,
       },
       units: teacherUnits,
       catalogEntry: currentTeacherCatalogEntry,

@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.9.0",
+    date: "2026-03-29",
+    summary: [
+      "학급 빙고를 여러 단원을 함께 선택해 시작할 수 있게 바꾸고, 사용 단어 수와 빙고판 크기를 교사 화면에서 바로 확인할 수 있습니다.",
+      "학생은 1분 안에 영단어 카드를 직접 빙고판에 배치하고, 시간이 지나면 남은 칸만 자동으로 채워진 뒤 플레이를 시작합니다.",
+      "빙고 참여 안내와 보드 확정 흐름을 정리해 수업 중 실제 배치와 체크 단계가 더 분명해졌습니다.",
+    ],
+  },
+  {
     version: "v1.8.1",
     date: "2026-03-29",
     summary: [
