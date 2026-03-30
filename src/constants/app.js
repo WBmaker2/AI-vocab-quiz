@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.9.2",
+    date: "2026-03-30",
+    summary: [
+      "학급 빙고에서 학생이 현재 부른 단어를 체크할 때 Firestore 권한 오류가 나던 저장 흐름을 실제 학생 클릭 payload에 맞게 바로잡았습니다.",
+      "학생 빙고 화면의 입력과 칸 찾기 보조 UI를 제거하고, 이제 보드의 해당 칸을 직접 클릭하는 흐름만 남겼습니다.",
+    ],
+  },
+  {
     version: "v1.9.1",
     date: "2026-03-30",
     summary: [

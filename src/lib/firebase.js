@@ -2353,11 +2353,6 @@ export async function markBingoCell({
     const nextHasBingo = nextBingoLines >= 3;
 
     transaction.update(playerRef, {
-      setupStatus: playerData.setupStatus,
-      requiredCellCount: playerData.requiredCellCount || (playerData.boardSize * playerData.boardSize),
-      availableWords: playerData.availableWords,
-      setupStartedAt: playerData.setupStartedAt ?? playerSnapshot.data()?.joinedAt ?? Timestamp.now(),
-      setupCompletedAt: playerData.setupCompletedAt ?? playerSnapshot.data()?.joinedAt ?? Timestamp.now(),
       markedWordIds: nextMarkedWordIds,
       bingoLines: nextBingoLines,
       completedLineKeys: bingoLinesResult.completedLineKeys,

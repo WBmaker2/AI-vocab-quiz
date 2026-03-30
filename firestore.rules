@@ -659,15 +659,14 @@ service cloud.firestore {
           && bingoSessionDoc(sessionId).data.status == 'live'
           && resource.data.setupStatus == 'ready'
           && request.resource.data.studentNameNormalized == playerId
+          && request.resource.data.studentNameNormalized == resource.data.studentNameNormalized
+          && request.resource.data.studentName == resource.data.studentName
           && request.resource.data.boardSize == resource.data.boardSize
           && request.resource.data.requiredCellCount == resource.data.requiredCellCount
           && request.resource.data.setupStatus == 'ready'
-          && request.resource.data.availableWords == resource.data.availableWords
-          && request.resource.data.boardCells == resource.data.boardCells
-          && request.resource.data.boardWordIds == resource.data.boardWordIds
-          && request.resource.data.joinedAt == resource.data.joinedAt
-          && request.resource.data.setupStartedAt == resource.data.setupStartedAt
-          && request.resource.data.setupCompletedAt == resource.data.setupCompletedAt
+          && request.resource.data.availableWords is list
+          && request.resource.data.boardCells is list
+          && request.resource.data.boardWordIds is list
           && request.resource.data.markedWordIds.hasAll(resource.data.markedWordIds)
           && request.resource.data.markedWordIds.size() == resource.data.markedWordIds.size() + 1
           && request.resource.data.markedWordIds.hasAny([bingoSessionDoc(sessionId).data.activeWordId])

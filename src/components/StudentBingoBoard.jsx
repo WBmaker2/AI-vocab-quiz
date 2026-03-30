@@ -180,9 +180,7 @@ export function StudentBingoBoard({
   onCheckWord,
   onBack,
 }) {
-  const [draft, setDraft] = useState("");
   const [localError, setLocalError] = useState("");
-  const [instructionMessage, setInstructionMessage] = useState("");
   const [selectedSetupWordId, setSelectedSetupWordId] = useState("");
   const [draggedSetupWordId, setDraggedSetupWordId] = useState("");
   const [setupSecondsLeft, setSetupSecondsLeft] = useState(60);
@@ -222,7 +220,6 @@ export function StudentBingoBoard({
 
   useEffect(() => {
     setLocalError("");
-    setInstructionMessage("");
   }, [currentWord, sourceBoard]);
 
   useEffect(() => {
@@ -343,23 +340,9 @@ export function StudentBingoBoard({
   );
 
   const visibleCurrentWord = String(currentWord ?? "").trim();
-  const normalizedCurrentWord = normalizeWord(visibleCurrentWord);
   const normalizedCurrentWordId = String(currentWordId ?? "").trim();
-  const currentWordOnBoard = gameplayBoardRows
-    .flat()
-    .some(
-      (tile) =>
-        String(tile.wordId ?? "").trim() === normalizedCurrentWordId
-        || normalizeWord(tile.word) === normalizedCurrentWord,
-    );
   const gridColumns = Math.max(1, gameplayBoardRows[0]?.length ?? 1);
   const currentCallLabel = visibleCurrentWord || "아직 호출된 단어가 없습니다.";
-  const canCheckCurrentWord =
-    Boolean(visibleCurrentWord) &&
-    currentWordOnBoard &&
-    !claimedSet.has(normalizedCurrentWordId) &&
-    !completedSet.has(normalizedCurrentWordId) &&
-    !lockedSet.has(normalizedCurrentWordId);
   const setupWordMap = useMemo(
     () => new Map(normalizedAvailableWords.map((item) => [item.wordId, item])),
     [normalizedAvailableWords],
@@ -611,9 +594,6 @@ export function StudentBingoBoard({
             </div>
 
             {localError ? <p className="bingo-host-status bingo-host-status-error">{localError}</p> : null}
-            {instructionMessage ? (
-              <p className="bingo-host-status">{instructionMessage}</p>
-            ) : null}
             {statusMessage ? <p className="bingo-host-status">{statusMessage}</p> : null}
 
             <div className="toolbar-row">
@@ -753,71 +733,9 @@ export function StudentBingoBoard({
             호출된 단어는 칸으로 강조만 됩니다. 실제 빙고 체크는 보드의 해당 칸을 직접 눌러야 합니다.
           </p>
 
-          <form className="bingo-manual-form" onSubmit={(event) => event.preventDefault()}>
-            <label className="field">
-              <span>입력</span>
-              <input
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                value={draft}
-                placeholder="현재 호출된 영어 단어를 입력"
-                onChange={(event) => setDraft(event.target.value)}
-                disabled={!canContinue}
-              />
-            </label>
-            <div className="toolbar-row">
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={!canCheckCurrentWord || !canContinue}
-                onClick={() => {
-                  const cleanDraft = normalizeWord(draft);
-                  if (!cleanDraft) {
-                    setLocalError("영어 단어를 입력해 주세요.");
-                    setInstructionMessage("");
-                    return;
-                  }
-
-                  if (!/^[a-z][a-z'\- ]*$/.test(cleanDraft)) {
-                    setLocalError("영어 단어만 입력할 수 있어요.");
-                    setInstructionMessage("");
-                    return;
-                  }
-
-                  if (cleanDraft !== normalizedCurrentWord) {
-                    setLocalError("현재 호출된 단어만 체크할 수 있어요.");
-                    setInstructionMessage("");
-                    return;
-                  }
-
-                  if (!currentWordOnBoard) {
-                    setLocalError("현재 호출된 단어가 보드에 없습니다.");
-                    setInstructionMessage("");
-                    return;
-                  }
-
-                  if (!canContinue) {
-                    setLocalError("세션이 종료되어 더 이상 체크할 수 없습니다.");
-                    setInstructionMessage("");
-                    return;
-                  }
-
-                  setLocalError("");
-                  setInstructionMessage("맞는 단어를 찾았어요. 칸 자체는 자동 체크되지 않으니 아래의 해당 칸을 직접 눌러 주세요.");
-                }}
-              >
-                칸 찾기
-              </button>
-            </div>
-          </form>
-
           {statusMessage ? <p className="bingo-host-status">{statusMessage}</p> : null}
           {errorMessage ? <p className="bingo-host-status bingo-host-status-error">{errorMessage}</p> : null}
           {localError ? <p className="bingo-host-status bingo-host-status-error">{localError}</p> : null}
-          {!localError && instructionMessage ? (
-            <p className="bingo-host-status">{instructionMessage}</p>
-          ) : null}
 
           <div className="bingo-metric-row">
             <span className="bingo-metric">
@@ -868,7 +786,7 @@ export function StudentBingoBoard({
                       if (!canContinue || !isCurrent || isClaimed || isLocked) {
                         return;
                       }
-                      setDraft(tile.word);
+                      setLocalError("");
                       onCheckWord?.(cleanWordId);
                     }}
                     disabled={!canContinue || !isCurrent || isClaimed || isLocked}
