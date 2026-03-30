@@ -121,13 +121,11 @@ export function SpeakingQuiz({
   const [progressionComparison, setProgressionComparison] = useState(null);
   const [newlyEarnedBadges, setNewlyEarnedBadges] = useState([]);
   const [progressionStudentName, setProgressionStudentName] = useState("");
-  const [incorrectAttempts, setIncorrectAttempts] = useState(0);
-  const [noSpeechAttempts, setNoSpeechAttempts] = useState(0);
+  const [failedAttempts, setFailedAttempts] = useState(0);
   const [blockingError, setBlockingError] = useState("");
 
   function resetQuestionFailureState() {
-    setIncorrectAttempts(0);
-    setNoSpeechAttempts(0);
+    setFailedAttempts(0);
     setBlockingError("");
   }
 
@@ -173,8 +171,7 @@ export function SpeakingQuiz({
   const isComplete = status === "complete";
   const canAdvance =
     status === "correct" ||
-    incorrectAttempts >= 3 ||
-    noSpeechAttempts >= 3 ||
+    failedAttempts >= 3 ||
     Boolean(blockingError);
   const isLockedAfterCorrect = status === "correct";
   const guidance = getGuidance(recognition.error);
@@ -203,8 +200,7 @@ export function SpeakingQuiz({
     }
 
     setBlockingError("");
-    setNoSpeechAttempts(0);
-    setIncorrectAttempts((current) => current + 1);
+    setFailedAttempts((current) => current + 1);
     setStatus("incorrect");
   }, [question?.id, question?.word, recognition.listening, recognition.transcript]);
 
@@ -215,8 +211,7 @@ export function SpeakingQuiz({
 
     if (recognition.error === "no-speech") {
       setBlockingError("");
-      setIncorrectAttempts(0);
-      setNoSpeechAttempts((current) => current + 1);
+      setFailedAttempts((current) => current + 1);
       setStatus("empty");
       return;
     }
@@ -309,7 +304,7 @@ export function SpeakingQuiz({
   function handleTryAgain() {
     setStatus("idle");
     setAttemptTranscript("");
-    resetQuestionFailureState();
+    setBlockingError("");
     recognition.reset();
   }
 
@@ -622,8 +617,8 @@ export function SpeakingQuiz({
             <p className="mode-label">Speaking Tip</p>
             <h3>진행 팁</h3>
             <p>
-              학생에게 단어를 또박또박 읽게 하고, 오답일 때는 원어민 발음 듣기
-              후 다시 따라 읽게 하면 좋습니다.
+              단어를 또박또박 읽고, 오답일 때는 원어민 발음 듣기 후 다시
+              읽으면 좋습니다.
             </p>
           </article>
 

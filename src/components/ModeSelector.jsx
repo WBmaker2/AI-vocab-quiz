@@ -304,14 +304,14 @@ export function ModeSelector({
             onClick={onOpenListening}
             disabled={!hasVocabulary}
           >
-            듣기 퀴즈 열기
+            듣기 퀴즈
           </button>
           <button
             className="secondary-button"
             onClick={onOpenSpeaking}
             disabled={!hasVocabulary}
           >
-            말하기 연습 열기
+            말하기 연습
           </button>
           <button
             className="ghost-button"
@@ -322,17 +322,17 @@ export function ModeSelector({
           </button>
           <button
             className="ghost-button"
-            onClick={onOpenBingo}
-            disabled={!remoteConfigured}
-          >
-            학급 빙고 게임
-          </button>
-          <button
-            className="ghost-button"
             onClick={onOpenFishing}
             disabled={!hasVocabulary}
           >
             단어 낚시
+          </button>
+          <button
+            className="ghost-button"
+            onClick={onOpenBingo}
+            disabled={!remoteConfigured}
+          >
+            학급 빙고 게임
           </button>
         </div>
 
