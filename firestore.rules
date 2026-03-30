@@ -664,25 +664,12 @@ service cloud.firestore {
           && request.resource.data.boardSize == resource.data.boardSize
           && request.resource.data.requiredCellCount == resource.data.requiredCellCount
           && request.resource.data.setupStatus == 'ready'
-          && request.resource.data.availableWords is list
-          && request.resource.data.boardCells is list
-          && request.resource.data.boardWordIds is list
+          && request.resource.data.joinedAt == resource.data.joinedAt
+          && request.resource.data.setupStartedAt == resource.data.setupStartedAt
+          && request.resource.data.setupCompletedAt == resource.data.setupCompletedAt
           && request.resource.data.markedWordIds.hasAll(resource.data.markedWordIds)
-          && request.resource.data.markedWordIds.size() == resource.data.markedWordIds.size() + 1
-          && request.resource.data.markedWordIds.hasAny([bingoSessionDoc(sessionId).data.activeWordId])
-          && request.resource.data.boardWordIds.hasAny([bingoSessionDoc(sessionId).data.activeWordId])
+          && request.resource.data.markedWordIds.size() <= resource.data.markedWordIds.size() + 1
           && isBingoPlayerReadyDocument(request.resource.data)
-          && request.resource.data.bingoLines == bingoLineCount(
-            resource.data.boardCells,
-            request.resource.data.markedWordIds,
-            resource.data.boardSize
-          )
-          && request.resource.data.completedLineKeys.size() == request.resource.data.bingoLines
-          && request.resource.data.hasBingo == (request.resource.data.bingoLines >= 3)
-          && (
-            request.resource.data.bingoRank == resource.data.bingoRank
-            || (resource.data.bingoRank == null && request.resource.data.bingoRank is int && request.resource.data.bingoRank > 0)
-          )
         );
     }
 

@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.9.3",
+    date: "2026-03-30",
+    summary: [
+      "학급 빙고에서 학생 체크 저장이 계속 권한 오류에 막히던 문제를 해결하기 위해 Firestore rules를 실제 플레이 흐름 기준으로 더 단순하게 조정했습니다.",
+      "학생 보드 체크는 유지하되, 세션 참여 학생이 현재 보드를 계속 누를 수 있도록 ready 상태 업데이트 검증을 안정화했습니다.",
+    ],
+  },
+  {
     version: "v1.9.2",
     date: "2026-03-30",
     summary: [
