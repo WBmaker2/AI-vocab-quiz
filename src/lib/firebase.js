@@ -2325,20 +2325,22 @@ export async function markBingoCell({
       throw new Error("빙고판 배치가 완료된 후에만 체크할 수 있습니다.");
     }
 
-    if (!canMarkBingoCell({
-      activeWordId,
-      cellWordId: cleanWordId,
-      alreadyMarked: playerData.markedWordIds.includes(cleanWordId),
-    })) {
-      throw new Error("현재 호출된 단어만 체크할 수 있습니다.");
-    }
-
     const boardCell = playerData.boardCells.find(
       (cell) => cell.wordId === cleanWordId,
     );
 
     if (!boardCell) {
       throw new Error("빙고판에 없는 단어입니다.");
+    }
+
+    if (!canMarkBingoCell({
+      activeWordId,
+      activeWordText: sessionData.activeWordText,
+      cellWordId: cleanWordId,
+      cellWordText: boardCell.word,
+      alreadyMarked: playerData.markedWordIds.includes(cleanWordId),
+    })) {
+      throw new Error("현재 호출된 단어만 체크할 수 있습니다.");
     }
 
     const nextMarkedWordIds = Array.from(

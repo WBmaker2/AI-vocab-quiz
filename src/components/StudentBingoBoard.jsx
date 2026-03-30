@@ -341,6 +341,7 @@ export function StudentBingoBoard({
 
   const visibleCurrentWord = String(currentWord ?? "").trim();
   const normalizedCurrentWordId = String(currentWordId ?? "").trim();
+  const normalizedCurrentWord = normalizeWord(visibleCurrentWord);
   const gridColumns = Math.max(1, gameplayBoardRows[0]?.length ?? 1);
   const currentCallLabel = visibleCurrentWord || "아직 호출된 단어가 없습니다.";
   const setupWordMap = useMemo(
@@ -730,7 +731,7 @@ export function StudentBingoBoard({
 
           <div className="bingo-current-word bingo-current-word-small">{currentCallLabel}</div>
           <p className="bingo-call-helper">
-            호출된 단어는 칸으로 강조만 됩니다. 실제 빙고 체크는 보드의 해당 칸을 직접 눌러야 합니다.
+            선생님이 부른 영단어를 보드에서 직접 찾아 눌러야 체크됩니다.
           </p>
 
           {statusMessage ? <p className="bingo-host-status">{statusMessage}</p> : null}
@@ -765,9 +766,13 @@ export function StudentBingoBoard({
             {gameplayBoardRows.flat().length > 0 ? (
               gameplayBoardRows.flat().map((tile) => {
                 const cleanWordId = String(tile.wordId ?? "").trim();
-                const isCurrent = cleanWordId === normalizedCurrentWordId;
                 const isClaimed = claimedSet.has(cleanWordId) || completedSet.has(cleanWordId);
                 const isLocked = lockedSet.has(cleanWordId);
+                const isCurrentById = Boolean(normalizedCurrentWordId)
+                  && cleanWordId === normalizedCurrentWordId;
+                const isCurrentByText = Boolean(normalizedCurrentWord)
+                  && normalizeWord(tile.word) === normalizedCurrentWord;
+                const isCallableChoice = isCurrentById || isCurrentByText;
 
                 return (
                   <button
@@ -776,20 +781,29 @@ export function StudentBingoBoard({
                     className={
                       isClaimed
                         ? "bingo-tile bingo-tile-claimed"
-                        : isCurrent && canContinue
-                          ? "bingo-tile bingo-tile-active"
-                          : isLocked
-                            ? "bingo-tile bingo-tile-locked"
-                            : "bingo-tile"
+                        : isLocked
+                          ? "bingo-tile bingo-tile-locked"
+                          : "bingo-tile"
                     }
                     onClick={() => {
-                      if (!canContinue || !isCurrent || isClaimed || isLocked) {
+                      if (!canContinue || isClaimed || isLocked) {
                         return;
                       }
+
+                      if (!visibleCurrentWord) {
+                        setLocalError("선생님이 부른 단어가 아직 없습니다.");
+                        return;
+                      }
+
+                      if (!isCallableChoice) {
+                        setLocalError("현재 호출된 단어만 체크할 수 있습니다.");
+                        return;
+                      }
+
                       setLocalError("");
                       onCheckWord?.(cleanWordId);
                     }}
-                    disabled={!canContinue || !isCurrent || isClaimed || isLocked}
+                    disabled={!canContinue || isClaimed || isLocked}
                   >
                     {isClaimed ? (
                       <span className="bingo-tile-claimed-badge">체크 완료</span>

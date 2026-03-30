@@ -347,6 +347,7 @@ function App() {
               .reverse()
               .map((entry, index) => ({
                 id: `${entry.wordId ?? entry.word ?? "call"}-${index}`,
+                wordId: entry.wordId,
                 word: entry.word,
                 source: formatBingoCallSource(entry),
               }))}

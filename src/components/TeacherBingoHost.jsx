@@ -445,15 +445,18 @@ export function TeacherBingoHost({
                       : "bingo-word-button"
                 }
                 onClick={() => {
-                  if (!option.id || !onSelectWord || option.called) {
+                  if (!option.id || !onSelectWord) {
                     return;
                   }
 
                   pendingSpeakRef.current = false;
                   onSelectWord(option);
                 }}
-                disabled={option.called || !onSelectWord}
+                disabled={!onSelectWord}
               >
+                {option.called ? (
+                  <span className="bingo-word-button-called-badge">호출 완료</span>
+                ) : null}
                 <strong>{option.word}</strong>
                 {option.meaning ? <small>{option.meaning}</small> : null}
               </button>

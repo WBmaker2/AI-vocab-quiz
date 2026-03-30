@@ -1,11 +1,11 @@
 {
   "name": "talking-vocab-quiz",
   "private": true,
-  "version": "1.9.4",
+  "version": "1.9.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --configLoader runner",
     "preview": "vite preview",
     "test:smoke": "node scripts/playwright_smoke.js"
   },

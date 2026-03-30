@@ -336,13 +336,24 @@ export function finalizeBingoBoardPlacements({
 
 export function canMarkBingoCell({
   activeWordId,
+  activeWordText,
   cellWordId,
+  cellWordText,
   alreadyMarked,
 }) {
   return Boolean(
-    normalizeBingoText(activeWordId)
-      && normalizeBingoText(cellWordId)
-      && normalizeBingoText(activeWordId) === normalizeBingoText(cellWordId)
+    (
+      (
+        normalizeBingoText(activeWordId)
+          && normalizeBingoText(cellWordId)
+          && normalizeBingoText(activeWordId) === normalizeBingoText(cellWordId)
+      ) || (
+        normalizeBingoText(activeWordText)
+          && normalizeBingoText(cellWordText)
+          && normalizeBingoText(activeWordText).toLowerCase()
+            === normalizeBingoText(cellWordText).toLowerCase()
+      )
+    )
       && !alreadyMarked,
   );
 }
