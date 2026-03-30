@@ -791,6 +791,9 @@ export function StudentBingoBoard({
                     }}
                     disabled={!canContinue || !isCurrent || isClaimed || isLocked}
                   >
+                    {isClaimed ? (
+                      <span className="bingo-tile-claimed-badge">체크 완료</span>
+                    ) : null}
                     <strong>{tile.word}</strong>
                     {tile.meaning ? <small>{tile.meaning}</small> : null}
                   </button>

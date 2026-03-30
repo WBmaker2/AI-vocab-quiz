@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.9.4",
+    date: "2026-03-30",
+    summary: [
+      "학생 빙고 보드에서 체크된 카드가 더 잘 보이도록 진한 외곽선, 배경 강조, 체크 완료 배지를 추가했습니다.",
+      "이미 누른 빙고 칸을 수업 중에도 한눈에 구분할 수 있도록 표시 대비를 높였습니다.",
+    ],
+  },
+  {
     version: "v1.9.3",
     date: "2026-03-30",
     summary: [
