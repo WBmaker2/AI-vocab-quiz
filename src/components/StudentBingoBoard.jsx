@@ -340,10 +340,11 @@ export function StudentBingoBoard({
   );
 
   const visibleCurrentWord = String(currentWord ?? "").trim();
-  const normalizedCurrentWordId = String(currentWordId ?? "").trim();
+  const normalizedCurrentWordId = normalizeWord(currentWordId);
   const normalizedCurrentWord = normalizeWord(visibleCurrentWord);
+  const hasCurrentWord = Boolean(visibleCurrentWord) || Boolean(normalizedCurrentWordId);
   const gridColumns = Math.max(1, gameplayBoardRows[0]?.length ?? 1);
-  const currentCallLabel = visibleCurrentWord || "아직 호출된 단어가 없습니다.";
+  const currentCallLabel = visibleCurrentWord || normalizedCurrentWordId || "아직 호출된 단어가 없습니다.";
   const setupWordMap = useMemo(
     () => new Map(normalizedAvailableWords.map((item) => [item.wordId, item])),
     [normalizedAvailableWords],
@@ -768,8 +769,9 @@ export function StudentBingoBoard({
                 const cleanWordId = String(tile.wordId ?? "").trim();
                 const isClaimed = claimedSet.has(cleanWordId) || completedSet.has(cleanWordId);
                 const isLocked = lockedSet.has(cleanWordId);
+                const normalizedTileWordId = normalizeWord(cleanWordId);
                 const isCurrentById = Boolean(normalizedCurrentWordId)
-                  && cleanWordId === normalizedCurrentWordId;
+                  && normalizedTileWordId === normalizedCurrentWordId;
                 const isCurrentByText = Boolean(normalizedCurrentWord)
                   && normalizeWord(tile.word) === normalizedCurrentWord;
                 const isCallableChoice = isCurrentById || isCurrentByText;
@@ -790,7 +792,7 @@ export function StudentBingoBoard({
                         return;
                       }
 
-                      if (!visibleCurrentWord) {
+                      if (!hasCurrentWord) {
                         setLocalError("선생님이 부른 단어가 아직 없습니다.");
                         return;
                       }

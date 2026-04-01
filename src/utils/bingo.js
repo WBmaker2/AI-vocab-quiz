@@ -341,17 +341,22 @@ export function canMarkBingoCell({
   cellWordText,
   alreadyMarked,
 }) {
+  const normalizedActiveId = normalizeBingoText(activeWordId).toLowerCase();
+  const normalizedCellId = normalizeBingoText(cellWordId).toLowerCase();
+  const normalizedActiveText = normalizeBingoText(activeWordText)
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  const normalizedCellText = normalizeBingoText(cellWordText)
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
   return Boolean(
     (
-      (
-        normalizeBingoText(activeWordId)
-          && normalizeBingoText(cellWordId)
-          && normalizeBingoText(activeWordId) === normalizeBingoText(cellWordId)
-      ) || (
-        normalizeBingoText(activeWordText)
-          && normalizeBingoText(cellWordText)
-          && normalizeBingoText(activeWordText).toLowerCase()
-            === normalizeBingoText(cellWordText).toLowerCase()
+      (normalizedActiveId && normalizedCellId && normalizedActiveId === normalizedCellId)
+      || (
+        normalizedActiveText
+          && normalizedCellText
+          && normalizedActiveText === normalizedCellText
       )
     )
       && !alreadyMarked,

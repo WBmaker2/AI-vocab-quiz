@@ -534,17 +534,16 @@ service cloud.firestore {
         && data.setupCompletedAt == null;
     }
 
-    function isBingoPlayerReadyDocument(data) {
+    function isBingoPlayerMarkedUpdateDocument(data) {
       return isBingoPlayerCommonKeys(data)
         && data.setupStatus == 'ready'
         && data.boardWordIds.size() == data.boardSize * data.boardSize
-        && data.bingoLines >= 0
         && data.completedLineKeys.size() == data.bingoLines
         && data.hasBingo == (data.bingoLines >= 3);
     }
 
     function isBingoPlayerDocument(data) {
-      return isBingoPlayerSetupDraftDocument(data) || isBingoPlayerReadyDocument(data);
+      return isBingoPlayerSetupDraftDocument(data) || isBingoPlayerMarkedUpdateDocument(data);
     }
 
     function bingoCellMarked(boardCells, markedWordIds, index) {
@@ -648,7 +647,7 @@ service cloud.firestore {
         && request.resource.data.joinedAt == resource.data.joinedAt
         && request.resource.data.setupStartedAt == resource.data.setupStartedAt
         && request.resource.data.setupCompletedAt is timestamp
-        && isBingoPlayerReadyDocument(request.resource.data);
+        && isBingoPlayerMarkedUpdateDocument(request.resource.data);
     }
 
     function isBingoPlayerUpdate(sessionId, playerId) {
@@ -658,18 +657,13 @@ service cloud.firestore {
           bingoSessionExists(sessionId)
           && bingoSessionDoc(sessionId).data.status == 'live'
           && resource.data.setupStatus == 'ready'
-          && request.resource.data.studentNameNormalized == playerId
           && request.resource.data.studentNameNormalized == resource.data.studentNameNormalized
-          && request.resource.data.studentName == resource.data.studentName
-          && request.resource.data.boardSize == resource.data.boardSize
-          && request.resource.data.requiredCellCount == resource.data.requiredCellCount
-          && request.resource.data.setupStatus == 'ready'
-          && request.resource.data.joinedAt == resource.data.joinedAt
-          && request.resource.data.setupStartedAt == resource.data.setupStartedAt
-          && request.resource.data.setupCompletedAt == resource.data.setupCompletedAt
+          && request.resource.data.markedWordIds is list
           && request.resource.data.markedWordIds.hasAll(resource.data.markedWordIds)
           && request.resource.data.markedWordIds.size() <= resource.data.markedWordIds.size() + 1
-          && isBingoPlayerReadyDocument(request.resource.data)
+          && request.resource.data.bingoLines >= resource.data.bingoLines
+          && request.resource.data.bingoLines == request.resource.data.completedLineKeys.size()
+          && request.resource.data.hasBingo == (request.resource.data.bingoLines >= 3)
         );
     }
 
