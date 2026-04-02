@@ -1,4 +1,6 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { GameLeaderboardPanel } from "./GameLeaderboardPanel.jsx";
+import { formatElapsedSeconds } from "../utils/quiz.js";
 import {
   calculateFishingScore,
   createFishingRound,
@@ -86,6 +88,11 @@ function FishingResultCard({
   wrongCount,
   missCount,
   averageReaction,
+  elapsedSeconds,
+  leaderboardContext,
+  remoteConfigured,
+  studentNameDraft,
+  onStudentNameDraftChange,
   onRetry,
   onBack,
 }) {
@@ -126,7 +133,26 @@ function FishingResultCard({
             <span>평균 반응 시간</span>
             <strong>{averageReaction}</strong>
           </article>
+          <article className="word-fishing-summary-card">
+            <span>걸린 시간</span>
+            <strong>{formatElapsedSeconds(elapsedSeconds)}</strong>
+          </article>
         </div>
+
+        <GameLeaderboardPanel
+          activityType="fishing"
+          finalScore={score}
+          elapsedSeconds={elapsedSeconds}
+          leaderboardContext={leaderboardContext}
+          remoteConfigured={remoteConfigured}
+          studentNameDraft={studentNameDraft}
+          onStudentNameDraftChange={onStudentNameDraftChange}
+          metrics={{
+            correctCount,
+            wrongCount,
+            missCount,
+          }}
+        />
 
         <div className="toolbar-row">
           <button className="primary-button" onClick={onRetry}>
@@ -145,6 +171,10 @@ export function WordFishingGame({
   items,
   speech,
   celebration,
+  leaderboardContext,
+  remoteConfigured,
+  studentNameDraft,
+  onStudentNameDraftChange,
   onBack,
 }) {
   const fishingItems = useMemo(() => normalizeFishingItems(items), [items]);
@@ -165,6 +195,7 @@ export function WordFishingGame({
   const [feedbackTone, setFeedbackTone] = useState("idle");
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
   const [reactionTotalMs, setReactionTotalMs] = useState(0);
+  const [elapsedTotalMs, setElapsedTotalMs] = useState(0);
 
   const roundStartRef = useRef(0);
   const roundLockRef = useRef(false);
@@ -191,6 +222,7 @@ export function WordFishingGame({
     setFeedbackTone("idle");
     setSelectedCandidateId("");
     setReactionTotalMs(0);
+    setElapsedTotalMs(0);
   }, [items, speech.cancel]);
 
   useEffect(() => {
@@ -254,6 +286,8 @@ export function WordFishingGame({
       outcome === "timeout"
         ? ROUND_DURATION_MS
         : Math.max(0, Date.now() - roundStartRef.current);
+
+    setElapsedTotalMs((current) => current + reactionMs);
 
     if (outcome === "correct") {
       speech.cancel();
@@ -359,6 +393,7 @@ export function WordFishingGame({
     setWrongCount(0);
     setMissCount(0);
     setReactionTotalMs(0);
+    setElapsedTotalMs(0);
     setUsedWordIds([]);
     setPhase("playing");
     queueRound([], 0);
@@ -385,6 +420,7 @@ export function WordFishingGame({
     reactionTotalMs,
     correctCount,
   );
+  const elapsedSeconds = Math.max(0, Math.ceil(elapsedTotalMs / 1000));
 
   if (phase === "ready") {
     return (
@@ -406,6 +442,11 @@ export function WordFishingGame({
         wrongCount={wrongCount}
         missCount={missCount}
         averageReaction={averageReaction}
+        elapsedSeconds={elapsedSeconds}
+        leaderboardContext={leaderboardContext}
+        remoteConfigured={remoteConfigured}
+        studentNameDraft={studentNameDraft}
+        onStudentNameDraftChange={onStudentNameDraftChange}
         onRetry={handleRetry}
         onBack={onBack}
       />

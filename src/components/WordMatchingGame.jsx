@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  fetchMatchingLeaderboards,
-  saveStudentProgress,
-  saveMatchingLeaderboardScore,
-} from "../lib/firebase.js";
+import { saveStudentProgress } from "../lib/firebase.js";
+import { GameLeaderboardPanel } from "./GameLeaderboardPanel.jsx";
 import { StudentProgressPanel } from "./StudentProgressPanel.jsx";
 import {
   advanceMatchingBoard,
@@ -27,23 +24,12 @@ function MatchingSummary({
   onChooseUnits,
   onBack,
 }) {
-  const [leaderboards, setLeaderboards] = useState({});
-  const [activePeriodType, setActivePeriodType] = useState("week");
-  const [showSaveForm, setShowSaveForm] = useState(false);
-  const [loadingLeaderboards, setLoadingLeaderboards] = useState(false);
-  const [leaderboardStatus, setLeaderboardStatus] = useState("");
-  const [leaderboardError, setLeaderboardError] = useState("");
-  const [savingScore, setSavingScore] = useState(false);
   const [progressionLoading, setProgressionLoading] = useState(false);
   const [progressionStatus, setProgressionStatus] = useState("");
   const [progressionError, setProgressionError] = useState("");
   const [progressionComparison, setProgressionComparison] = useState(null);
   const [newlyEarnedBadges, setNewlyEarnedBadges] = useState([]);
   const [progressionStudentName, setProgressionStudentName] = useState("");
-  const schoolId = String(leaderboardContext?.schoolId ?? "").trim();
-  const schoolName = String(leaderboardContext?.schoolName ?? "").trim();
-  const grade = String(leaderboardContext?.grade ?? "").trim();
-  const canUseLeaderboard = remoteConfigured && schoolId && schoolName && grade;
   const progressionSchoolId = String(progressionContext?.schoolId ?? "").trim();
   const progressionSchoolName = String(progressionContext?.schoolName ?? "").trim();
   const progressionGrade = String(progressionContext?.grade ?? "").trim();
@@ -52,70 +38,15 @@ function MatchingSummary({
     progressionSchoolId &&
     progressionSchoolName &&
     progressionGrade;
-  const availablePeriods = Object.values(leaderboards);
-  const activePeriod = leaderboards[activePeriodType] ?? availablePeriods[0] ?? null;
-  const contextLabel =
-    schoolName && grade ? `${schoolName} · ${grade}학년` : "";
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadLeaderboards() {
-      if (!canUseLeaderboard) {
-        setLeaderboards({});
-        setLoadingLeaderboards(false);
-        setLeaderboardError("");
-        setLeaderboardStatus("");
-        return;
-      }
-
-      setLoadingLeaderboards(true);
-      setLeaderboardError("");
-
-      try {
-        const nextBoards = await fetchMatchingLeaderboards({
-          schoolId,
-          grade,
-        });
-
-        if (!cancelled) {
-          setLeaderboards(nextBoards);
-          const firstPeriod = Object.keys(nextBoards)[0] ?? "week";
-          setActivePeriodType((current) =>
-            nextBoards[current] ? current : firstPeriod,
-          );
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setLeaderboards({});
-          setLeaderboardError(
-            error?.message || "리더보드를 불러오지 못했습니다.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingLeaderboards(false);
-        }
-      }
-    }
-
-    void loadLeaderboards();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [canUseLeaderboard, grade, schoolId]);
-
-  useEffect(() => {
-    setShowSaveForm(false);
-    setSavingScore(false);
     setProgressionLoading(false);
     setProgressionStatus("");
     setProgressionError("");
     setProgressionComparison(null);
     setNewlyEarnedBadges([]);
     setProgressionStudentName("");
-  }, [finalScore, solvedPairs, elapsedSeconds, schoolId, grade]);
+  }, [finalScore, solvedPairs, elapsedSeconds, progressionSchoolId, progressionGrade]);
 
   useEffect(() => {
     const cleanDraft = String(studentNameDraft ?? "").trim().replace(/\s+/g, " ");
@@ -185,78 +116,6 @@ function MatchingSummary({
     }
   }
 
-  async function handleSaveScore() {
-    const cleanStudentName = String(studentNameDraft ?? "")
-      .trim()
-      .replace(/\s+/g, " ");
-
-    if (!canUseLeaderboard) {
-      setLeaderboardError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
-      return;
-    }
-
-    if (!cleanStudentName) {
-      setLeaderboardError("이름을 입력해 주세요.");
-      return;
-    }
-
-    setSavingScore(true);
-    setLeaderboardError("");
-    setLeaderboardStatus("");
-
-    try {
-      const result = await saveMatchingLeaderboardScore({
-        schoolId,
-        schoolName,
-        grade,
-        studentName: cleanStudentName,
-        score: finalScore,
-        elapsedSeconds,
-        solvedPairs,
-      });
-      onStudentNameDraftChange?.(cleanStudentName);
-      setShowSaveForm(false);
-
-      if (result.failedPeriods?.length > 0 && result.updatedPeriods.length > 0) {
-        setLeaderboardStatus(
-          `${cleanStudentName} 학생의 일부 기록을 반영했습니다. 다시 열면 최신 리더보드를 확인할 수 있어요.`,
-        );
-      } else if (result.failedPeriods?.length > 0) {
-        setLeaderboardError("일부 기간 점수 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-      } else if (result.updatedPeriods.length > 0) {
-        setLeaderboardStatus(
-          `${cleanStudentName} 학생의 기록을 저장했습니다. ${finalScore}점으로 바로 반영됐어요.`,
-        );
-      } else {
-        setLeaderboardStatus(
-          `${cleanStudentName} 학생의 기존 최고 기록을 유지했습니다. 더 높은 점수를 받으면 갱신돼요.`,
-        );
-      }
-
-      try {
-        const refreshedBoards = await fetchMatchingLeaderboards({
-          schoolId,
-          grade,
-        });
-        setLeaderboards(refreshedBoards);
-        const firstPeriod = Object.keys(refreshedBoards)[0] ?? "week";
-        setActivePeriodType((current) =>
-          refreshedBoards[current] ? current : firstPeriod,
-        );
-      } catch {
-        setLeaderboardStatus((current) =>
-          current
-            ? `${current} 새 순위는 잠시 후 다시 열면 확인할 수 있어요.`
-            : `${cleanStudentName} 학생의 점수는 저장됐고, 새 순위는 잠시 후 다시 확인할 수 있어요.`,
-        );
-      }
-    } catch (error) {
-      setLeaderboardError(error?.message || "점수를 저장하지 못했습니다.");
-    } finally {
-      setSavingScore(false);
-    }
-  }
-
   const progressionDisabledReason = !remoteConfigured
     ? "Firebase 연결이 없어 이 기기에서는 개인 기록을 저장할 수 없습니다."
     : !progressionSchoolId || !progressionSchoolName || !progressionGrade
@@ -301,7 +160,7 @@ function MatchingSummary({
               maxLength={20}
               placeholder="이름을 입력하세요"
               onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
-              disabled={progressionLoading || savingScore || hasSavedProgress}
+              disabled={progressionLoading || hasSavedProgress}
             />
           </label>
           <div className="matching-leaderboard-actions">
@@ -339,152 +198,18 @@ function MatchingSummary({
           title="짝 맞추기 성장 기록"
         />
       </section>
-      <section className="matching-leaderboard-panel" aria-label="매칭 게임 리더보드">
-        <div className="matching-leaderboard-head">
-          <div>
-            <p className="mode-label">Matching Leaderboard</p>
-            <h4>리더보드에 점수를 등록하시겠습니까?</h4>
-          </div>
-          {contextLabel ? (
-            <span className="matching-leaderboard-context">{contextLabel}</span>
-          ) : null}
-        </div>
 
-        {!remoteConfigured ? (
-          <p className="result-copy">
-            Firebase 연결이 없어 이 기기에서는 리더보드를 사용할 수 없습니다.
-          </p>
-        ) : null}
+      <GameLeaderboardPanel
+        activityType="matching"
+        finalScore={finalScore}
+        elapsedSeconds={elapsedSeconds}
+        leaderboardContext={leaderboardContext}
+        remoteConfigured={remoteConfigured}
+        studentNameDraft={studentNameDraft}
+        onStudentNameDraftChange={onStudentNameDraftChange}
+        metrics={{ solvedPairs }}
+      />
 
-        {remoteConfigured && !canUseLeaderboard ? (
-          <p className="result-copy">
-            현재 선택한 학교 또는 학년 정보가 없어 이번 점수는 저장할 수 없습니다.
-          </p>
-        ) : null}
-
-        {canUseLeaderboard ? (
-          <>
-            {!showSaveForm ? (
-              <div className="matching-leaderboard-actions">
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => {
-                    setShowSaveForm(true);
-                    setLeaderboardError("");
-                    setLeaderboardStatus("");
-                  }}
-                >
-                  네, 등록할게요
-                </button>
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => {
-                    setShowSaveForm(false);
-                    setLeaderboardError("");
-                    setLeaderboardStatus("원할 때 아래 리더보드만 확인할 수 있습니다.");
-                  }}
-                >
-                  아니요, 이번에는 괜찮아요
-                </button>
-              </div>
-            ) : (
-              <div className="matching-save-form">
-                <label className="matching-save-field">
-                  <span>학생 이름</span>
-                  <input
-                    type="text"
-                    value={studentNameDraft}
-                    maxLength={20}
-                    placeholder="이름을 입력하세요"
-                    onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
-                    disabled={savingScore || progressionLoading}
-                  />
-                </label>
-                <div className="matching-leaderboard-actions">
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={() => void handleSaveScore()}
-                    disabled={savingScore}
-                  >
-                    {savingScore ? "저장 중..." : "점수 저장"}
-                  </button>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => {
-                      setShowSaveForm(false);
-                      setLeaderboardError("");
-                    }}
-                    disabled={savingScore}
-                  >
-                    취소
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {leaderboardStatus ? (
-              <p className="matching-leaderboard-status">{leaderboardStatus}</p>
-            ) : null}
-            {leaderboardError ? (
-              <p className="matching-leaderboard-error">{leaderboardError}</p>
-            ) : null}
-
-            <div className="matching-leaderboard-tabs" role="tablist" aria-label="기간별 리더보드">
-              {availablePeriods.map((period) => (
-                <button
-                  key={period.periodType}
-                  className={
-                    period.periodType === activePeriodType
-                      ? "matching-leaderboard-tab matching-leaderboard-tab-active"
-                      : "matching-leaderboard-tab"
-                  }
-                  type="button"
-                  role="tab"
-                  aria-selected={period.periodType === activePeriodType}
-                  onClick={() => setActivePeriodType(period.periodType)}
-                >
-                  {period.label}
-                </button>
-              ))}
-            </div>
-
-            {loadingLeaderboards ? (
-              <p className="result-copy">리더보드를 불러오는 중입니다...</p>
-            ) : activePeriod ? (
-              activePeriod.entries.length > 0 ? (
-                <ol className="matching-leaderboard-list">
-                  {activePeriod.entries.map((entry) => (
-                    <li key={entry.id} className="matching-leaderboard-item">
-                      <div>
-                        <strong>
-                          {entry.rank}위 · {entry.studentName}
-                        </strong>
-                        <span>
-                          {activePeriod.periodType === "school_all" &&
-                          entry.grade &&
-                          entry.grade !== "all"
-                            ? `${entry.grade}학년 · `
-                            : ""}
-                          {formatElapsedSeconds(entry.elapsedSeconds)}
-                        </span>
-                      </div>
-                      <span>{entry.score}점</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="result-copy">
-                  아직 등록된 기록이 없습니다. 첫 기록을 남겨 보세요.
-                </p>
-              )
-            ) : null}
-          </>
-        ) : null}
-      </section>
       <div className="toolbar-row">
         <button className="primary-button" onClick={onRetry}>
           다시 하기

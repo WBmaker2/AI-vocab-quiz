@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { VocabularyForm } from "./VocabularyForm.jsx";
 import { VocabularyList } from "./VocabularyList.jsx";
+import {
+  ACTIVITY_LEADERBOARD_DEFINITIONS,
+  getActivityLeaderboardDefinition,
+} from "../utils/activityLeaderboard.js";
 import { LEADERBOARD_PERIOD_DEFINITIONS } from "../utils/leaderboard.js";
 import { formatElapsedSeconds } from "../utils/quiz.js";
 
@@ -12,6 +16,27 @@ const EMPTY_FORM = {
 };
 
 const CREATE_UNIT_VALUE = "__create_new_unit__";
+
+
+function formatTeacherLeaderboardEntryDetail(entry, activityType, periodType) {
+  const detailParts = [];
+
+  if (periodType === "school_all" && entry.grade && entry.grade !== "all") {
+    detailParts.push(`${entry.grade}학년`);
+  }
+
+  detailParts.push(formatElapsedSeconds(entry.elapsedSeconds));
+
+  if (activityType === "fishing") {
+    detailParts.push(`정답 ${entry.correctCount ?? 0}`);
+    detailParts.push(`오답 ${entry.wrongCount ?? 0}`);
+    detailParts.push(`놓침 ${entry.missCount ?? 0}`);
+  } else {
+    detailParts.push(`짝 ${entry.solvedPairs ?? 0}개`);
+  }
+
+  return detailParts.join(" · ");
+}
 
 export function TeacherWorkspace({
   gradeOptions,
@@ -269,6 +294,9 @@ export function TeacherWorkspace({
     }
   }
 
+  const activeLeaderboardDefinition = getActivityLeaderboardDefinition(
+    leaderboard?.activityType,
+  );
   const activeLeaderboard = leaderboard?.boards?.[leaderboard?.tab] ?? null;
   const activeLeaderboardEntries = activeLeaderboard?.entries ?? [];
   const bingoAvailableUnits = bingo?.availableUnits ?? units;
@@ -654,8 +682,8 @@ export function TeacherWorkspace({
         </div>
 
         <p className="inline-hint">
-          현재 학교의 같은 학년 리더보드를 관리하고, 학교 전체 순위 탭도 함께
-          확인할 수 있습니다.
+          현재 학교의 같은 학년 기준으로 {activeLeaderboardDefinition.label} 리더보드를 관리하고,
+          우리학교 전체 순위 탭까지 함께 확인할 수 있습니다.
         </p>
 
         {!profile?.schoolId ? (
@@ -672,6 +700,27 @@ export function TeacherWorkspace({
             {leaderboard?.status ? (
               <p className="inline-hint success-hint">{leaderboard.status}</p>
             ) : null}
+
+            <div
+              className="matching-leaderboard-tabs"
+              role="tablist"
+              aria-label="교사 리더보드 활동"
+            >
+              {ACTIVITY_LEADERBOARD_DEFINITIONS.map(({ type, label }) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={
+                    leaderboard?.activityType === type
+                      ? "matching-leaderboard-tab matching-leaderboard-tab-active"
+                      : "matching-leaderboard-tab"
+                  }
+                  onClick={() => leaderboard?.setActivityType?.(type)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
             <div
               className="matching-leaderboard-tabs"
@@ -704,7 +753,11 @@ export function TeacherWorkspace({
                       <strong>{entry.rank}위</strong>
                       <span>{entry.studentName}</span>
                       <small>
-                        {entry.score}점 · {formatElapsedSeconds(entry.elapsedSeconds)}
+                        {entry.score}점 · {formatTeacherLeaderboardEntryDetail(
+                          entry,
+                          leaderboard?.activityType,
+                          leaderboard?.tab,
+                        )}
                       </small>
                     </div>
 

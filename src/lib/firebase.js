@@ -33,6 +33,7 @@ import {
   normalizeStudentNameKey,
   pickBetterMatchingLeaderboardEntry,
 } from "../utils/leaderboard";
+import { normalizeActivityLeaderboardType } from "../utils/activityLeaderboard.js";
 import { BADGE_IDS } from "../constants/badges.js";
 import {
   buildProgressSummary,
@@ -316,6 +317,47 @@ function createMatchingLeaderboardPayload({
   };
 }
 
+function createFishingLeaderboardPayload({
+  schoolId,
+  schoolName,
+  grade,
+  studentName,
+  periodType,
+  periodKey,
+  score,
+  elapsedSeconds,
+  correctCount,
+  wrongCount,
+  missCount,
+}) {
+  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
+  const cleanSchoolName = normalizeLeaderboardText(schoolName);
+  const cleanGrade = normalizeLeaderboardScope(grade);
+  const cleanStudentName = normalizeLeaderboardText(studentName);
+  const cleanStudentNameNormalized = normalizeStudentNameKey(studentName);
+
+  return {
+    scopeKey: createMatchingLeaderboardScopeKey({
+      schoolId: cleanSchoolId,
+      grade: cleanGrade,
+      periodType,
+      periodKey,
+    }),
+    schoolId: cleanSchoolId,
+    schoolName: cleanSchoolName,
+    grade: cleanGrade,
+    studentName: cleanStudentName,
+    studentNameNormalized: cleanStudentNameNormalized,
+    periodType,
+    periodKey,
+    score: toNonNegativeInteger(score, "score"),
+    elapsedSeconds: toNonNegativeInteger(elapsedSeconds, "elapsedSeconds"),
+    correctCount: toNonNegativeInteger(correctCount, "correctCount"),
+    wrongCount: toNonNegativeInteger(wrongCount, "wrongCount"),
+    missCount: toNonNegativeInteger(missCount, "missCount"),
+  };
+}
+
 function createMatchingLeaderboardEntryRef(
   firestore,
   { schoolId, grade, periodType, periodKey, studentName },
@@ -334,6 +376,31 @@ function createMatchingLeaderboardEntryRef(
     ref: doc(
       firestore,
       "matchingLeaderboards",
+      scopeKey,
+      "entries",
+      studentKey,
+    ),
+  };
+}
+
+function createFishingLeaderboardEntryRef(
+  firestore,
+  { schoolId, grade, periodType, periodKey, studentName },
+) {
+  const scopeKey = createMatchingLeaderboardScopeKey({
+    schoolId,
+    grade,
+    periodType,
+    periodKey,
+  });
+  const studentKey = normalizeStudentNameKey(studentName);
+
+  return {
+    scopeKey,
+    studentKey,
+    ref: doc(
+      firestore,
+      "fishingLeaderboards",
       scopeKey,
       "entries",
       studentKey,
@@ -364,6 +431,43 @@ function createMatchingLeaderboardWritePayload({
     score: source.score,
     elapsedSeconds: source.elapsedSeconds,
     solvedPairs: source.solvedPairs,
+  });
+
+  return {
+    ...payload,
+    schoolName: cleanSchoolName,
+    studentName: cleanStudentName,
+    studentNameNormalized: normalizeStudentNameKey(cleanStudentName),
+    createdAt: source.createdAt ?? serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+}
+
+function createFishingLeaderboardWritePayload({
+  source,
+  schoolId,
+  schoolName,
+  grade,
+  studentName,
+  periodType,
+  periodKey,
+}) {
+  const cleanStudentName = normalizeLeaderboardText(studentName);
+  const cleanSchoolName = normalizeLeaderboardText(
+    source.schoolName ?? schoolName,
+  );
+  const payload = createFishingLeaderboardPayload({
+    schoolId,
+    schoolName: cleanSchoolName,
+    grade,
+    studentName: cleanStudentName,
+    periodType,
+    periodKey,
+    score: source.score,
+    elapsedSeconds: source.elapsedSeconds,
+    correctCount: source.correctCount,
+    wrongCount: source.wrongCount,
+    missCount: source.missCount,
   });
 
   return {
@@ -442,6 +546,78 @@ async function upsertMatchingLeaderboardPeriod({
   });
 }
 
+async function upsertFishingLeaderboardPeriod({
+  firestore,
+  schoolId,
+  schoolName,
+  grade,
+  studentName,
+  periodType,
+  periodKey,
+  score,
+  elapsedSeconds,
+  correctCount,
+  wrongCount,
+  missCount,
+}) {
+  const scopeKey = createMatchingLeaderboardScopeKey({
+    schoolId,
+    grade,
+    periodType,
+    periodKey,
+  });
+  const payload = createFishingLeaderboardPayload({
+    schoolId,
+    schoolName,
+    grade,
+    studentName,
+    periodType,
+    periodKey,
+    score,
+    elapsedSeconds,
+    correctCount,
+    wrongCount,
+    missCount,
+  });
+  const studentKey = payload.studentNameNormalized;
+  const leaderboardRef = doc(
+    firestore,
+    "fishingLeaderboards",
+    scopeKey,
+    "entries",
+    studentKey,
+  );
+
+  return runTransaction(firestore, async (transaction) => {
+    const snapshot = await transaction.get(leaderboardRef);
+
+    if (!snapshot.exists()) {
+      transaction.set(leaderboardRef, {
+        ...payload,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return "created";
+    }
+
+    const existingScore = Number(snapshot.data().score ?? 0);
+
+    if (payload.score > existingScore) {
+      transaction.update(leaderboardRef, {
+        score: payload.score,
+        elapsedSeconds: payload.elapsedSeconds,
+        correctCount: payload.correctCount,
+        wrongCount: payload.wrongCount,
+        missCount: payload.missCount,
+        updatedAt: serverTimestamp(),
+      });
+      return "updated";
+    }
+
+    return "skipped";
+  });
+}
+
 async function fetchMatchingLeaderboardPeriod({
   firestore,
   schoolId,
@@ -505,6 +681,81 @@ async function fetchMatchingLeaderboardPeriod({
   };
 }
 
+async function fetchFishingLeaderboardPeriod({
+  firestore,
+  schoolId,
+  grade,
+  periodType,
+  periodKey,
+  limitCount,
+}) {
+  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
+  const cleanGrade = normalizeLeaderboardScope(grade);
+  const scopeKey = createMatchingLeaderboardScopeKey({
+    schoolId: cleanSchoolId,
+    grade: cleanGrade,
+    periodType,
+    periodKey,
+  });
+
+  if (!cleanSchoolId || !cleanGrade || !periodKey || !scopeKey) {
+    return {
+      periodType,
+      periodKey,
+      entries: [],
+    };
+  }
+
+  const leaderboardQuery = query(
+    collection(firestore, "fishingLeaderboards", scopeKey, "entries"),
+  );
+  const snapshot = await getDocs(leaderboardQuery);
+  const entries = snapshot.docs
+    .map((item) => ({
+      id: item.id,
+      ...item.data(),
+    }))
+    .sort((left, right) => {
+      const scoreCompare = Number(right.score ?? 0) - Number(left.score ?? 0);
+      if (scoreCompare !== 0) {
+        return scoreCompare;
+      }
+
+      const elapsedCompare =
+        Number(left.elapsedSeconds ?? 0) - Number(right.elapsedSeconds ?? 0);
+      if (elapsedCompare !== 0) {
+        return elapsedCompare;
+      }
+
+      const leftUpdatedAt = left.updatedAt?.toMillis?.() ?? 0;
+      const rightUpdatedAt = right.updatedAt?.toMillis?.() ?? 0;
+      return leftUpdatedAt - rightUpdatedAt;
+    })
+    .slice(0, limitCount)
+    .map((entry, index) => ({
+      ...entry,
+      rank: index + 1,
+    }));
+
+  return {
+    periodType,
+    periodKey,
+    entries,
+  };
+}
+
+export async function fetchTeacherActivityLeaderboards({
+  activityType,
+  schoolId,
+  grade,
+  now = new Date(),
+  limitCount = 20,
+}) {
+  return normalizeActivityLeaderboardType(activityType) === "fishing"
+    ? fetchFishingLeaderboards({ schoolId, grade, now, limitCount })
+    : fetchMatchingLeaderboards({ schoolId, grade, now, limitCount });
+}
+
 export async function fetchTeacherMatchingLeaderboards({
   schoolId,
   grade,
@@ -512,6 +763,20 @@ export async function fetchTeacherMatchingLeaderboards({
   limitCount = 20,
 }) {
   return fetchMatchingLeaderboards({
+    schoolId,
+    grade,
+    now,
+    limitCount,
+  });
+}
+
+export async function fetchTeacherFishingLeaderboards({
+  schoolId,
+  grade,
+  now = new Date(),
+  limitCount = 20,
+}) {
+  return fetchFishingLeaderboards({
     schoolId,
     grade,
     now,
@@ -642,6 +907,153 @@ export async function renameTeacherMatchingLeaderboardStudent({
   };
 }
 
+export async function renameTeacherActivityLeaderboardStudent({
+  activityType,
+  schoolId,
+  grade,
+  oldStudentName,
+  newStudentName,
+  now = new Date(),
+}) {
+  return normalizeActivityLeaderboardType(activityType) === "fishing"
+    ? renameTeacherFishingLeaderboardStudent({
+        schoolId,
+        grade,
+        oldStudentName,
+        newStudentName,
+        now,
+      })
+    : renameTeacherMatchingLeaderboardStudent({
+        schoolId,
+        grade,
+        oldStudentName,
+        newStudentName,
+        now,
+      });
+}
+
+export async function renameTeacherFishingLeaderboardStudent({
+  schoolId,
+  grade,
+  oldStudentName,
+  newStudentName,
+  now = new Date(),
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
+  const cleanGrade = normalizeLeaderboardScope(grade);
+  const cleanOldStudentName = normalizeStudentName(oldStudentName);
+  const cleanNewStudentName = normalizeStudentName(newStudentName);
+  const oldStudentKey = normalizeStudentNameKey(cleanOldStudentName);
+  const newStudentKey = normalizeStudentNameKey(cleanNewStudentName);
+
+  if (!cleanSchoolId) {
+    throw new Error("School id is required.");
+  }
+
+  if (!cleanGrade) {
+    throw new Error("Grade is required.");
+  }
+
+  if (!cleanOldStudentName) {
+    throw new Error("Existing student name is required.");
+  }
+
+  if (!cleanNewStudentName) {
+    throw new Error("New student name is required.");
+  }
+
+  if (oldStudentKey === newStudentKey) {
+    throw new Error("The new student name must be different from the current name.");
+  }
+
+  const periodKeys = createLeaderboardPeriodKeys(now);
+  const updatedPeriods = [];
+  const keptPeriods = [];
+  const skippedPeriods = [];
+  await runTransaction(firestore, async (transaction) => {
+    const periodSnapshots = [];
+
+    for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
+      const periodKey = periodKeys[type];
+      const scopeGrade = createMatchingLeaderboardGradeScope(type, cleanGrade);
+      const oldEntry = createFishingLeaderboardEntryRef(firestore, {
+        schoolId: cleanSchoolId,
+        grade: scopeGrade,
+        periodType: type,
+        periodKey,
+        studentName: cleanOldStudentName,
+      });
+      const newEntry = createFishingLeaderboardEntryRef(firestore, {
+        schoolId: cleanSchoolId,
+        grade: scopeGrade,
+        periodType: type,
+        periodKey,
+        studentName: cleanNewStudentName,
+      });
+
+      const oldSnapshot = await transaction.get(oldEntry.ref);
+      const newSnapshot = await transaction.get(newEntry.ref);
+      periodSnapshots.push({
+        type,
+        periodKey,
+        scopeGrade,
+        oldEntry,
+        newEntry,
+        oldSnapshot,
+        newSnapshot,
+      });
+    }
+
+    for (const periodSnapshot of periodSnapshots) {
+      const {
+        type,
+        periodKey,
+        scopeGrade,
+        oldEntry,
+        newEntry,
+        oldSnapshot,
+        newSnapshot,
+      } = periodSnapshot;
+
+      if (!oldSnapshot.exists()) {
+        skippedPeriods.push(type);
+        continue;
+      }
+
+      const oldData = oldSnapshot.data();
+      const newData = newSnapshot.exists() ? newSnapshot.data() : null;
+      const winner = pickBetterMatchingLeaderboardEntry(newData, oldData);
+
+      if (newData && winner === newData) {
+        transaction.delete(oldEntry.ref);
+        keptPeriods.push(type);
+        continue;
+      }
+
+      const mergedPayload = createFishingLeaderboardWritePayload({
+        source: winner ?? oldData,
+        schoolId: cleanSchoolId,
+        schoolName: oldData.schoolName ?? newData?.schoolName ?? "",
+        grade: scopeGrade,
+        studentName: cleanNewStudentName,
+        periodType: type,
+        periodKey,
+      });
+
+      transaction.set(newEntry.ref, mergedPayload);
+      transaction.delete(oldEntry.ref);
+      updatedPeriods.push(type);
+    }
+  });
+
+  return {
+    updatedPeriods,
+    keptPeriods,
+    skippedPeriods,
+  };
+}
+
 export async function deleteTeacherMatchingLeaderboardStudent({
   schoolId,
   grade,
@@ -707,6 +1119,95 @@ export async function deleteTeacherMatchingLeaderboardStudent({
     deletedPeriods,
     skippedPeriods,
   };
+}
+
+export async function deleteTeacherFishingLeaderboardStudent({
+  schoolId,
+  grade,
+  studentName,
+  now = new Date(),
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
+  const cleanGrade = normalizeLeaderboardScope(grade);
+  const cleanStudentName = normalizeStudentName(studentName);
+
+  if (!cleanSchoolId) {
+    throw new Error("School id is required.");
+  }
+
+  if (!cleanGrade) {
+    throw new Error("Grade is required.");
+  }
+
+  if (!cleanStudentName) {
+    throw new Error("Student name is required.");
+  }
+
+  const periodKeys = createLeaderboardPeriodKeys(now);
+  const deletedPeriods = [];
+  const skippedPeriods = [];
+  await runTransaction(firestore, async (transaction) => {
+    const periodSnapshots = [];
+
+    for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
+      const periodKey = periodKeys[type];
+      const scopeGrade = createMatchingLeaderboardGradeScope(type, cleanGrade);
+      const entry = createFishingLeaderboardEntryRef(firestore, {
+        schoolId: cleanSchoolId,
+        grade: scopeGrade,
+        periodType: type,
+        periodKey,
+        studentName: cleanStudentName,
+      });
+
+      const snapshot = await transaction.get(entry.ref);
+      periodSnapshots.push({
+        type,
+        entry,
+        snapshot,
+      });
+    }
+
+    for (const periodSnapshot of periodSnapshots) {
+      const { type, entry, snapshot } = periodSnapshot;
+
+      if (!snapshot.exists()) {
+        skippedPeriods.push(type);
+        continue;
+      }
+
+      transaction.delete(entry.ref);
+      deletedPeriods.push(type);
+    }
+  });
+
+  return {
+    deletedPeriods,
+    skippedPeriods,
+  };
+}
+
+export async function deleteTeacherActivityLeaderboardStudent({
+  activityType,
+  schoolId,
+  grade,
+  studentName,
+  now = new Date(),
+}) {
+  return normalizeActivityLeaderboardType(activityType) === "fishing"
+    ? deleteTeacherFishingLeaderboardStudent({
+        schoolId,
+        grade,
+        studentName,
+        now,
+      })
+    : deleteTeacherMatchingLeaderboardStudent({
+        schoolId,
+        grade,
+        studentName,
+        now,
+      });
 }
 
 export function normalizeSchoolName(value) {
@@ -1343,6 +1844,41 @@ export async function fetchMatchingLeaderboards({
   return Object.fromEntries(leaderboardEntries);
 }
 
+export async function fetchFishingLeaderboards({
+  schoolId,
+  grade,
+  now = new Date(),
+  limitCount = 10,
+}) {
+  const { db: firestore } = ensureFirebase();
+  const periodKeys = createLeaderboardPeriodKeys(now);
+  const leaderboardEntries = await Promise.all(
+    LEADERBOARD_PERIOD_DEFINITIONS.map(async ({ type, label }) => {
+      const scopeGrade = createMatchingLeaderboardGradeScope(type, grade);
+      const periodResult = await fetchFishingLeaderboardPeriod({
+        firestore,
+        schoolId,
+        grade: scopeGrade,
+        periodType: type,
+        periodKey: periodKeys[type],
+        limitCount,
+      });
+
+      return [
+        type,
+        {
+          periodType: type,
+          periodKey: periodResult.periodKey,
+          label,
+          entries: periodResult.entries,
+        },
+      ];
+    }),
+  );
+
+  return Object.fromEntries(leaderboardEntries);
+}
+
 export async function saveMatchingLeaderboardScore({
   schoolId,
   schoolName,
@@ -1395,6 +1931,86 @@ export async function saveMatchingLeaderboardScore({
         score,
         elapsedSeconds,
         solvedPairs,
+      });
+
+      if (result === "skipped") {
+        skippedPeriods.push(type);
+      } else {
+        updatedPeriods.push(type);
+      }
+    } catch (error) {
+      failedPeriods.push(type);
+      lastError = error;
+    }
+  }
+
+  if (failedPeriods.length > 0 && updatedPeriods.length === 0 && skippedPeriods.length === 0) {
+    throw lastError ?? new Error("리더보드 점수를 저장하지 못했습니다.");
+  }
+
+  return {
+    updatedPeriods,
+    skippedPeriods,
+    failedPeriods,
+  };
+}
+
+export async function saveFishingLeaderboardScore({
+  schoolId,
+  schoolName,
+  grade,
+  studentName,
+  score,
+  elapsedSeconds,
+  correctCount,
+  wrongCount,
+  missCount,
+  now = new Date(),
+}) {
+  const { db: firestore } = ensureFirebase();
+  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
+  const cleanSchoolName = normalizeLeaderboardText(schoolName);
+  const cleanGrade = normalizeLeaderboardScope(grade);
+  const cleanStudentName = normalizeStudentName(studentName);
+
+  if (!cleanSchoolId) {
+    throw new Error("School id is required.");
+  }
+
+  if (!cleanSchoolName) {
+    throw new Error("School name is required.");
+  }
+
+  if (!cleanGrade) {
+    throw new Error("Grade is required.");
+  }
+
+  if (!cleanStudentName) {
+    throw new Error("Student name is required.");
+  }
+
+  const periodKeys = createLeaderboardPeriodKeys(now);
+  const updatedPeriods = [];
+  const skippedPeriods = [];
+  const failedPeriods = [];
+  let lastError = null;
+
+  for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
+    const scopeGrade = createMatchingLeaderboardGradeScope(type, cleanGrade);
+    try {
+      const result = await upsertFishingLeaderboardPeriod({
+        firestore,
+        schoolId: cleanSchoolId,
+        schoolName: cleanSchoolName,
+        grade: scopeGrade,
+        studentName: cleanStudentName,
+        periodType: type,
+        periodKey: periodKeys[type],
+        score,
+        elapsedSeconds,
+        correctCount,
+        wrongCount,
+        missCount,
       });
 
       if (result === "skipped") {

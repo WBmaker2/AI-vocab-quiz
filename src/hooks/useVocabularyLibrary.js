@@ -11,11 +11,11 @@ import {
   deleteTeacherAccountData,
   deleteTeacherVocabularySetsForGrade,
   deleteTeacherVocabularySet,
-  deleteTeacherMatchingLeaderboardStudent,
+  deleteTeacherActivityLeaderboardStudent,
   fetchPublishedPublisherSourceUnits,
   fetchPublishedVocabularySet,
+  fetchTeacherActivityLeaderboards,
   fetchTeacherVocabularySet,
-  fetchTeacherMatchingLeaderboards,
   findOrCreateSchool,
   getCurrentUser,
   getTeacherProfile,
@@ -25,7 +25,7 @@ import {
   listTeacherSetCatalog,
   listTeachersForSchool,
   saveTeacherVocabularySet,
-  renameTeacherMatchingLeaderboardStudent,
+  renameTeacherActivityLeaderboardStudent,
   searchPublishedPublisherSources,
   searchSchoolsByName,
   signInWithGoogle,
@@ -38,6 +38,7 @@ import {
   groupPublisherSourcesByTeacherAndSchool,
   summarizePublisherCopyResult,
 } from "../utils/publisherCopy.js";
+import { getActivityLeaderboardDefinition } from "../utils/activityLeaderboard.js";
 import { determineBingoBoardSize } from "../utils/bingo.js";
 import { LEADERBOARD_PERIOD_DEFINITIONS } from "../utils/leaderboard.js";
 import { mergeVocabularyItems } from "../utils/vocabularyMerge.js";
@@ -157,6 +158,8 @@ export function useVocabularyLibrary() {
   const [teacherLeaderboardError, setTeacherLeaderboardError] = useState("");
   const [teacherLeaderboardStatus, setTeacherLeaderboardStatus] = useState("");
   const [teacherLeaderboardTab, setTeacherLeaderboardTab] = useState("week");
+  const [teacherLeaderboardActivityType, setTeacherLeaderboardActivityType] =
+    useState("matching");
   const [teacherLeaderboardEditingName, setTeacherLeaderboardEditingName] =
     useState("");
   const [teacherLeaderboardDraftName, setTeacherLeaderboardDraftName] =
@@ -426,7 +429,8 @@ export function useVocabularyLibrary() {
       setTeacherLeaderboardStatus("");
 
       try {
-        const boards = await fetchTeacherMatchingLeaderboards({
+        const boards = await fetchTeacherActivityLeaderboards({
+          activityType: teacherLeaderboardActivityType,
           schoolId: teacherProfile.schoolId,
           grade: teacherSelection.grade,
           limitCount: 20,
@@ -459,7 +463,11 @@ export function useVocabularyLibrary() {
     return () => {
       cancelled = true;
     };
-  }, [teacherProfile?.schoolId, teacherSelection.grade]);
+  }, [
+    teacherLeaderboardActivityType,
+    teacherProfile?.schoolId,
+    teacherSelection.grade,
+  ]);
 
   useEffect(() => {
     if (!isFirebaseConfigured || !userId) {
@@ -747,6 +755,15 @@ export function useVocabularyLibrary() {
     setTeacherSelectedCopySourceId("");
   }
 
+
+  function updateTeacherLeaderboardActivityType(nextType) {
+    setTeacherLeaderboardActivityType(nextType);
+    setTeacherLeaderboardStatus("");
+    setTeacherLeaderboardError("");
+    setTeacherLeaderboardEditingName("");
+    setTeacherLeaderboardDraftName("");
+  }
+
   function refreshTeacherLeaderboards() {
     if (!teacherProfile?.schoolId || !teacherSelection.grade) {
       setTeacherLeaderboards({});
@@ -757,7 +774,8 @@ export function useVocabularyLibrary() {
     setTeacherLeaderboardError("");
     setTeacherLeaderboardStatus("");
 
-    return fetchTeacherMatchingLeaderboards({
+    return fetchTeacherActivityLeaderboards({
+      activityType: teacherLeaderboardActivityType,
       schoolId: teacherProfile.schoolId,
       grade: teacherSelection.grade,
       limitCount: 20,
@@ -814,9 +832,13 @@ export function useVocabularyLibrary() {
       return false;
     }
 
+    const activityDefinition = getActivityLeaderboardDefinition(
+      teacherLeaderboardActivityType,
+    );
+
     if (
       !window.confirm(
-        `'${cleanOldName}' 이름을 '${cleanNewName}'(으)로 현재 주/월/연 리더보드에서 모두 수정할까요?`,
+        `'${cleanOldName}' 이름을 '${cleanNewName}'(으)로 현재 ${activityDefinition.label} 리더보드의 주/월/연/우리학교 전체 기록에서 모두 수정할까요?`,
       )
     ) {
       return false;
@@ -827,7 +849,8 @@ export function useVocabularyLibrary() {
     setTeacherLeaderboardStatus("");
 
     try {
-      const result = await renameTeacherMatchingLeaderboardStudent({
+      const result = await renameTeacherActivityLeaderboardStudent({
+        activityType: teacherLeaderboardActivityType,
         schoolId: teacherProfile.schoolId,
         grade: teacherSelection.grade,
         oldStudentName: cleanOldName,
@@ -852,7 +875,7 @@ export function useVocabularyLibrary() {
 
       setTeacherLeaderboardStatus(
         [updatedLabel, keptLabel, skippedLabel].filter(Boolean).join(" · ") ||
-          "학생 이름을 수정했습니다.",
+          `${activityDefinition.label} 리더보드 학생 이름을 수정했습니다.`,
       );
       return true;
     } catch (error) {
@@ -877,9 +900,13 @@ export function useVocabularyLibrary() {
       return false;
     }
 
+    const activityDefinition = getActivityLeaderboardDefinition(
+      teacherLeaderboardActivityType,
+    );
+
     if (
       !window.confirm(
-        `'${cleanStudentName}' 학생 기록을 현재 주/월/연 리더보드에서 모두 삭제할까요?`,
+        `'${cleanStudentName}' 학생 기록을 현재 ${activityDefinition.label} 리더보드의 주/월/연/우리학교 전체 기록에서 모두 삭제할까요?`,
       )
     ) {
       return false;
@@ -890,7 +917,8 @@ export function useVocabularyLibrary() {
     setTeacherLeaderboardStatus("");
 
     try {
-      const result = await deleteTeacherMatchingLeaderboardStudent({
+      const result = await deleteTeacherActivityLeaderboardStudent({
+        activityType: teacherLeaderboardActivityType,
         schoolId: teacherProfile.schoolId,
         grade: teacherSelection.grade,
         studentName: cleanStudentName,
@@ -912,7 +940,7 @@ export function useVocabularyLibrary() {
       await refreshTeacherLeaderboards();
       setTeacherLeaderboardStatus(
         [deletedLabel, skippedLabel].filter(Boolean).join(" · ") ||
-          "학생 기록을 삭제했습니다.",
+          `${activityDefinition.label} 리더보드 학생 기록을 삭제했습니다.`,
       );
       return true;
     } catch (error) {
@@ -2159,6 +2187,8 @@ export function useVocabularyLibrary() {
         status: teacherLeaderboardStatus,
         tab: teacherLeaderboardTab,
         setTab: setTeacherLeaderboardTab,
+        activityType: teacherLeaderboardActivityType,
+        setActivityType: updateTeacherLeaderboardActivityType,
         editingName: teacherLeaderboardEditingName,
         draftName: teacherLeaderboardDraftName,
         saving: teacherLeaderboardSaving,

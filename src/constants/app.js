@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.9.9",
+    date: "2026-04-02",
+    summary: [
+      "단어 낚시 완료 화면에도 주간, 월간, 연간, 우리학교 전체 리더보드를 추가해 짝 맞추기와 같은 방식으로 점수를 저장하고 바로 순위를 확인할 수 있습니다.",
+      "교사 화면의 리더보드 관리는 카드 하나만 유지한 채 `짝 맞추기`와 `단어 낚시` 활동 탭을 넣어, 낚시 기록도 이름 수정과 기록 삭제를 같은 흐름에서 관리할 수 있게 정리했습니다.",
+    ],
+  },
+  {
     version: "v1.9.7",
     date: "2026-03-30",
     summary: [

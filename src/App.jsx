@@ -310,6 +310,10 @@ function App() {
             items={library.student.items}
             speech={speechSynthesis}
             celebration={celebrationAudio}
+            leaderboardContext={library.student.leaderboardContext}
+            remoteConfigured={library.remoteConfigured}
+            studentNameDraft={library.student.nameDraft}
+            onStudentNameDraftChange={library.student.updateNameDraft}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
           />
         ) : null}
