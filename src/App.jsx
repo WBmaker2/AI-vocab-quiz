@@ -9,6 +9,7 @@ import { UpdateHistoryModal } from "./components/UpdateHistoryModal.jsx";
 import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
 import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
 import { WordFishingGame } from "./components/WordFishingGame.jsx";
+import { WordTypingGame } from "./components/WordTypingGame.jsx";
 import { WordMatchingGame } from "./components/WordMatchingGame.jsx";
 import { APP_UPDATES, APP_VERSION } from "./constants/app.js";
 import { GRADE_OPTIONS, PUBLISHER_OPTIONS } from "./constants/vocabulary.js";
@@ -25,6 +26,7 @@ const APP_VIEWS = {
   SPEAKING: "speaking",
   MATCHING: "matching",
   FISHING: "fishing",
+  TYPING: "typing",
   BINGO_HOST: "bingo-host",
   BINGO_JOIN: "bingo-join",
   BINGO_BOARD: "bingo-board",
@@ -205,6 +207,7 @@ function App() {
             onOpenSpeaking={() => navigateTo(APP_VIEWS.SPEAKING)}
             onOpenMatching={() => navigateTo(APP_VIEWS.MATCHING)}
             onOpenFishing={() => navigateTo(APP_VIEWS.FISHING)}
+            onOpenTyping={() => navigateTo(APP_VIEWS.TYPING)}
             onOpenBingo={() => navigateTo(APP_VIEWS.BINGO_JOIN)}
           />
         ) : null}
@@ -314,6 +317,15 @@ function App() {
             remoteConfigured={library.remoteConfigured}
             studentNameDraft={library.student.nameDraft}
             onStudentNameDraftChange={library.student.updateNameDraft}
+            onBack={() => navigateTo(APP_VIEWS.HOME)}
+          />
+        ) : null}
+
+        {view === APP_VIEWS.TYPING ? (
+          <WordTypingGame
+            items={library.student.items}
+            speech={speechSynthesis}
+            celebration={celebrationAudio}
             onBack={() => navigateTo(APP_VIEWS.HOME)}
           />
         ) : null}
