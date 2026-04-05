@@ -1,5 +1,8 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { saveStudentProgress } from "../lib/firebase.js";
+import { GameLeaderboardPanel } from "./GameLeaderboardPanel.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
+import { StudentProgressPanel } from "./StudentProgressPanel.jsx";
 import {
   calculateTypingAverageSeconds,
   calculateTypingScore,
@@ -25,6 +28,14 @@ function shuffleItems(items) {
 
 function formatAverageSeconds(value) {
   return `${Number(value ?? 0).toFixed(1)}초`;
+}
+
+function formatTypingAccuracy(value) {
+  const numericValue = Number(value ?? 0);
+
+  return Number.isInteger(numericValue)
+    ? `${numericValue}%`
+    : `${numericValue.toFixed(1)}%`;
 }
 
 function TypingStartCard({ canStart, ttsSupported, itemCount, onStart, onBack }) {
@@ -99,12 +110,139 @@ function TypingResultCard({
   score,
   correctCount,
   failedCount,
+  questionCount,
+  elapsedSeconds,
   hintUsedCount,
   averageSeconds,
   bestCombo,
+  accuracy,
+  leaderboardContext,
+  progressionContext,
+  remoteConfigured,
+  studentNameDraft,
+  onStudentNameDraftChange,
   onRetry,
   onBack,
 }) {
+  const [progressionLoading, setProgressionLoading] = useState(false);
+  const [progressionStatus, setProgressionStatus] = useState("");
+  const [progressionError, setProgressionError] = useState("");
+  const [progressionComparison, setProgressionComparison] = useState(null);
+  const [newlyEarnedBadges, setNewlyEarnedBadges] = useState([]);
+  const [progressionStudentName, setProgressionStudentName] = useState("");
+
+  const progressionSchoolId = String(progressionContext?.schoolId ?? "").trim();
+  const progressionSchoolName = String(progressionContext?.schoolName ?? "").trim();
+  const progressionGrade = String(progressionContext?.grade ?? "").trim();
+  const canSaveProgress =
+    remoteConfigured &&
+    progressionSchoolId &&
+    progressionSchoolName &&
+    progressionGrade;
+
+  useEffect(() => {
+    setProgressionLoading(false);
+    setProgressionStatus("");
+    setProgressionError("");
+    setProgressionComparison(null);
+    setNewlyEarnedBadges([]);
+    setProgressionStudentName("");
+  }, [
+    score,
+    correctCount,
+    failedCount,
+    questionCount,
+    elapsedSeconds,
+    hintUsedCount,
+    bestCombo,
+    accuracy,
+    progressionSchoolId,
+    progressionSchoolName,
+    progressionGrade,
+    remoteConfigured,
+  ]);
+
+  useEffect(() => {
+    const cleanDraft = String(studentNameDraft ?? "").trim().replace(/\s+/g, " ");
+    const cleanSaved = String(progressionStudentName ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+
+    if (cleanSaved && cleanDraft && cleanSaved === cleanDraft) {
+      return;
+    }
+
+    if (!cleanDraft || (cleanSaved && cleanSaved !== cleanDraft)) {
+      setProgressionStatus("");
+      setProgressionError("");
+      setProgressionComparison(null);
+      setNewlyEarnedBadges([]);
+      if (cleanSaved && cleanSaved !== cleanDraft) {
+        setProgressionStudentName("");
+      }
+    }
+  }, [progressionStudentName, studentNameDraft]);
+
+  async function handleSaveProgress() {
+    const cleanStudentName = String(studentNameDraft ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
+
+    if (!canSaveProgress) {
+      setProgressionError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
+      return;
+    }
+
+    if (!cleanStudentName) {
+      setProgressionError("학생 이름을 입력해 주세요.");
+      return;
+    }
+
+    setProgressionLoading(true);
+    setProgressionError("");
+    setProgressionStatus("");
+
+    try {
+      const saved = await saveStudentProgress({
+        schoolId: progressionSchoolId,
+        schoolName: progressionSchoolName,
+        grade: progressionGrade,
+        studentName: cleanStudentName,
+        activityType: "typing",
+        result: {
+          score,
+          elapsedSeconds,
+          correctCount,
+          questionCount,
+          accuracy,
+          hintUsedCount,
+          bestCombo,
+        },
+      });
+
+      onStudentNameDraftChange?.(cleanStudentName);
+      setProgressionStudentName(cleanStudentName);
+      setProgressionComparison(saved.comparison);
+      setNewlyEarnedBadges(saved.newlyEarnedBadges ?? []);
+      setProgressionStatus(
+        `${cleanStudentName} 학생의 영어 타자 성장 기록을 저장했습니다.`,
+      );
+    } catch (error) {
+      setProgressionError(error?.message || "개인 기록을 저장하지 못했습니다.");
+    } finally {
+      setProgressionLoading(false);
+    }
+  }
+
+  const progressionDisabledReason = !remoteConfigured
+    ? "Firebase 연결이 없어 이 기기에서는 개인 기록을 저장할 수 없습니다."
+    : !progressionSchoolId || !progressionSchoolName || !progressionGrade
+      ? "학교와 학년을 먼저 선택하면 개인 최고 기록과 배지를 저장할 수 있어요."
+      : !String(studentNameDraft ?? "").trim()
+        ? "학생 이름을 입력하면 개인 최고 기록과 배지를 저장할 수 있어요."
+        : "";
+  const hasSavedProgress = Boolean(progressionStudentName);
+
   return (
     <section className="workspace-panel word-typing-shell">
       <div className="section-heading">
@@ -131,22 +269,124 @@ function TypingResultCard({
             <strong>{correctCount}개</strong>
           </article>
           <article className="word-typing-summary-card">
-            <span>실패</span>
-            <strong>{failedCount}개</strong>
+            <span>문항 수</span>
+            <strong>{questionCount}개</strong>
+          </article>
+          <article className="word-typing-summary-card">
+            <span>정확도</span>
+            <strong>{formatTypingAccuracy(accuracy)}</strong>
+          </article>
+          <article className="word-typing-summary-card">
+            <span>걸린 시간</span>
+            <strong>{formatAverageSeconds(elapsedSeconds)}</strong>
           </article>
           <article className="word-typing-summary-card">
             <span>힌트 사용</span>
             <strong>{hintUsedCount}회</strong>
           </article>
           <article className="word-typing-summary-card">
-            <span>평균 입력 시간</span>
-            <strong>{formatAverageSeconds(averageSeconds)}</strong>
-          </article>
-          <article className="word-typing-summary-card">
             <span>최고 콤보</span>
             <strong>{bestCombo}콤보</strong>
           </article>
         </div>
+
+        <p className="result-copy">
+          {failedCount > 0
+            ? `틀린 문제는 ${failedCount}개였습니다. 정확도와 콤보를 함께 올리는 방향으로 연습해 보세요.`
+            : "모든 문제를 한 번 이상 맞혔습니다. 다음에는 더 빠르게 써 보는 연습을 해 보세요."}
+        </p>
+
+        <section className="result-progression-block">
+          <div className="matching-leaderboard-head">
+            <div>
+              <p className="mode-label">Student Progress</p>
+              <h4>개인 최고 기록과 배지를 저장할까요?</h4>
+            </div>
+          </div>
+
+          <div className="matching-save-form">
+            <label className="matching-save-field">
+              <span>학생 이름</span>
+              <input
+                type="text"
+                value={studentNameDraft}
+                maxLength={20}
+                placeholder="이름을 입력하세요"
+                onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
+                disabled={progressionLoading || hasSavedProgress}
+              />
+            </label>
+            <div className="matching-leaderboard-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void handleSaveProgress()}
+                disabled={
+                  progressionLoading ||
+                  hasSavedProgress ||
+                  !String(studentNameDraft ?? "").trim()
+                }
+              >
+                {progressionLoading
+                  ? "저장 중..."
+                  : hasSavedProgress
+                    ? "저장 완료"
+                    : "개인 기록 저장"}
+              </button>
+            </div>
+          </div>
+
+          {progressionStatus ? (
+            <p className="matching-leaderboard-status">{progressionStatus}</p>
+          ) : null}
+          {progressionError ? (
+            <p className="matching-leaderboard-error">{progressionError}</p>
+          ) : null}
+
+          <StudentProgressPanel
+            comparison={progressionComparison}
+            newlyEarnedBadges={newlyEarnedBadges}
+            disabledReason={!progressionComparison ? progressionDisabledReason : ""}
+            loading={progressionLoading}
+            title="영어 타자 성장 기록"
+          />
+        </section>
+
+        <GameLeaderboardPanel
+          activityType="typing"
+          finalScore={score}
+          elapsedSeconds={elapsedSeconds}
+          leaderboardContext={leaderboardContext}
+          remoteConfigured={remoteConfigured}
+          studentNameDraft={studentNameDraft}
+          onStudentNameDraftChange={onStudentNameDraftChange}
+          metrics={{
+            correctCount,
+            questionCount,
+            accuracy,
+            hintUsedCount,
+            bestCombo,
+          }}
+        />
+
+        <article className="hint-card word-typing-tip-card">
+          <p className="mode-label">Typing Tip</p>
+          <h3>진행 팁</h3>
+          <p className="question-copy">
+            뜻을 먼저 보고, 발음을 들은 뒤 또박또박 철자를 떠올려 입력해 보세요.
+            틀렸을 때는 발음을 다시 듣고 힌트를 참고하면 좋습니다.
+          </p>
+          <div className="progression-metrics">
+            <div className="progression-metric">
+              <span>완료한 문제</span>
+              <strong>{questionCount}개</strong>
+            </div>
+            <div className="progression-metric">
+              <span>평균 입력 시간</span>
+              <strong>{formatAverageSeconds(averageSeconds)}</strong>
+            </div>
+          </div>
+        </article>
 
         <div className="toolbar-row">
           <button className="primary-button" onClick={onRetry}>
@@ -161,7 +401,17 @@ function TypingResultCard({
   );
 }
 
-export function WordTypingGame({ items, speech, celebration, onBack }) {
+export function WordTypingGame({
+  items,
+  speech,
+  celebration,
+  leaderboardContext,
+  progressionContext,
+  remoteConfigured,
+  studentNameDraft,
+  onStudentNameDraftChange,
+  onBack,
+}) {
   const typingItems = useMemo(() => normalizeTypingItems(items), [items]);
   const inputRef = useRef(null);
   const questionStartRef = useRef(0);
@@ -219,9 +469,12 @@ export function WordTypingGame({ items, speech, celebration, onBack }) {
   const canStart = typingItems.length > 0;
   const currentQuestion = questions[questionIndex] ?? null;
   const completedCount = correctCount + failedCount;
-  const progressValue = phase === "complete" ? questions.length : completedCount;
+  const questionCount = questions.length;
+  const progressValue = phase === "complete" ? questionCount : completedCount;
   const hintUsed = currentQuestion ? hintUsedIds.includes(currentQuestion.id) : false;
   const averageSeconds = calculateTypingAverageSeconds(elapsedMs, completedCount || 1);
+  const elapsedSeconds = Math.max(0, Math.ceil(elapsedMs / 1000));
+  const accuracy = questionCount > 0 ? Math.round((correctCount / questionCount) * 100) : 0;
 
   const speakCurrentWord = useEffectEvent(() => {
     if (!currentQuestion) {
@@ -391,9 +644,17 @@ export function WordTypingGame({ items, speech, celebration, onBack }) {
         score={score}
         correctCount={correctCount}
         failedCount={failedCount}
+        questionCount={questionCount}
+        elapsedSeconds={elapsedSeconds}
         hintUsedCount={hintUsedIds.length}
         averageSeconds={averageSeconds}
         bestCombo={bestCombo}
+        accuracy={accuracy}
+        leaderboardContext={leaderboardContext}
+        progressionContext={progressionContext}
+        remoteConfigured={remoteConfigured}
+        studentNameDraft={studentNameDraft}
+        onStudentNameDraftChange={onStudentNameDraftChange}
         onRetry={startGame}
         onBack={onBack}
       />

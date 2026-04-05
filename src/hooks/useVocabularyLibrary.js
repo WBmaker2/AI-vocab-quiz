@@ -89,6 +89,16 @@ function clearTeacherAutoSaveTimer(timerRef) {
   }
 }
 
+function getTeacherActivityLeaderboardDefinition(activityType) {
+  return activityType === "typing"
+    ? {
+        type: "typing",
+        label: "영어 타자",
+        collectionName: "typingLeaderboards",
+      }
+    : getActivityLeaderboardDefinition(activityType);
+}
+
 function buildTeacherBingoItemsFromCatalog(catalog, grade, selectedUnits) {
   const cleanGrade = String(grade ?? "").trim();
   const cleanSelectedUnits = Array.from(
@@ -832,7 +842,7 @@ export function useVocabularyLibrary() {
       return false;
     }
 
-    const activityDefinition = getActivityLeaderboardDefinition(
+    const activityDefinition = getTeacherActivityLeaderboardDefinition(
       teacherLeaderboardActivityType,
     );
 
@@ -900,7 +910,7 @@ export function useVocabularyLibrary() {
       return false;
     }
 
-    const activityDefinition = getActivityLeaderboardDefinition(
+    const activityDefinition = getTeacherActivityLeaderboardDefinition(
       teacherLeaderboardActivityType,
     );
 

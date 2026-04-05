@@ -17,6 +17,36 @@ const EMPTY_FORM = {
 
 const CREATE_UNIT_VALUE = "__create_new_unit__";
 
+const TEACHER_ACTIVITY_LEADERBOARD_DEFINITIONS = ACTIVITY_LEADERBOARD_DEFINITIONS.some(
+  (definition) => definition.type === "typing",
+)
+  ? ACTIVITY_LEADERBOARD_DEFINITIONS
+  : [
+      ...ACTIVITY_LEADERBOARD_DEFINITIONS,
+      {
+        type: "typing",
+        label: "영어 타자",
+        collectionName: "typingLeaderboards",
+      },
+    ];
+
+function getTeacherActivityLeaderboardDefinition(activityType) {
+  return activityType === "typing"
+    ? {
+        type: "typing",
+        label: "영어 타자",
+        collectionName: "typingLeaderboards",
+      }
+    : getActivityLeaderboardDefinition(activityType);
+}
+
+function formatTeacherLeaderboardAccuracy(value) {
+  const numericValue = Number(value ?? 0);
+
+  return Number.isInteger(numericValue)
+    ? `${numericValue}%`
+    : `${numericValue.toFixed(1)}%`;
+}
 
 function formatTeacherLeaderboardEntryDetail(entry, activityType, periodType) {
   const detailParts = [];
@@ -31,6 +61,11 @@ function formatTeacherLeaderboardEntryDetail(entry, activityType, periodType) {
     detailParts.push(`정답 ${entry.correctCount ?? 0}`);
     detailParts.push(`오답 ${entry.wrongCount ?? 0}`);
     detailParts.push(`놓침 ${entry.missCount ?? 0}`);
+  } else if (activityType === "typing") {
+    detailParts.push(`정답 ${entry.correctCount ?? 0}/${entry.questionCount ?? 0}`);
+    detailParts.push(`정확도 ${formatTeacherLeaderboardAccuracy(entry.accuracy)}`);
+    detailParts.push(`힌트 ${entry.hintUsedCount ?? 0}회`);
+    detailParts.push(`최고 ${entry.bestCombo ?? 0}콤보`);
   } else {
     detailParts.push(`짝 ${entry.solvedPairs ?? 0}개`);
   }
@@ -294,7 +329,7 @@ export function TeacherWorkspace({
     }
   }
 
-  const activeLeaderboardDefinition = getActivityLeaderboardDefinition(
+  const activeLeaderboardDefinition = getTeacherActivityLeaderboardDefinition(
     leaderboard?.activityType,
   );
   const activeLeaderboard = leaderboard?.boards?.[leaderboard?.tab] ?? null;
@@ -706,7 +741,7 @@ export function TeacherWorkspace({
               role="tablist"
               aria-label="교사 리더보드 활동"
             >
-              {ACTIVITY_LEADERBOARD_DEFINITIONS.map(({ type, label }) => (
+              {TEACHER_ACTIVITY_LEADERBOARD_DEFINITIONS.map(({ type, label }) => (
                 <button
                   key={type}
                   type="button"

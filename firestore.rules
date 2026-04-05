@@ -34,6 +34,10 @@ service cloud.firestore {
       return profileId == schoolId + "__" + grade + "__" + studentNameNormalized;
     }
 
+    function studentProfileNumber(data, fieldName) {
+      return data.keys().hasAny([fieldName]) ? data[fieldName] : 0;
+    }
+
     function isStudentProfileDocument(data) {
       return data.keys().hasOnly([
           'schoolId',
@@ -45,12 +49,21 @@ service cloud.firestore {
           'listeningSessions',
           'speakingSessions',
           'matchingSessions',
+          'typingSessions',
           'listeningBestScore',
           'listeningBestCorrectCount',
           'speakingBestScore',
           'speakingBestCorrectCount',
           'matchingBestScore',
           'matchingBestTime',
+          'typingBestScore',
+          'typingBestCorrectCount',
+          'typingBestAccuracy',
+          'typingBestCombo',
+          'typingBestQuestionCount',
+          'typingBestHintUsedCount',
+          'typingBestElapsedSeconds',
+          'typingLastPlayedAt',
           'earnedBadges',
           'createdAt',
           'updatedAt'
@@ -69,12 +82,21 @@ service cloud.firestore {
         && isNonNegativeNumber(data.listeningSessions)
         && isNonNegativeNumber(data.speakingSessions)
         && isNonNegativeNumber(data.matchingSessions)
+        && isNonNegativeNumber(data.typingSessions)
         && isNonNegativeNumber(data.listeningBestScore)
         && isNonNegativeNumber(data.listeningBestCorrectCount)
         && isNonNegativeNumber(data.speakingBestScore)
         && isNonNegativeNumber(data.speakingBestCorrectCount)
         && isNonNegativeNumber(data.matchingBestScore)
         && isNonNegativeNumber(data.matchingBestTime)
+        && isNonNegativeNumber(data.typingBestScore)
+        && isNonNegativeNumber(data.typingBestCorrectCount)
+        && isNonNegativeNumber(data.typingBestAccuracy)
+        && isNonNegativeNumber(data.typingBestQuestionCount)
+        && isNonNegativeNumber(data.typingBestHintUsedCount)
+        && isNonNegativeNumber(data.typingBestCombo)
+        && isNonNegativeNumber(data.typingBestElapsedSeconds)
+        && (data.typingLastPlayedAt == null || data.typingLastPlayedAt is timestamp)
         && data.earnedBadges is list
         && data.earnedBadges.hasOnly([
           'first_challenge',
@@ -99,15 +121,16 @@ service cloud.firestore {
 
     function studentProfileSessionsMatchTotal(data) {
       return data.totalSessions
-        == data.listeningSessions + data.speakingSessions + data.matchingSessions;
+        == data.listeningSessions + data.speakingSessions + data.matchingSessions + data.typingSessions;
     }
 
     function isStudentProfileFirstSessionShape(data) {
       return studentProfileSessionsMatchTotal(data)
         && (
-          (data.listeningSessions == 1 && data.speakingSessions == 0 && data.matchingSessions == 0)
-          || (data.listeningSessions == 0 && data.speakingSessions == 1 && data.matchingSessions == 0)
-          || (data.listeningSessions == 0 && data.speakingSessions == 0 && data.matchingSessions == 1)
+          (data.listeningSessions == 1 && data.speakingSessions == 0 && data.matchingSessions == 0 && data.typingSessions == 0)
+          || (data.listeningSessions == 0 && data.speakingSessions == 1 && data.matchingSessions == 0 && data.typingSessions == 0)
+          || (data.listeningSessions == 0 && data.speakingSessions == 0 && data.matchingSessions == 1 && data.typingSessions == 0)
+          || (data.listeningSessions == 0 && data.speakingSessions == 0 && data.matchingSessions == 0 && data.typingSessions == 1)
         );
     }
 
@@ -115,14 +138,17 @@ service cloud.firestore {
       return request.resource.data.listeningSessions >= resource.data.listeningSessions
         && request.resource.data.speakingSessions >= resource.data.speakingSessions
         && request.resource.data.matchingSessions >= resource.data.matchingSessions
+        && request.resource.data.typingSessions >= resource.data.typingSessions
         && request.resource.data.listeningSessions <= resource.data.listeningSessions + 1
         && request.resource.data.speakingSessions <= resource.data.speakingSessions + 1
         && request.resource.data.matchingSessions <= resource.data.matchingSessions + 1
+        && request.resource.data.typingSessions <= resource.data.typingSessions + 1
         && studentProfileSessionsMatchTotal(request.resource.data)
         && (
           request.resource.data.listeningSessions - resource.data.listeningSessions
           + request.resource.data.speakingSessions - resource.data.speakingSessions
           + request.resource.data.matchingSessions - resource.data.matchingSessions
+          + request.resource.data.typingSessions - resource.data.typingSessions
         ) == 1;
     }
 
@@ -281,6 +307,99 @@ service cloud.firestore {
       return isTeacherForSchool(resource.data.schoolId);
     }
 
+    function isTypingLeaderboardDocument(data) {
+      return data.keys().hasOnly([
+          'scopeKey',
+          'schoolId',
+          'schoolName',
+          'grade',
+          'studentName',
+          'studentNameNormalized',
+          'periodType',
+          'periodKey',
+          'score',
+          'elapsedSeconds',
+          'questionCount',
+          'correctCount',
+          'accuracy',
+          'hintUsedCount',
+          'bestCombo',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.scopeKey is string
+        && data.scopeKey.size() > 0
+        && data.schoolId is string
+        && data.schoolId.size() > 0
+        && data.schoolName is string
+        && data.schoolName.size() > 0
+        && data.grade is string
+        && data.grade.size() > 0
+        && data.studentName is string
+        && data.studentName.size() > 0
+        && data.studentNameNormalized is string
+        && data.studentNameNormalized.size() > 0
+        && isMatchingLeaderboardPeriodType(data.periodType)
+        && data.periodKey is string
+        && data.periodKey.size() > 0
+        && isMatchingLeaderboardScopeKey(
+          data.scopeKey,
+          data.schoolId,
+          data.grade,
+          data.periodType,
+          data.periodKey
+        )
+        && isNonNegativeNumber(data.score)
+        && isNonNegativeNumber(data.elapsedSeconds)
+        && isNonNegativeNumber(data.questionCount)
+        && isNonNegativeNumber(data.correctCount)
+        && isNonNegativeNumber(data.accuracy)
+        && isNonNegativeNumber(data.hintUsedCount)
+        && isNonNegativeNumber(data.bestCombo);
+    }
+
+    function isTypingLeaderboardStudentWrite() {
+      return isTypingLeaderboardDocument(request.resource.data)
+        && request.resource.data.scopeKey == request.resource.data.schoolId + "__" + request.resource.data.grade + "__" + request.resource.data.periodType + "__" + request.resource.data.periodKey;
+    }
+
+    function isTypingLeaderboardTeacherCreate(studentKey) {
+      return isTypingLeaderboardDocument(request.resource.data)
+        && isTeacherForSchool(request.resource.data.schoolId)
+        && studentKey == request.resource.data.studentNameNormalized;
+    }
+
+    function isTypingLeaderboardTeacherUpdate(studentKey) {
+      return isTypingLeaderboardTeacherCreate(studentKey)
+        && resource.data.schoolId == request.resource.data.schoolId
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.periodType == request.resource.data.periodType
+        && resource.data.periodKey == request.resource.data.periodKey;
+    }
+
+    function isTypingLeaderboardTeacherDelete() {
+      return isTeacherForSchool(resource.data.schoolId);
+    }
+
+    function isTypingLeaderboardStudentImprovement() {
+      return request.resource.data.score > resource.data.score
+        || (
+          request.resource.data.score == resource.data.score
+          && request.resource.data.accuracy > resource.data.accuracy
+        )
+        || (
+          request.resource.data.score == resource.data.score
+          && request.resource.data.accuracy == resource.data.accuracy
+          && request.resource.data.elapsedSeconds < resource.data.elapsedSeconds
+        )
+        || (
+          request.resource.data.score == resource.data.score
+          && request.resource.data.accuracy == resource.data.accuracy
+          && request.resource.data.elapsedSeconds == resource.data.elapsedSeconds
+          && request.resource.data.bestCombo > resource.data.bestCombo
+        );
+    }
+
     match /schools/{schoolId} {
       allow read: if true;
       allow create: if isSignedIn()
@@ -336,6 +455,36 @@ service cloud.firestore {
         && (
           request.resource.data.matchingBestScore > resource.data.matchingBestScore
           || request.resource.data.matchingBestTime <= resource.data.matchingBestTime
+        )
+        && request.resource.data.typingBestScore >= studentProfileNumber(resource.data, 'typingBestScore')
+        && request.resource.data.typingBestElapsedSeconds >= 0
+        && (
+          request.resource.data.typingBestScore > studentProfileNumber(resource.data, 'typingBestScore')
+          || (
+            request.resource.data.typingBestScore == studentProfileNumber(resource.data, 'typingBestScore')
+            && request.resource.data.typingBestAccuracy > studentProfileNumber(resource.data, 'typingBestAccuracy')
+          )
+          || (
+            request.resource.data.typingBestScore == studentProfileNumber(resource.data, 'typingBestScore')
+            && request.resource.data.typingBestAccuracy == studentProfileNumber(resource.data, 'typingBestAccuracy')
+            && request.resource.data.typingBestElapsedSeconds < studentProfileNumber(resource.data, 'typingBestElapsedSeconds')
+          )
+          || (
+            request.resource.data.typingBestScore == studentProfileNumber(resource.data, 'typingBestScore')
+            && request.resource.data.typingBestAccuracy == studentProfileNumber(resource.data, 'typingBestAccuracy')
+            && request.resource.data.typingBestElapsedSeconds == studentProfileNumber(resource.data, 'typingBestElapsedSeconds')
+            && request.resource.data.typingBestCombo >= studentProfileNumber(resource.data, 'typingBestCombo')
+          )
+        )
+        && (
+          (
+            request.resource.data.typingSessions == resource.data.typingSessions
+            && request.resource.data.typingLastPlayedAt == resource.data.typingLastPlayedAt
+          )
+          || (
+            request.resource.data.typingSessions == resource.data.typingSessions + 1
+            && request.resource.data.typingLastPlayedAt is timestamp
+          )
         )
         && request.resource.data.earnedBadges.hasAll(resource.data.earnedBadges)
         && request.resource.data.earnedBadges.size() >= resource.data.earnedBadges.size();
@@ -447,6 +596,41 @@ service cloud.firestore {
           && studentKey == request.resource.data.studentNameNormalized;
 
         allow delete: if isFishingLeaderboardTeacherDelete();
+      }
+    }
+
+    match /typingLeaderboards/{scopeKey} {
+      allow read, write: if false;
+
+      match /entries/{studentKey} {
+        allow read: if true;
+
+        allow create: if (
+          isTypingLeaderboardStudentWrite()
+          && scopeKey == request.resource.data.scopeKey
+          && studentKey == request.resource.data.studentNameNormalized
+        ) || (
+          isTypingLeaderboardTeacherCreate(studentKey)
+          && scopeKey == request.resource.data.scopeKey
+        );
+
+        allow update: if isTypingLeaderboardStudentWrite()
+          && scopeKey == request.resource.data.scopeKey
+          && studentKey == request.resource.data.studentNameNormalized
+          && resource.data.scopeKey == request.resource.data.scopeKey
+          && resource.data.schoolId == request.resource.data.schoolId
+          && resource.data.schoolName == request.resource.data.schoolName
+          && resource.data.grade == request.resource.data.grade
+          && resource.data.studentNameNormalized == request.resource.data.studentNameNormalized
+          && resource.data.periodType == request.resource.data.periodType
+          && resource.data.periodKey == request.resource.data.periodKey
+          && isTypingLeaderboardStudentImprovement();
+
+        allow update: if isTypingLeaderboardTeacherUpdate(studentKey)
+          && scopeKey == request.resource.data.scopeKey
+          && studentKey == request.resource.data.studentNameNormalized;
+
+        allow delete: if isTypingLeaderboardTeacherDelete();
       }
     }
 

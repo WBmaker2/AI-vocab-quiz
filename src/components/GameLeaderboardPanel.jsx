@@ -1,23 +1,53 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  fetchFishingLeaderboards,
-  fetchMatchingLeaderboards,
-  saveFishingLeaderboardScore,
-  saveMatchingLeaderboardScore,
-} from "../lib/firebase.js";
+import * as firebaseApi from "../lib/firebase.js";
 import { getActivityLeaderboardDefinition } from "../utils/activityLeaderboard.js";
 import { formatElapsedSeconds } from "../utils/quiz.js";
 
+const TYPING_LEADERBOARD_DEFINITION = {
+  type: "typing",
+  label: "영어 타자",
+  collectionName: "typingLeaderboards",
+};
+
+function getFirebaseApiHandler(name) {
+  return firebaseApi[name];
+}
+
 function getLeaderboardHandlers(activityType) {
+  if (activityType === "typing") {
+    return {
+      fetchLeaderboards: getFirebaseApiHandler("fetchTypingLeaderboards"),
+      saveScore: getFirebaseApiHandler("saveTypingLeaderboardScore"),
+    };
+  }
+
   return activityType === "fishing"
     ? {
-        fetchLeaderboards: fetchFishingLeaderboards,
-        saveScore: saveFishingLeaderboardScore,
+        fetchLeaderboards: firebaseApi.fetchFishingLeaderboards,
+        saveScore: firebaseApi.saveFishingLeaderboardScore,
       }
     : {
-        fetchLeaderboards: fetchMatchingLeaderboards,
-        saveScore: saveMatchingLeaderboardScore,
+        fetchLeaderboards: firebaseApi.fetchMatchingLeaderboards,
+        saveScore: firebaseApi.saveMatchingLeaderboardScore,
       };
+}
+
+function getActivityDefinition(activityType) {
+  const definition = getActivityLeaderboardDefinition(activityType);
+
+  if (definition.type === "typing" || activityType === "typing") {
+    return TYPING_LEADERBOARD_DEFINITION;
+  }
+
+  return definition;
+}
+
+function formatLeaderboardAccuracy(value) {
+  const numericValue = Number(value ?? 0);
+
+  return Number.isInteger(numericValue)
+    ? `${numericValue}%`
+    : `${numericValue.toFixed(1)}%`;
 }
 
 function formatLeaderboardEntryDetail(entry, periodType, activityType) {
@@ -31,6 +61,11 @@ function formatLeaderboardEntryDetail(entry, periodType, activityType) {
 
   if (activityType === "fishing") {
     detailParts.push(`정답 ${entry.correctCount ?? 0}`);
+  } else if (activityType === "typing") {
+    detailParts.push(`정답 ${entry.correctCount ?? 0}/${entry.questionCount ?? 0}`);
+    detailParts.push(`정확도 ${formatLeaderboardAccuracy(entry.accuracy)}`);
+    detailParts.push(`힌트 ${entry.hintUsedCount ?? 0}회`);
+    detailParts.push(`최고 ${entry.bestCombo ?? 0}콤보`);
   } else if (entry.solvedPairs != null) {
     detailParts.push(`짝 ${entry.solvedPairs}개`);
   }
@@ -60,7 +95,7 @@ export function GameLeaderboardPanel({
   const schoolName = String(leaderboardContext?.schoolName ?? "").trim();
   const grade = String(leaderboardContext?.grade ?? "").trim();
   const canUseLeaderboard = remoteConfigured && schoolId && schoolName && grade;
-  const definition = getActivityLeaderboardDefinition(activityType);
+  const definition = getActivityDefinition(activityType);
   const handlers = useMemo(
     () => getLeaderboardHandlers(definition.type),
     [definition.type],
@@ -77,6 +112,16 @@ export function GameLeaderboardPanel({
         setLeaderboards({});
         setLoadingLeaderboards(false);
         setLeaderboardError("");
+        setLeaderboardStatus("");
+        return;
+      }
+
+      if (!handlers.fetchLeaderboards) {
+        setLeaderboards({});
+        setLoadingLeaderboards(false);
+        setLeaderboardError(
+          `${definition.label} 리더보드 연결이 아직 준비되지 않았습니다.`,
+        );
         setLeaderboardStatus("");
         return;
       }
@@ -132,6 +177,13 @@ export function GameLeaderboardPanel({
 
     if (!canUseLeaderboard) {
       setLeaderboardError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
+      return;
+    }
+
+    if (!handlers.saveScore) {
+      setLeaderboardError(
+        `${definition.label} 점수 저장 연결이 아직 준비되지 않았습니다.`,
+      );
       return;
     }
 

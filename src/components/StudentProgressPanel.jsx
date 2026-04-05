@@ -49,6 +49,14 @@ function formatDuration(totalSeconds) {
     .join(":");
 }
 
+function formatTypingAccuracy(value) {
+  const safeAccuracy = Math.max(0, Number(value) || 0);
+
+  return Number.isInteger(safeAccuracy)
+    ? `${safeAccuracy}%`
+    : `${safeAccuracy.toFixed(1)}%`;
+}
+
 function formatMetricValue(value, activityType) {
   if (value == null) {
     return "";
@@ -59,6 +67,40 @@ function formatMetricValue(value, activityType) {
       const score = Number(value.score ?? 0);
       const elapsedSeconds = Number(value.elapsedSeconds ?? 0);
       return `${score}점 · ${formatDuration(elapsedSeconds)}`;
+    }
+
+    if (activityType === "typing") {
+      const parts = [];
+      const score = value.score != null ? `${Number(value.score ?? 0)}점` : "";
+      const questionCount = value.questionCount != null ? Number(value.questionCount ?? 0) : 0;
+      const correctCount = value.correctCount != null ? Number(value.correctCount ?? 0) : 0;
+      const accuracy = value.accuracy != null ? `정확도 ${formatTypingAccuracy(value.accuracy)}` : "";
+      const elapsedSeconds = value.elapsedSeconds != null ? formatDuration(value.elapsedSeconds) : "";
+      const hintUsedCount = value.hintUsedCount != null ? `힌트 ${Number(value.hintUsedCount ?? 0)}회` : "";
+      const bestCombo = value.bestCombo != null ? `최고 ${Number(value.bestCombo ?? 0)}콤보` : "";
+
+      if (score) {
+        parts.push(score);
+      }
+      if (questionCount) {
+        parts.push(`${correctCount}/${questionCount}문항`);
+      } else if (correctCount) {
+        parts.push(`${correctCount}개`);
+      }
+      if (accuracy) {
+        parts.push(accuracy);
+      }
+      if (elapsedSeconds) {
+        parts.push(elapsedSeconds);
+      }
+      if (hintUsedCount) {
+        parts.push(hintUsedCount);
+      }
+      if (bestCombo) {
+        parts.push(bestCombo);
+      }
+
+      return parts.join(" · ");
     }
 
     const score = Number(value.score ?? 0);

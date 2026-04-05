@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.1",
+    date: "2026-04-05",
+    summary: [
+      "영어 단어 타자 게임 완료 화면에 주간, 월간, 연간, 우리학교 전체 리더보드를 추가해 학생이 이름을 입력하고 점수를 저장할 수 있습니다.",
+      "개인 성장 기록 패널과 교사 리더보드 관리에 `영어 타자` 활동을 연결해, 최고 기록 확인과 이름 수정·기록 삭제까지 기존 게임과 같은 흐름으로 관리할 수 있게 했습니다.",
+    ],
+  },
+  {
     version: "v1.10.0",
     date: "2026-04-04",
     summary: [
