@@ -59,9 +59,9 @@ service cloud.firestore {
           'typingBestScore',
           'typingBestCorrectCount',
           'typingBestAccuracy',
-          'typingBestCombo',
           'typingBestQuestionCount',
           'typingBestHintUsedCount',
+          'typingBestCombo',
           'typingBestElapsedSeconds',
           'typingLastPlayedAt',
           'earnedBadges',
@@ -138,17 +138,17 @@ service cloud.firestore {
       return request.resource.data.listeningSessions >= resource.data.listeningSessions
         && request.resource.data.speakingSessions >= resource.data.speakingSessions
         && request.resource.data.matchingSessions >= resource.data.matchingSessions
-        && request.resource.data.typingSessions >= resource.data.typingSessions
+        && request.resource.data.typingSessions >= studentProfileNumber(resource.data, 'typingSessions')
         && request.resource.data.listeningSessions <= resource.data.listeningSessions + 1
         && request.resource.data.speakingSessions <= resource.data.speakingSessions + 1
         && request.resource.data.matchingSessions <= resource.data.matchingSessions + 1
-        && request.resource.data.typingSessions <= resource.data.typingSessions + 1
+        && request.resource.data.typingSessions <= studentProfileNumber(resource.data, 'typingSessions') + 1
         && studentProfileSessionsMatchTotal(request.resource.data)
         && (
           request.resource.data.listeningSessions - resource.data.listeningSessions
           + request.resource.data.speakingSessions - resource.data.speakingSessions
           + request.resource.data.matchingSessions - resource.data.matchingSessions
-          + request.resource.data.typingSessions - resource.data.typingSessions
+          + request.resource.data.typingSessions - studentProfileNumber(resource.data, 'typingSessions')
         ) == 1;
     }
 
@@ -457,35 +457,11 @@ service cloud.firestore {
           || request.resource.data.matchingBestTime <= resource.data.matchingBestTime
         )
         && request.resource.data.typingBestScore >= studentProfileNumber(resource.data, 'typingBestScore')
+        && request.resource.data.typingBestCorrectCount >= studentProfileNumber(resource.data, 'typingBestCorrectCount')
+        && request.resource.data.typingBestAccuracy >= studentProfileNumber(resource.data, 'typingBestAccuracy')
+        && request.resource.data.typingBestCombo >= studentProfileNumber(resource.data, 'typingBestCombo')
         && request.resource.data.typingBestElapsedSeconds >= 0
-        && (
-          request.resource.data.typingBestScore > studentProfileNumber(resource.data, 'typingBestScore')
-          || (
-            request.resource.data.typingBestScore == studentProfileNumber(resource.data, 'typingBestScore')
-            && request.resource.data.typingBestAccuracy > studentProfileNumber(resource.data, 'typingBestAccuracy')
-          )
-          || (
-            request.resource.data.typingBestScore == studentProfileNumber(resource.data, 'typingBestScore')
-            && request.resource.data.typingBestAccuracy == studentProfileNumber(resource.data, 'typingBestAccuracy')
-            && request.resource.data.typingBestElapsedSeconds < studentProfileNumber(resource.data, 'typingBestElapsedSeconds')
-          )
-          || (
-            request.resource.data.typingBestScore == studentProfileNumber(resource.data, 'typingBestScore')
-            && request.resource.data.typingBestAccuracy == studentProfileNumber(resource.data, 'typingBestAccuracy')
-            && request.resource.data.typingBestElapsedSeconds == studentProfileNumber(resource.data, 'typingBestElapsedSeconds')
-            && request.resource.data.typingBestCombo >= studentProfileNumber(resource.data, 'typingBestCombo')
-          )
-        )
-        && (
-          (
-            request.resource.data.typingSessions == resource.data.typingSessions
-            && request.resource.data.typingLastPlayedAt == resource.data.typingLastPlayedAt
-          )
-          || (
-            request.resource.data.typingSessions == resource.data.typingSessions + 1
-            && request.resource.data.typingLastPlayedAt is timestamp
-          )
-        )
+        && (request.resource.data.typingLastPlayedAt == null || request.resource.data.typingLastPlayedAt is timestamp)
         && request.resource.data.earnedBadges.hasAll(resource.data.earnedBadges)
         && request.resource.data.earnedBadges.size() >= resource.data.earnedBadges.size();
 
