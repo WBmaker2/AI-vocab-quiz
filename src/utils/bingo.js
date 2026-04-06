@@ -89,6 +89,47 @@ export function determineBingoBoardSize(itemCount) {
   return 3;
 }
 
+export function summarizeBingoWordBoard(wordOptions) {
+  const safeWordOptions = Array.isArray(wordOptions) ? wordOptions : [];
+  const totalWordCount = safeWordOptions.length;
+  const remainingWordCount = safeWordOptions.filter(
+    (option) => option?.called !== true,
+  ).length;
+
+  return {
+    totalWordCount,
+    remainingWordCount,
+  };
+}
+
+export function collectBingoCountChanges(previousCounts, students) {
+  const previousMap =
+    previousCounts instanceof Map
+      ? previousCounts
+      : new Map(Object.entries(previousCounts ?? {}));
+  const nextCounts = new Map();
+  const changedIds = [];
+
+  for (const student of Array.isArray(students) ? students : []) {
+    const id = String(student?.id ?? "").trim();
+    if (!id) {
+      continue;
+    }
+
+    const bingoCount = Math.max(0, Number(student?.bingoCount ?? 0) || 0);
+    nextCounts.set(id, bingoCount);
+
+    if (previousMap.has(id) && previousMap.get(id) !== bingoCount) {
+      changedIds.push(id);
+    }
+  }
+
+  return {
+    changedIds,
+    nextCounts,
+  };
+}
+
 function getBoardCellIndexes(boardSize) {
   if (boardSize === 3) {
     return {

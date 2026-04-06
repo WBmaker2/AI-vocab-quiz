@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  collectBingoCountChanges,
+  summarizeBingoWordBoard,
+} from "../utils/bingo.js";
+
 function normalizeStudent(student, index) {
   if (typeof student === "string") {
     return {
@@ -65,7 +70,11 @@ function getBingoBucket(count) {
     return "2";
   }
 
-  return "1";
+  if (count === 1) {
+    return "1";
+  }
+
+  return "0";
 }
 
 function formatCallMode(callMode) {
@@ -107,10 +116,13 @@ export function TeacherBingoHost({
   const [rollingVisual, setRollingVisual] = useState(false);
   const [revealPulse, setRevealPulse] = useState(false);
   const [showSessionCodeModal, setShowSessionCodeModal] = useState(false);
+  const [changedStudentIds, setChangedStudentIds] = useState([]);
   const pendingSpeakRef = useRef(false);
   const previousWordRef = useRef(currentWord);
+  const previousBingoCountsRef = useRef(new Map());
   const revealTimerRef = useRef(null);
   const resetTimerRef = useRef(null);
+  const changeBadgeTimersRef = useRef(new Map());
 
   const normalizedStudents = useMemo(
     () =>
@@ -119,6 +131,10 @@ export function TeacherBingoHost({
         .filter((student) => student.name),
     [students],
   );
+  const changedStudentIdSet = useMemo(
+    () => new Set(changedStudentIds),
+    [changedStudentIds],
+  );
 
   const bingoSummary = useMemo(() => {
     return normalizedStudents.reduce(
@@ -126,7 +142,7 @@ export function TeacherBingoHost({
         summary[getBingoBucket(student.bingoCount)] += 1;
         return summary;
       },
-      { "1": 0, "2": 0, "3+": 0 },
+      { "0": 0, "1": 0, "2": 0, "3+": 0 },
     );
   }, [normalizedStudents]);
 
@@ -151,6 +167,10 @@ export function TeacherBingoHost({
         )
         .filter((option) => option.word),
     [calledWordIdSet, currentWordId, wordOptions],
+  );
+  const wordBoardSummary = useMemo(
+    () => summarizeBingoWordBoard(normalizedWordOptions),
+    [normalizedWordOptions],
   );
   const recentHistory = (Array.isArray(callHistory) ? callHistory : [])
     .slice(0, 4)
@@ -204,9 +224,49 @@ export function TeacherBingoHost({
   }, [isPicking]);
 
   useEffect(() => {
+    const { changedIds, nextCounts } = collectBingoCountChanges(
+      previousBingoCountsRef.current,
+      normalizedStudents,
+    );
+    previousBingoCountsRef.current = nextCounts;
+
+    setChangedStudentIds((previousIds) =>
+      previousIds.filter((studentId) => nextCounts.has(studentId)),
+    );
+
+    if (!changedIds.length) {
+      return;
+    }
+
+    setChangedStudentIds((previousIds) =>
+      Array.from(new Set([...previousIds, ...changedIds])),
+    );
+
+    changedIds.forEach((studentId) => {
+      const activeTimer = changeBadgeTimersRef.current.get(studentId);
+      if (activeTimer) {
+        window.clearTimeout(activeTimer);
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        setChangedStudentIds((previousIds) =>
+          previousIds.filter((id) => id !== studentId),
+        );
+        changeBadgeTimersRef.current.delete(studentId);
+      }, 3000);
+
+      changeBadgeTimersRef.current.set(studentId, timeoutId);
+    });
+  }, [normalizedStudents]);
+
+  useEffect(() => {
     return () => {
       window.clearTimeout(revealTimerRef.current);
       window.clearTimeout(resetTimerRef.current);
+      changeBadgeTimersRef.current.forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+      changeBadgeTimersRef.current.clear();
     };
   }, []);
 
@@ -351,70 +411,90 @@ export function TeacherBingoHost({
               </button>
             </div>
 
-          {statusMessage ? (
+            {statusMessage ? (
               <p className="bingo-host-status">{statusMessage}</p>
             ) : null}
             {errorMessage ? (
               <p className="bingo-host-status bingo-host-status-error">{errorMessage}</p>
             ) : null}
           </div>
+
+          <section className="bingo-summary-card bingo-inline-summary">
+            <div className="bingo-card-head">
+              <div>
+                <p className="mode-label">Student Status</p>
+                <h3>빙고 현황</h3>
+              </div>
+              <span className="bingo-status-chip">{totalStudents}명</span>
+            </div>
+
+            <div className="bingo-summary-grid">
+              <div className="summary-card bingo-mini-summary">
+                <span>0빙고</span>
+                <strong>{bingoSummary["0"]}</strong>
+              </div>
+              <div className="summary-card bingo-mini-summary">
+                <span>1빙고</span>
+                <strong>{bingoSummary["1"]}</strong>
+              </div>
+              <div className="summary-card bingo-mini-summary">
+                <span>2빙고</span>
+                <strong>{bingoSummary["2"]}</strong>
+              </div>
+              <div className="summary-card bingo-mini-summary">
+                <span>3+빙고</span>
+                <strong>{bingoSummary["3+"]}</strong>
+              </div>
+            </div>
+
+            <div className="bingo-callout">
+              <strong>진행 규칙</strong>
+              <p>
+                3빙고가 나와도 세션은 계속됩니다. 선생님이 종료할 때까지 학생들은
+                계속 체크할 수 있어요.
+              </p>
+            </div>
+
+            <ul className="bingo-student-list" aria-label="학생 상태 목록">
+              {normalizedStudents.length > 0 ? (
+                normalizedStudents.map((student) => (
+                  <li
+                    key={student.id}
+                    className={
+                      changedStudentIdSet.has(student.id)
+                        ? "bingo-student-row bingo-student-row-updated"
+                        : "bingo-student-row"
+                    }
+                  >
+                    {changedStudentIdSet.has(student.id) ? (
+                      <span className="bingo-student-new-badge">NEW</span>
+                    ) : null}
+                    <div className="bingo-student-meta">
+                      <strong>{student.name}</strong>
+                      {student.status ? <span>{student.status}</span> : <span>대기 중</span>}
+                    </div>
+                    <div className="bingo-student-badges">
+                      <span className="bingo-student-bingo">
+                        {student.bingoCount}빙고
+                      </span>
+                      <span
+                        className={
+                          student.connected
+                            ? "bingo-presence bingo-presence-on"
+                            : "bingo-presence"
+                        }
+                      >
+                        {student.connected ? "접속" : "오프라인"}
+                      </span>
+                    </div>
+                  </li>
+                ))
+              ) : (
+                <li className="bingo-empty-state">아직 참여한 학생이 없습니다.</li>
+              )}
+            </ul>
+          </section>
         </article>
-
-        <aside className="bingo-card bingo-summary-card">
-          <div className="bingo-card-head">
-            <div>
-              <p className="mode-label">Student Status</p>
-              <h3>빙고 현황</h3>
-            </div>
-            <span className="bingo-status-chip">{totalStudents}명</span>
-          </div>
-
-          <div className="bingo-summary-grid">
-            <div className="summary-card bingo-mini-summary">
-              <span>1빙고</span>
-              <strong>{bingoSummary["1"]}</strong>
-            </div>
-            <div className="summary-card bingo-mini-summary">
-              <span>2빙고</span>
-              <strong>{bingoSummary["2"]}</strong>
-            </div>
-            <div className="summary-card bingo-mini-summary">
-              <span>3+빙고</span>
-              <strong>{bingoSummary["3+"]}</strong>
-            </div>
-          </div>
-
-          <div className="bingo-callout">
-            <strong>진행 규칙</strong>
-            <p>
-              3빙고가 나와도 세션은 계속됩니다. 선생님이 종료할 때까지 학생들은
-              계속 체크할 수 있어요.
-            </p>
-          </div>
-
-          <ul className="bingo-student-list" aria-label="학생 상태 목록">
-            {normalizedStudents.length > 0 ? (
-              normalizedStudents.map((student) => (
-                <li key={student.id} className="bingo-student-row">
-                  <div className="bingo-student-meta">
-                    <strong>{student.name}</strong>
-                    {student.status ? <span>{student.status}</span> : <span>대기 중</span>}
-                  </div>
-                  <div className="bingo-student-badges">
-                    <span className="bingo-student-bingo">
-                      {student.bingoCount}빙고
-                    </span>
-                    <span className={student.connected ? "bingo-presence bingo-presence-on" : "bingo-presence"}>
-                      {student.connected ? "접속" : "오프라인"}
-                    </span>
-                  </div>
-                </li>
-              ))
-            ) : (
-              <li className="bingo-empty-state">아직 참여한 학생이 없습니다.</li>
-            )}
-          </ul>
-        </aside>
       </div>
 
       <section className="bingo-history-card">
@@ -424,10 +504,9 @@ export function TeacherBingoHost({
             <h3>단어 선택 보드</h3>
           </div>
           <span className="bingo-status-chip">
-            남은 단어{" "}
-            <strong>
-              {normalizedWordOptions.filter((option) => !option.called).length}
-            </strong>
+            남은 단어 <strong>{wordBoardSummary.remainingWordCount}</strong>
+            <span aria-hidden="true"> / </span>
+            전체 단어 <strong>{wordBoardSummary.totalWordCount}</strong>
           </span>
         </div>
 

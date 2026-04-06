@@ -40,7 +40,16 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
-    version: "v1.10.1",
+    version: "v1.10.2",
+    date: "2026-04-06",
+    summary: [
+      "학급 빙고 교사 화면에서 `빙고 현황`을 현재 호출 카드 아래로 이동해, 수업 중 호출 단어와 학생 진행 상황을 한눈에 이어서 볼 수 있게 정리했습니다.",
+      "학생 현황 카드는 데스크톱에서 한 줄 4개씩 보이도록 조정하고, 빙고 수가 바뀐 학생은 `NEW` 표시로 바로 구분할 수 있게 했습니다.",
+      "단어 선택 보드에는 `남은 단어 / 전체 단어` 표기를 추가하고, 빙고 현황 요약 카드에 `0빙고`를 새로 넣어 시작 상태부터 집계가 보이도록 했습니다.",
+    ],
+  },
+  {
+    version: "v1.10.2",
     date: "2026-04-05",
     summary: [
       "영어 단어 타자 게임 완료 화면에 주간, 월간, 연간, 우리학교 전체 리더보드를 추가해 학생이 이름을 입력하고 점수를 저장할 수 있습니다.",
