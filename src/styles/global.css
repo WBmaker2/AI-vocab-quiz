@@ -1928,6 +1928,14 @@ button:disabled {
   margin-top: 1rem;
 }
 
+.bingo-setup-actions {
+  align-items: stretch;
+}
+
+.bingo-randomize-button {
+  min-width: 11.5rem;
+}
+
 .bingo-setup-board-card,
 .bingo-setup-tray-card {
   min-height: 100%;
@@ -2287,6 +2295,7 @@ button:disabled {
 
 .bingo-board-grid {
   align-items: start;
+  grid-template-columns: 1fr;
 }
 
 .bingo-call-card {

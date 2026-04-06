@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.3",
+    date: "2026-04-06",
+    summary: [
+      "학생 학급 빙고의 빙고판 배치 카드에 `빙고판 랜덤 배치` 버튼을 추가해, 남은 시간이 있어도 즉시 랜덤 배치 후 배치 완료로 바로 넘어갈 수 있게 했습니다.",
+      "학생 플레이 화면은 `선생님이 부른 단어` 카드를 위에, `단어 보드` 카드를 아래에 두는 상하 구조로 바꿔 수업 중 시선 이동이 더 자연스럽게 이어지도록 정리했습니다.",
+    ],
+  },
+  {
     version: "v1.10.2",
     date: "2026-04-06",
     summary: [

@@ -185,6 +185,7 @@ export function StudentBingoBoard({
   const [draggedSetupWordId, setDraggedSetupWordId] = useState("");
   const [setupSecondsLeft, setSetupSecondsLeft] = useState(60);
   const [setupDraftCells, setSetupDraftCells] = useState([]);
+  const [setupFinalizeMode, setSetupFinalizeMode] = useState("");
 
   const saveDraftTimerRef = useRef(null);
   const autoFinalizeTriggeredRef = useRef(false);
@@ -476,6 +477,9 @@ export function StudentBingoBoard({
       return;
     }
 
+    setLocalError("");
+    setSetupFinalizeMode(autoFillRemaining ? "random" : "manual");
+
     try {
       await onFinalizeSetup({
         boardCells: setupDraftCells,
@@ -484,6 +488,8 @@ export function StudentBingoBoard({
       clearSelection();
     } catch (error) {
       setLocalError(error?.message ?? "빙고판 배치를 완료하지 못했습니다.");
+    } finally {
+      setSetupFinalizeMode("");
     }
   }
 
@@ -598,14 +604,26 @@ export function StudentBingoBoard({
             {localError ? <p className="bingo-host-status bingo-host-status-error">{localError}</p> : null}
             {statusMessage ? <p className="bingo-host-status">{statusMessage}</p> : null}
 
-            <div className="toolbar-row">
+            <div className="toolbar-row bingo-setup-actions">
               <button
                 type="button"
                 className="primary-button"
                 onClick={() => handleFinalizeSetup(false)}
                 disabled={!setupBoardComplete || actionLoading}
               >
-                {actionLoading ? "빙고판 확정 중..." : "빙고판 배치 완료"}
+                {actionLoading && setupFinalizeMode !== "random"
+                  ? "빙고판 확정 중..."
+                  : "빙고판 배치 완료"}
+              </button>
+              <button
+                type="button"
+                className="secondary-button bingo-randomize-button"
+                onClick={() => handleFinalizeSetup(true)}
+                disabled={actionLoading}
+              >
+                {actionLoading && setupFinalizeMode === "random"
+                  ? "랜덤 배치 중..."
+                  : "빙고판 랜덤 배치"}
               </button>
             </div>
           </article>
