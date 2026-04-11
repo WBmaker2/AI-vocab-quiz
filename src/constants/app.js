@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.6",
+    date: "2026-04-11",
+    summary: [
+      "교사 관리화면을 기본 관리, 일괄 등록, 학급 빙고, 리더보드 4개 탭으로 재구성해, 길게 이어지던 관리 기능을 목적별로 나눠 바로 찾을 수 있게 했습니다.",
+      "학교와 선생님 정보, 요약 통계는 상단 공통 영역에 유지하고, 각 탭에는 기존 카드와 기능을 그대로 재배치해 학년·단원 관리와 일괄 등록, 빙고 준비, 리더보드 관리를 더 빠르게 오갈 수 있게 정리했습니다.",
+    ],
+  },
+  {
     version: "v1.10.5",
     date: "2026-04-11",
     summary: [

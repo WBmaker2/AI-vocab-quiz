@@ -16,6 +16,33 @@ const EMPTY_FORM = {
 };
 
 const CREATE_UNIT_VALUE = "__create_new_unit__";
+const DEFAULT_TEACHER_TAB = "manage";
+const TEACHER_WORKSPACE_TABS = [
+  {
+    id: "manage",
+    label: "기본 관리",
+    description:
+      "단원 선택, 새 단어 추가, 등록된 단어 조회까지 기본 단어 세트 관리 작업을 한곳에 모았습니다.",
+  },
+  {
+    id: "bulk",
+    label: "일괄 등록",
+    description:
+      "엑셀 업로드와 다른 학교 단어카드 복사 기능을 한 탭에서 이어서 사용할 수 있습니다.",
+  },
+  {
+    id: "bingo",
+    label: "학급 빙고",
+    description:
+      "학생 공개 상태를 확인하고, 여러 단원을 묶어 학급 빙고 수업을 바로 준비할 수 있습니다.",
+  },
+  {
+    id: "leaderboard",
+    label: "리더보드",
+    description:
+      "활동별 리더보드 기록을 불러와 이름 수정과 기록 삭제를 전용 화면에서 관리합니다.",
+  },
+];
 
 const TEACHER_ACTIVITY_LEADERBOARD_DEFINITIONS = ACTIVITY_LEADERBOARD_DEFINITIONS.some(
   (definition) => definition.type === "typing",
@@ -128,6 +155,7 @@ export function TeacherWorkspace({
   const [editingId, setEditingId] = useState("");
   const [importFile, setImportFile] = useState(null);
   const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(DEFAULT_TEACHER_TAB);
   const [unitChoice, setUnitChoice] = useState(
     units.includes(selection.unit) ? selection.unit : CREATE_UNIT_VALUE,
   );
@@ -337,6 +365,9 @@ export function TeacherWorkspace({
   const bingoAvailableUnits = bingo?.availableUnits ?? units;
   const bingoSelectedUnits = bingo?.selectedUnits ?? [];
   const bingoCanStart = bingo?.canStart ?? canStartBingo;
+  const activeTeacherTab =
+    TEACHER_WORKSPACE_TABS.find((tab) => tab.id === activeTab) ??
+    TEACHER_WORKSPACE_TABS[0];
 
   function handleStartLeaderboardEdit(studentName) {
     leaderboard?.startEdit?.(studentName);
@@ -700,6 +731,43 @@ export function TeacherWorkspace({
         </div>
       </div>
 
+      <div className="teacher-workspace-tabs-wrap">
+        <div
+          className="teacher-workspace-tabs"
+          role="tablist"
+          aria-label="교사 관리 기능 탭"
+        >
+          {TEACHER_WORKSPACE_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              id={`teacher-tab-${tab.id}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`teacher-panel-${tab.id}`}
+              className={
+                activeTab === tab.id
+                  ? "teacher-workspace-tab teacher-workspace-tab-active"
+                  : "teacher-workspace-tab"
+              }
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <p className="inline-hint teacher-workspace-tab-copy">
+          {activeTeacherTab.description}
+        </p>
+      </div>
+
+      <div
+        id={`teacher-panel-${activeTeacherTab.id}`}
+        role="tabpanel"
+        aria-labelledby={`teacher-tab-${activeTeacherTab.id}`}
+        className="teacher-workspace-tab-panel"
+      >
+        {activeTab === "leaderboard" ? (
       <article className="form-card teacher-leaderboard-card">
         <div className="section-heading compact">
           <div>
@@ -851,8 +919,11 @@ export function TeacherWorkspace({
           </>
         )}
       </article>
+        ) : null}
 
-      <article className="form-card">
+        {activeTab === "bulk" ? (
+          <>
+            <article className="form-card">
         <div className="section-heading compact">
           <div>
             <p className="mode-label">Excel Upload</p>
@@ -997,8 +1068,12 @@ export function TeacherWorkspace({
           </div>
         ) : null}
       </article>
+          </>
+        ) : null}
 
-      <article className="form-card">
+        {activeTab === "manage" ? (
+          <>
+            <article className="form-card">
         <div className="section-heading compact">
           <div>
             <p className="mode-label">My Set</p>
@@ -1163,7 +1238,10 @@ export function TeacherWorkspace({
         onPreview={previewWord}
         canPreview={speech.supported}
       />
+          </>
+        ) : null}
 
+        {activeTab === "bingo" ? (
       <div className="launch-card">
         <div>
           <p className="mode-label">Student Access</p>
@@ -1237,6 +1315,8 @@ export function TeacherWorkspace({
             홈으로 돌아가기
           </button>
         </div>
+      </div>
+        ) : null}
       </div>
     </section>
   );

@@ -447,6 +447,47 @@ button:disabled {
   margin: 1rem 0;
 }
 
+.teacher-workspace-tabs-wrap {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.teacher-workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.teacher-workspace-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 3rem;
+  padding: 0.78rem 1.15rem;
+  border: 1px solid rgba(23, 50, 77, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #4f657c;
+  font-weight: 800;
+  box-shadow: 0 10px 22px rgba(23, 50, 77, 0.06);
+}
+
+.teacher-workspace-tab-active {
+  border-color: rgba(29, 143, 255, 0.24);
+  background: linear-gradient(135deg, #eef6ff, #fff4e8);
+  color: #1f63a8;
+  box-shadow: 0 12px 26px rgba(29, 143, 255, 0.12);
+}
+
+.teacher-workspace-tab-copy {
+  margin-top: 0;
+}
+
+.teacher-workspace-tab-panel {
+  display: grid;
+  gap: 1rem;
+}
+
 .summary-card {
   min-width: 0;
   padding: 1rem 1.1rem;
@@ -2628,6 +2669,15 @@ button:disabled {
   .question-head,
   .matching-leaderboard-head {
     flex-direction: column;
+  }
+
+  .teacher-workspace-tabs {
+    flex-direction: column;
+  }
+
+  .teacher-workspace-tab {
+    width: 100%;
+    justify-content: center;
   }
 
   .toolbar-row {
