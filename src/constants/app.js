@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.7",
+    date: "2026-04-12",
+    summary: [
+      "영어 단어 타자 게임에서 같은 영어 단어와 뜻 조합이 여러 번 들어온 경우에도 수업 세트에 담긴 순서 그대로 문제에 포함되도록 조정했습니다.",
+      "타자 점수 규칙도 다듬어 3번째 시도에 정답을 맞혀도 점수를 받을 수 있게 하고, 콤보 보너스는 연속 2개 정답부터 쌓이도록 정리했습니다.",
+    ],
+  },
+  {
     version: "v1.10.6",
     date: "2026-04-11",
     summary: [

@@ -23,17 +23,23 @@ export function normalizeTypingItems(items) {
       const word = normalizeWordPart(item?.word);
       const meaning = normalizeWordPart(item?.meaning);
       const normalizedWord = normalizeTypingAnswer(word);
+      const id =
+        normalizeWordPart(item?.id) || createTypingId(word, meaning, index);
       const letterCount = [...word].filter((character) => /\S/.test(character)).length;
 
+      if (!word || !meaning || !normalizedWord || !id) {
+        return null;
+      }
+
       return {
-        id: createTypingId(word, meaning, index),
+        id,
         word,
         meaning,
         normalizedWord,
         letterCount,
       };
     })
-    .filter((item) => item.word && item.meaning);
+    .filter(Boolean);
 }
 
 export function isTypingAnswerCorrect(input, expectedWord) {
@@ -47,24 +53,24 @@ export function createTypingHint(word) {
     .filter((index) => index >= 0);
 
   if (visibleIndexes.length <= 2) {
-    return characters.join(' ');
+    return characters.join(" ");
   }
 
   const firstIndex = visibleIndexes[0];
   const lastIndex = visibleIndexes[visibleIndexes.length - 1];
   const tokens = characters.map((character, index) => {
     if (!/\S/.test(character)) {
-      return '/';
+      return "/";
     }
 
     if (index === firstIndex || index === lastIndex) {
       return character.toLowerCase();
     }
 
-    return '_';
+    return "_";
   });
 
-  return tokens.join(' ').replace(/\s*\/\s*/g, '   ');
+  return tokens.join(" ").replace(/\s*\/\s*/g, "   ");
 }
 
 export function calculateTypingScore({
@@ -78,9 +84,10 @@ export function calculateTypingScore({
   const safeCombo = Math.max(0, Math.floor(Number(combo) || 0));
 
   const baseScore = 100;
-  const attemptPenalty = Math.max(0, safeAttempts - 1) * 10;
-  const timeBonus = safeSeconds <= 2 ? 20 : safeSeconds <= 4 ? 12 : safeSeconds <= 6 ? 6 : 0;
-  const comboBonus = Math.min(Math.max(0, safeCombo - 1) * 5, 20);
+  const attemptPenalty = Math.max(0, safeAttempts - 1) * 20;
+  const timeBonus = Math.max(0, Math.min(20, Math.round(20 - safeSeconds * 2)));
+  const comboBonus =
+    safeCombo >= 2 ? Math.min(Math.max(0, (safeCombo - 1) * 5), 20) : 0;
   const hintPenalty = usedHint ? 10 : 0;
 
   return Math.max(0, Math.round(baseScore + timeBonus + comboBonus - attemptPenalty - hintPenalty));
