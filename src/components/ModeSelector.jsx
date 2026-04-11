@@ -80,22 +80,12 @@ export function ModeSelector({
 
   return (
     <section className="panel-grid">
-      <article className="mode-card mode-card-teacher">
-        <p className="mode-label">Teacher Mode</p>
-        <h2>선생님 단어 세트 관리</h2>
-        <p>
-          Google 로그인 후 학교와 선생님 정보를 등록하면, 내 단어 세트만
-          저장하고 공개할 수 있습니다.
-        </p>
-        <button className="primary-button" onClick={onOpenTeacher}>
-          {auth.signedIn ? "내 단어 세트 열기" : "Google 로그인 후 시작"}
-        </button>
-      </article>
-
-      <article className="mode-card mode-card-student">
-        <p className="mode-label">Student Mode</p>
-        <h2>학생 활동 시작</h2>
-        <p>학교를 찾고, 선생님과 학년, 단원을 순서대로 선택하세요.</p>
+      <article className="mode-card mode-card-student mode-card-priority">
+        <div className="mode-card-top">
+          <p className="mode-label">Student Mode</p>
+          <h2>학생 활동 시작</h2>
+          <p className="mode-card-copy">학교를 찾고 선생님·학년·단원을 선택하세요.</p>
+        </div>
 
         <div className="form-grid compact-grid">
           <label className="field field-wide">
@@ -350,6 +340,19 @@ export function ModeSelector({
             단어 세트를 먼저 불러오세요.
           </p>
         ) : null}
+      </article>
+
+      <article className="mode-card mode-card-teacher mode-card-support">
+        <div className="mode-card-top">
+          <p className="mode-label">Teacher Mode</p>
+          <h2>선생님 단어 세트 관리</h2>
+          <p className="mode-card-copy">
+            Google 로그인 후 학교와 선생님 정보를 등록하면 내 단어 세트를 저장하고 공개할 수 있습니다.
+          </p>
+        </div>
+        <button className="primary-button" onClick={onOpenTeacher}>
+          {auth.signedIn ? "내 단어 세트 열기" : "Google 로그인 후 시작"}
+        </button>
       </article>
     </section>
   );

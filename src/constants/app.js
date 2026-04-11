@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.5",
+    date: "2026-04-11",
+    summary: [
+      "홈 랜딩에서 `학생 활동 시작` 카드를 `선생님 단어 세트 관리`보다 먼저 배치해, 학생이 첫 화면에서 바로 활동 시작 영역을 확인할 수 있게 했습니다.",
+      "상단 Hero와 브라우저 안내의 문구·여백·배지 크기를 함께 줄여, 첫 화면 안에 학생 시작 카드가 더 많이 보이도록 세로 공간을 압축했습니다.",
+    ],
+  },
+  {
     version: "v1.10.4",
     date: "2026-04-11",
     summary: [

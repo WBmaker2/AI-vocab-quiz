@@ -1,12 +1,9 @@
 export function BrowserSupportNotice({ support }) {
   return (
-    <section className="notice-card" aria-label="브라우저 지원 안내">
-      <div>
+    <section className="notice-card notice-card-compact" aria-label="브라우저 지원 안내">
+      <div className="notice-copy">
         <strong>브라우저 안내</strong>
-        <p>
-          듣기(TTS)는 대부분의 최신 브라우저에서 동작합니다. 말하기(STT)는
-          Chrome 또는 Edge 계열 브라우저에서 가장 안정적입니다.
-        </p>
+        <p>TTS는 대부분 지원, STT는 Chrome·Edge에서 가장 안정적입니다.</p>
       </div>
       <div className="support-grid">
         <span className={support.tts ? "support-pill on" : "support-pill off"}>

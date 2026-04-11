@@ -156,13 +156,12 @@ function App() {
           </div>
           <h1 className="hero-title">AI 원어민 단어 퀴즈 쇼</h1>
           <p className="hero-subtitle">
-            선생님이 오늘의 단어만 입력하면, 듣기와 말하기 활동으로
-            이어지는 수업용 단어 게임입니다.
+            오늘의 단어를 불러오면 듣기·말하기·게임 활동을 바로 시작할 수 있습니다.
           </p>
           <div className="hero-badges" aria-label="핵심 기능">
             <span>TTS 듣기 퀴즈</span>
             <span>STT 말하기 연습</span>
-            <span>Firebase 공유 저장</span>
+            <span>교실 공유 저장</span>
           </div>
         </header>
 
