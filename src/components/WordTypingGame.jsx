@@ -2,7 +2,12 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { saveStudentProgress } from "../lib/firebase.js";
 import { GameLeaderboardPanel } from "./GameLeaderboardPanel.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
+import { ResultSummary } from "./ResultSummary.jsx";
 import { StudentProgressPanel } from "./StudentProgressPanel.jsx";
+import {
+  buildSessionReviewItems,
+  registerSessionReviewMiss,
+} from "../utils/sessionReview.js";
 import {
   calculateTypingAverageSeconds,
   calculateTypingScore,
@@ -14,6 +19,7 @@ import {
 const ATTEMPT_LIMIT = 3;
 const NEXT_QUESTION_DELAY_MS = 800;
 const FAILED_QUESTION_DELAY_MS = 1100;
+const SESSION_REVIEW_LIMIT = 3;
 
 function shuffleItems(items) {
   const nextItems = [...items];
@@ -121,6 +127,10 @@ function TypingResultCard({
   remoteConfigured,
   studentNameDraft,
   onStudentNameDraftChange,
+  hasReviewAvailable,
+  reviewCount,
+  reviewSummary,
+  onStartReview,
   onRetry,
   onBack,
 }) {
@@ -296,6 +306,32 @@ function TypingResultCard({
             : "모든 문제를 한 번 이상 맞혔습니다. 다음에는 더 빠르게 써 보는 연습을 해 보세요."}
         </p>
 
+        {reviewSummary ? (
+          <article className="session-review-summary-card">
+            <p className="mode-label">Session Review</p>
+            <h4>오답 복습을 마쳤어요</h4>
+            <p className="result-copy">
+              틀린 단어 {reviewSummary.total}개 중 {reviewSummary.correctedCount}개를 바로 다시 썼어요.
+            </p>
+          </article>
+        ) : hasReviewAvailable ? (
+          <article className="session-review-card">
+            <p className="mode-label">Session Review</p>
+            <h4>방금 틀린 단어만 다시 써볼까요?</h4>
+            <p className="result-copy">
+              {reviewCount}개 단어를 바로 다시 쓰며 복습할 수 있어요.
+            </p>
+            <div className="toolbar-row">
+              <button className="primary-button" onClick={onStartReview}>
+                오답 복습 시작
+              </button>
+              <button className="ghost-button" onClick={onBack}>
+                이번에는 건너뛰기
+              </button>
+            </div>
+          </article>
+        ) : null}
+
         <section className="result-progression-block">
           <div className="matching-leaderboard-head">
             <div>
@@ -436,6 +472,12 @@ export function WordTypingGame({
   const [elapsedMs, setElapsedMs] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
+  const [reviewEntries, setReviewEntries] = useState([]);
+  const [reviewItems, setReviewItems] = useState([]);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewScore, setReviewScore] = useState(0);
+  const [reviewSummary, setReviewSummary] = useState(null);
+  const [reviewHintUsedIds, setReviewHintUsedIds] = useState([]);
 
   useEffect(() => {
     speech.cancel();
@@ -457,6 +499,12 @@ export function WordTypingGame({
     setElapsedMs(0);
     setCorrectCount(0);
     setFailedCount(0);
+    setReviewEntries([]);
+    setReviewItems([]);
+    setReviewIndex(0);
+    setReviewScore(0);
+    setReviewSummary(null);
+    setReviewHintUsedIds([]);
   }, [items, speech.cancel]);
 
   useEffect(() => {
@@ -468,20 +516,34 @@ export function WordTypingGame({
 
   const canStart = typingItems.length > 0;
   const currentQuestion = questions[questionIndex] ?? null;
+  const reviewQuestion = reviewItems[reviewIndex] ?? null;
+  const isReviewPhase = phase === "review";
+  const isReviewComplete = phase === "review-complete";
+  const activeQuestion = isReviewPhase ? reviewQuestion : currentQuestion;
   const completedCount = correctCount + failedCount;
   const questionCount = questions.length;
   const progressValue = phase === "complete" ? questionCount : completedCount;
-  const hintUsed = currentQuestion ? hintUsedIds.includes(currentQuestion.id) : false;
+  const reviewProgressValue =
+    reviewIndex + (feedbackTone === "correct" || feedbackTone === "failed" ? 1 : 0);
+  const availableReviewItems = useMemo(
+    () => buildSessionReviewItems(reviewEntries, SESSION_REVIEW_LIMIT),
+    [reviewEntries],
+  );
+  const hintUsed = activeQuestion
+    ? isReviewPhase
+      ? reviewHintUsedIds.includes(activeQuestion.id)
+      : hintUsedIds.includes(activeQuestion.id)
+    : false;
   const averageSeconds = calculateTypingAverageSeconds(elapsedMs, completedCount || 1);
   const elapsedSeconds = Math.max(0, Math.ceil(elapsedMs / 1000));
   const accuracy = questionCount > 0 ? Math.round((correctCount / questionCount) * 100) : 0;
 
   const speakCurrentWord = useEffectEvent(() => {
-    if (!currentQuestion) {
+    if (!activeQuestion) {
       return;
     }
 
-    speech.speak(currentQuestion.word, {
+    speech.speak(activeQuestion.word, {
       lang: "en-US",
       rate: 0.88,
     });
@@ -507,23 +569,49 @@ export function WordTypingGame({
     }, delayMs);
   });
 
+  const moveToNextReviewQuestion = useEffectEvent((delayMs) => {
+    window.clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = window.setTimeout(() => {
+      if (reviewIndex >= reviewItems.length - 1) {
+        speech.cancel();
+        transitionLockedRef.current = false;
+        setReviewSummary({
+          total: reviewItems.length,
+          correctedCount: reviewScore,
+        });
+        setPhase("review-complete");
+        return;
+      }
+
+      transitionLockedRef.current = false;
+      announcedQuestionIdRef.current = "";
+      setReviewIndex((current) => current + 1);
+      setAttemptCount(0);
+      setCurrentInput("");
+      setFeedbackTone("idle");
+      setFeedbackMessage("뜻을 보고, 발음을 들은 뒤 영어 단어를 정확하게 입력해 보세요.");
+    }, delayMs);
+  });
+
   useEffect(() => {
-    if (phase !== "playing" || !currentQuestion) {
+    if ((phase !== "playing" && phase !== "review") || !activeQuestion) {
       return;
     }
 
-    if (announcedQuestionIdRef.current === currentQuestion.id) {
+    const announcementKey = `${phase}:${activeQuestion.id}`;
+
+    if (announcedQuestionIdRef.current === announcementKey) {
       return;
     }
 
-    announcedQuestionIdRef.current = currentQuestion.id;
+    announcedQuestionIdRef.current = announcementKey;
     questionStartRef.current = Date.now();
     speakCurrentWord();
     window.setTimeout(() => {
       inputRef.current?.focus();
       inputRef.current?.select?.();
     }, 0);
-  }, [currentQuestion, phase, speakCurrentWord]);
+  }, [activeQuestion, phase, speakCurrentWord]);
 
   useEffect(() => {
     if (phase !== "complete" || completionCelebratedRef.current) {
@@ -557,15 +645,25 @@ export function WordTypingGame({
     setElapsedMs(0);
     setCorrectCount(0);
     setFailedCount(0);
+    setReviewEntries([]);
+    setReviewItems([]);
+    setReviewIndex(0);
+    setReviewScore(0);
+    setReviewSummary(null);
+    setReviewHintUsedIds([]);
     setPhase("playing");
   }
 
   function handleShowHint() {
-    if (!currentQuestion || hintUsed || transitionLockedRef.current) {
+    if (!activeQuestion || hintUsed || transitionLockedRef.current) {
       return;
     }
 
-    setHintUsedIds((current) => [...current, currentQuestion.id]);
+    if (isReviewPhase) {
+      setReviewHintUsedIds((current) => [...current, activeQuestion.id]);
+    } else {
+      setHintUsedIds((current) => [...current, activeQuestion.id]);
+    }
     setFeedbackTone("idle");
     setFeedbackMessage("힌트를 참고해서 다시 입력해 보세요.");
   }
@@ -573,7 +671,7 @@ export function WordTypingGame({
   function handleSubmit(event) {
     event?.preventDefault?.();
 
-    if (!currentQuestion || transitionLockedRef.current) {
+    if (!activeQuestion || transitionLockedRef.current) {
       return;
     }
 
@@ -587,7 +685,17 @@ export function WordTypingGame({
     const answerSeconds = Math.max(0, (Date.now() - questionStartRef.current) / 1000);
     const nextAttemptCount = attemptCount + 1;
 
-    if (isTypingAnswerCorrect(answer, currentQuestion.word)) {
+    if (isTypingAnswerCorrect(answer, activeQuestion.word)) {
+      if (isReviewPhase) {
+        transitionLockedRef.current = true;
+        setReviewScore((current) => current + 1);
+        setFeedbackTone("correct");
+        setFeedbackMessage(`정답입니다! "${activeQuestion.word}"를 정확하게 다시 썼어요.`);
+        void celebration?.playSuccess?.();
+        moveToNextReviewQuestion(NEXT_QUESTION_DELAY_MS);
+        return;
+      }
+
       const nextCombo = combo + 1;
       const gainedScore = calculateTypingScore({
         attemptsUsed: nextAttemptCount,
@@ -603,7 +711,7 @@ export function WordTypingGame({
       setCombo(nextCombo);
       setBestCombo((current) => Math.max(current, nextCombo));
       setFeedbackTone("correct");
-      setFeedbackMessage(`정답입니다! "${currentQuestion.word}"를 정확하게 썼어요.`);
+      setFeedbackMessage(`정답입니다! "${activeQuestion.word}"를 정확하게 썼어요.`);
       void celebration?.playSuccess?.();
       moveToNextQuestion(NEXT_QUESTION_DELAY_MS);
       return;
@@ -613,17 +721,61 @@ export function WordTypingGame({
 
     if (nextAttemptCount >= ATTEMPT_LIMIT) {
       transitionLockedRef.current = true;
+
+      if (isReviewPhase) {
+        setFeedbackTone("failed");
+        setFeedbackMessage(`아쉽지만 이번 복습 문제의 정답은 "${activeQuestion.word}"입니다.`);
+        moveToNextReviewQuestion(FAILED_QUESTION_DELAY_MS);
+        return;
+      }
+
       setElapsedMs((current) => current + answerSeconds * 1000);
       setFailedCount((current) => current + 1);
       setCombo(0);
       setFeedbackTone("failed");
-      setFeedbackMessage(`아쉽지만 이번 문제의 정답은 "${currentQuestion.word}"입니다.`);
+      setFeedbackMessage(`아쉽지만 이번 문제의 정답은 "${activeQuestion.word}"입니다.`);
+      setReviewEntries((current) =>
+        registerSessionReviewMiss(current, activeQuestion, "typing"),
+      );
       moveToNextQuestion(FAILED_QUESTION_DELAY_MS);
       return;
     }
 
     setFeedbackTone("wrong");
     setFeedbackMessage(`다시 한 번 써 보세요. ${ATTEMPT_LIMIT - nextAttemptCount}번 더 입력할 수 있어요.`);
+  }
+
+  function startReview() {
+    if (availableReviewItems.length === 0) {
+      return;
+    }
+
+    speech.cancel();
+    window.clearTimeout(transitionTimerRef.current);
+    transitionLockedRef.current = false;
+    announcedQuestionIdRef.current = "";
+    setReviewItems(availableReviewItems);
+    setReviewIndex(0);
+    setReviewScore(0);
+    setReviewSummary(null);
+    setReviewHintUsedIds([]);
+    setAttemptCount(0);
+    setCurrentInput("");
+    setFeedbackTone("idle");
+    setFeedbackMessage("뜻을 보고, 발음을 들은 뒤 영어 단어를 정확하게 입력해 보세요.");
+    setPhase("review");
+  }
+
+  function returnToResult() {
+    speech.cancel();
+    window.clearTimeout(transitionTimerRef.current);
+    transitionLockedRef.current = false;
+    announcedQuestionIdRef.current = "";
+    setAttemptCount(0);
+    setCurrentInput("");
+    setFeedbackTone("idle");
+    setFeedbackMessage("뜻을 보고, 발음을 들은 뒤 영어 단어를 정확하게 입력해 보세요.");
+    setPhase("complete");
   }
 
   if (phase === "ready") {
@@ -655,9 +807,62 @@ export function WordTypingGame({
         remoteConfigured={remoteConfigured}
         studentNameDraft={studentNameDraft}
         onStudentNameDraftChange={onStudentNameDraftChange}
+        hasReviewAvailable={availableReviewItems.length > 0}
+        reviewCount={availableReviewItems.length}
+        reviewSummary={reviewSummary}
+        onStartReview={startReview}
         onRetry={startGame}
         onBack={onBack}
       />
+    );
+  }
+
+  if (isReviewComplete) {
+    return (
+      <section className="workspace-panel word-typing-shell">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Typing Review</p>
+            <h2>영어 단어 타자 오답 복습 완료</h2>
+          </div>
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+        </div>
+
+        <ResultSummary
+          title="타자 오답 복습 완료"
+          score={reviewSummary?.correctedCount ?? 0}
+          total={reviewSummary?.total ?? 0}
+          summaryCopy={`틀린 단어 ${reviewSummary?.total ?? 0}개 중 ${reviewSummary?.correctedCount ?? 0}개를 바로 다시 썼어요.`}
+          extraContent={
+            <article className="session-review-summary-card">
+              <p className="mode-label">Session Review</p>
+              <h4>헷갈렸던 철자를 바로 복습했어요</h4>
+              <div className="session-review-progress">
+                <span>복습 문제</span>
+                <strong>{reviewSummary?.total ?? 0}개</strong>
+              </div>
+              <div className="session-review-progress">
+                <span>다시 맞힌 문제</span>
+                <strong>{reviewSummary?.correctedCount ?? 0}개</strong>
+              </div>
+            </article>
+          }
+          footerContent={
+            <div className="toolbar-row">
+              <button className="primary-button" onClick={returnToResult}>
+                결과 다시 보기
+              </button>
+              <button className="ghost-button" onClick={onBack}>
+                홈으로
+              </button>
+            </div>
+          }
+          onRetry={returnToResult}
+          onBack={onBack}
+        />
+      </section>
     );
   }
 
@@ -665,8 +870,8 @@ export function WordTypingGame({
     <section className="workspace-panel word-typing-shell">
       <div className="section-heading">
         <div>
-          <p className="mode-label">Word Typing</p>
-          <h2>영어 단어 타자 게임</h2>
+          <p className="mode-label">{isReviewPhase ? "Typing Review" : "Word Typing"}</p>
+          <h2>{isReviewPhase ? "방금 틀린 단어 다시 쓰기" : "영어 단어 타자 게임"}</h2>
         </div>
         <button className="ghost-button" onClick={onBack}>
           홈으로
@@ -677,18 +882,24 @@ export function WordTypingGame({
         <div className="quiz-main">
           <article className="scoreboard-card word-typing-scoreboard">
             <div>
-              <span>현재 문제</span>
+              <span>{isReviewPhase ? "복습 문제" : "현재 문제"}</span>
               <strong>
-                {Math.min(questionIndex + 1, questions.length)} / {questions.length}
+                {isReviewPhase
+                  ? `${Math.min(reviewIndex + 1, reviewItems.length)} / ${reviewItems.length}`
+                  : `${Math.min(questionIndex + 1, questions.length)} / ${questions.length}`}
               </strong>
             </div>
             <div>
-              <span>현재 점수</span>
-              <strong>{score}점</strong>
+              <span>{isReviewPhase ? "복습 정답 수" : "현재 점수"}</span>
+              <strong>{isReviewPhase ? `${reviewScore}개` : `${score}점`}</strong>
             </div>
             <div>
-              <span>현재 콤보</span>
-              <strong>{combo}콤보</strong>
+              <span>{isReviewPhase ? "복습 남은 문제" : "현재 콤보"}</span>
+              <strong>
+                {isReviewPhase
+                  ? `${Math.max(reviewItems.length - reviewIndex - 1, 0)}개`
+                  : `${combo}콤보`}
+              </strong>
             </div>
             <div>
               <span>남은 기회</span>
@@ -699,19 +910,26 @@ export function WordTypingGame({
           <article className="question-card word-typing-prompt-card">
             <div className="question-head">
               <div>
-                <p className="mode-label">Current Mission</p>
-                <h3>이 뜻에 맞는 영어 단어를 입력해 보세요</h3>
+                <p className="mode-label">{isReviewPhase ? `Review ${reviewIndex + 1}` : "Current Mission"}</p>
+                <h3>{isReviewPhase ? "방금 틀린 단어를 다시 입력해 보세요" : "이 뜻에 맞는 영어 단어를 입력해 보세요"}</h3>
               </div>
-              <span className="word-typing-combo-badge">최고 {bestCombo}콤보</span>
+              <span className="word-typing-combo-badge">
+                {isReviewPhase ? "복습 모드" : `최고 ${bestCombo}콤보`}
+              </span>
             </div>
 
-            <ProgressBar value={progressValue} max={questions.length} />
+            <ProgressBar
+              value={isReviewPhase ? reviewProgressValue : progressValue}
+              max={isReviewPhase ? reviewItems.length : questions.length}
+            />
 
             <div className="word-typing-meaning-card">
               <span>한국어 뜻</span>
-              <strong className="word-typing-meaning">{currentQuestion?.meaning ?? ""}</strong>
+              <strong className="word-typing-meaning">{activeQuestion?.meaning ?? ""}</strong>
               <p className="question-copy">
-                영어 발음을 듣고 아래 입력창에 단어를 직접 써 보세요.
+                {isReviewPhase
+                  ? "방금 틀린 단어만 다시 모았습니다. 이번에는 철자를 천천히 떠올려 보세요."
+                  : "영어 발음을 듣고 아래 입력창에 단어를 직접 써 보세요."}
               </p>
             </div>
           </article>
@@ -725,9 +943,9 @@ export function WordTypingGame({
               <button
                 className="secondary-button"
                 onClick={speakCurrentWord}
-                disabled={!currentQuestion || !speech.supported}
+                disabled={!activeQuestion || !speech.supported}
               >
-                발음 듣기
+                {isReviewPhase ? "복습 발음 듣기" : "발음 듣기"}
               </button>
             </div>
 
@@ -754,13 +972,13 @@ export function WordTypingGame({
                 className="ghost-button"
                 type="button"
                 onClick={handleShowHint}
-                disabled={!currentQuestion || hintUsed || transitionLockedRef.current}
+                disabled={!activeQuestion || hintUsed || transitionLockedRef.current}
               >
                 {hintUsed ? "힌트 사용 완료" : "힌트 보기"}
               </button>
               <div className="word-typing-hint-box" aria-live="polite">
-                <span>글자 수 {currentQuestion?.letterCount ?? 0}</span>
-                <strong>{hintUsed && currentQuestion ? createTypingHint(currentQuestion.word) : "필요할 때 힌트를 열어 보세요."}</strong>
+                <span>글자 수 {activeQuestion?.letterCount ?? 0}</span>
+                <strong>{hintUsed && activeQuestion ? createTypingHint(activeQuestion.word) : "필요할 때 힌트를 열어 보세요."}</strong>
               </div>
             </div>
           </article>
@@ -774,29 +992,53 @@ export function WordTypingGame({
               <p>{feedbackMessage}</p>
             </div>
             <div className="feedback-meta">
-              <span>정답은 빠를수록 보너스를 받지만, 가장 중요한 것은 정확하게 쓰는 것입니다.</span>
-              <span>3번 틀리면 정답을 알려주고 다음 문제로 넘어갑니다.</span>
+              {isReviewPhase ? (
+                <>
+                  <span>복습에서는 원래 점수를 바꾸지 않고, 다시 맞힌 개수만 따로 보여줍니다.</span>
+                  <span>3번 틀리면 정답을 보여준 뒤 다음 복습 문제로 넘어갑니다.</span>
+                </>
+              ) : (
+                <>
+                  <span>정답은 빠를수록 보너스를 받지만, 가장 중요한 것은 정확하게 쓰는 것입니다.</span>
+                  <span>3번 틀리면 정답을 알려주고 다음 문제로 넘어갑니다.</span>
+                </>
+              )}
             </div>
           </article>
 
-          <article className="hint-card word-typing-tip-card">
-            <p className="mode-label">Typing Tip</p>
-            <h3>진행 팁</h3>
-            <p className="question-copy">
-              뜻을 먼저 보고, 발음을 들은 뒤 또박또박 철자를 떠올려 입력해 보세요.
-              틀렸을 때는 발음을 다시 듣고 힌트를 참고하면 좋습니다.
-            </p>
-            <div className="progression-metrics">
-              <div className="progression-metric">
-                <span>완료한 문제</span>
-                <strong>{completedCount}개</strong>
+          {isReviewPhase ? (
+            <article className="session-review-card">
+              <p className="mode-label">Review Progress</p>
+              <h3>타자 오답 복습 진행 중</h3>
+              <div className="session-review-progress">
+                <span>복습 정답 수</span>
+                <strong>{reviewScore} / {reviewItems.length}</strong>
               </div>
-              <div className="progression-metric">
-                <span>평균 입력 시간</span>
-                <strong>{formatAverageSeconds(averageSeconds)}</strong>
+              <div className="session-review-progress">
+                <span>남은 복습 문제</span>
+                <strong>{Math.max(reviewItems.length - reviewIndex - 1, 0)}개</strong>
               </div>
-            </div>
-          </article>
+            </article>
+          ) : (
+            <article className="hint-card word-typing-tip-card">
+              <p className="mode-label">Typing Tip</p>
+              <h3>진행 팁</h3>
+              <p className="question-copy">
+                뜻을 먼저 보고, 발음을 들은 뒤 또박또박 철자를 떠올려 입력해 보세요.
+                틀렸을 때는 발음을 다시 듣고 힌트를 참고하면 좋습니다.
+              </p>
+              <div className="progression-metrics">
+                <div className="progression-metric">
+                  <span>완료한 문제</span>
+                  <strong>{completedCount}개</strong>
+                </div>
+                <div className="progression-metric">
+                  <span>평균 입력 시간</span>
+                  <strong>{formatAverageSeconds(averageSeconds)}</strong>
+                </div>
+              </div>
+            </article>
+          )}
         </div>
       </div>
     </section>

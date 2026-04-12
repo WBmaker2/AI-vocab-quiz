@@ -2,11 +2,14 @@ export function ResultSummary({
   title,
   score,
   total,
+  summaryCopy = "",
   extraContent = null,
+  footerContent = null,
   onRetry,
   onBack,
 }) {
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+  const resolvedSummaryCopy = summaryCopy || `정답률 ${percentage}%로 활동을 마쳤습니다.`;
 
   return (
     <article className="result-card">
@@ -15,16 +18,18 @@ export function ResultSummary({
       <p className="result-score">
         {score} / {total}
       </p>
-      <p className="result-copy">정답률 {percentage}%로 활동을 마쳤습니다.</p>
+      <p className="result-copy">{resolvedSummaryCopy}</p>
       {extraContent}
-      <div className="toolbar-row">
-        <button className="primary-button" onClick={onRetry}>
-          다시 하기
-        </button>
-        <button className="ghost-button" onClick={onBack}>
-          홈으로
-        </button>
-      </div>
+      {footerContent ?? (
+        <div className="toolbar-row">
+          <button className="primary-button" onClick={onRetry}>
+            다시 하기
+          </button>
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+        </div>
+      )}
     </article>
   );
 }

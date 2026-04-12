@@ -1321,6 +1321,46 @@ button:disabled {
   margin-top: 1.5rem;
 }
 
+.session-review-card,
+.session-review-summary-card {
+  margin-top: 1.2rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(23, 50, 77, 0.08);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 240, 0.98), rgba(238, 247, 255, 0.96));
+  box-shadow: 0 14px 34px rgba(23, 50, 77, 0.07);
+}
+
+.session-review-card h4,
+.session-review-summary-card h4 {
+  margin: 0.18rem 0 0;
+  font-size: 1.12rem;
+}
+
+.session-review-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(23, 50, 77, 0.06);
+}
+
+.session-review-progress span {
+  color: #5d6f81;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.session-review-progress strong {
+  color: #17324d;
+  font-size: 1rem;
+}
+
 .result-progression-form {
   display: grid;
   gap: 0.85rem;

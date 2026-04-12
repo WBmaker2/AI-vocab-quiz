@@ -1,10 +1,16 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { saveStudentProgress } from "../lib/firebase.js";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { ResultSummary } from "./ResultSummary.jsx";
 import { ScoreBoard } from "./ScoreBoard.jsx";
 import { StudentProgressPanel } from "./StudentProgressPanel.jsx";
 import { createListeningQuestions } from "../utils/quiz.js";
+import {
+  buildSessionReviewItems,
+  registerSessionReviewMiss,
+} from "../utils/sessionReview.js";
+
+const SESSION_REVIEW_LIMIT = 3;
 
 function getFeedbackMessage(question, selectedAnswer, status) {
   if (status === "correct") {
@@ -44,6 +50,14 @@ export function ListeningQuiz({
   const [progressionComparison, setProgressionComparison] = useState(null);
   const [newlyEarnedBadges, setNewlyEarnedBadges] = useState([]);
   const [progressionStudentName, setProgressionStudentName] = useState("");
+  const [reviewEntries, setReviewEntries] = useState([]);
+  const [reviewPhase, setReviewPhase] = useState("idle");
+  const [reviewQuestions, setReviewQuestions] = useState([]);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewScore, setReviewScore] = useState(0);
+  const [reviewSelectedAnswer, setReviewSelectedAnswer] = useState("");
+  const [reviewStatus, setReviewStatus] = useState("idle");
+  const [reviewSummary, setReviewSummary] = useState(null);
 
   useEffect(() => {
     setQuestions(createListeningQuestions(items));
@@ -60,6 +74,14 @@ export function ListeningQuiz({
     setProgressionComparison(null);
     setNewlyEarnedBadges([]);
     setProgressionStudentName("");
+    setReviewEntries([]);
+    setReviewPhase("idle");
+    setReviewQuestions([]);
+    setReviewIndex(0);
+    setReviewScore(0);
+    setReviewSelectedAnswer("");
+    setReviewStatus("idle");
+    setReviewSummary(null);
   }, [items]);
 
   useEffect(() => {
@@ -83,32 +105,69 @@ export function ListeningQuiz({
 
   const totalQuestions = questions.length;
   const question = questions[questionIndex];
+  const reviewQuestion = reviewQuestions[reviewIndex];
+  const isReviewPlaying = reviewPhase === "playing";
+  const isReviewComplete = reviewPhase === "complete";
   const isComplete = status === "complete";
   const hasAnswered = status === "correct" || status === "incorrect";
+  const hasReviewAnswered = reviewStatus === "correct" || reviewStatus === "incorrect";
+  const availableReviewItems = useMemo(
+    () => buildSessionReviewItems(reviewEntries, SESSION_REVIEW_LIMIT),
+    [reviewEntries],
+  );
+  const reviewCard = reviewSummary ? (
+    <article className="session-review-summary-card">
+      <p className="mode-label">Session Review</p>
+      <h4>오답 복습을 마쳤어요</h4>
+      <p className="result-copy">
+        틀린 문제 {reviewSummary.total}개 중 {reviewSummary.correctedCount}개를 바로 고쳤어요.
+      </p>
+    </article>
+  ) : availableReviewItems.length > 0 ? (
+    <article className="session-review-card">
+      <p className="mode-label">Session Review</p>
+      <h4>방금 틀린 문제만 다시 연습할까요?</h4>
+      <p className="result-copy">
+        {availableReviewItems.length}문제를 바로 다시 풀 수 있어요.
+      </p>
+      <div className="toolbar-row">
+        <button className="primary-button" onClick={handleStartReview}>
+          오답 복습 시작
+        </button>
+        <button className="ghost-button" onClick={onBack}>
+          이번에는 건너뛰기
+        </button>
+      </div>
+    </article>
+  ) : null;
 
-  const announceQuestion = useEffectEvent(() => {
-    if (!question) {
+  const announceQuestion = useEffectEvent((targetQuestion = question) => {
+    if (!targetQuestion) {
       return;
     }
 
-    speech.speak(question.word, {
+    speech.speak(targetQuestion.word, {
       lang: "en-US",
       rate: 0.9,
     });
   });
 
   useEffect(() => {
-    if (!question || isComplete) {
+    const targetQuestion = isReviewPlaying ? reviewQuestion : question;
+
+    if (!targetQuestion || isComplete || isReviewComplete) {
       return;
     }
 
-    if (announcedQuestionIdRef.current === question.id) {
+    const announcementKey = `${isReviewPlaying ? "review" : "main"}:${targetQuestion.id}`;
+
+    if (announcedQuestionIdRef.current === announcementKey) {
       return;
     }
 
-    announcedQuestionIdRef.current = question.id;
-    announceQuestion();
-  }, [announceQuestion, isComplete, question?.id]);
+    announcedQuestionIdRef.current = announcementKey;
+    announceQuestion(targetQuestion);
+  }, [announceQuestion, isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion]);
 
   useEffect(() => {
     if (status !== "correct" || !question) {
@@ -143,7 +202,12 @@ export function ListeningQuiz({
 
     if (isCorrect) {
       setScore((current) => current + 1);
+      return;
     }
+
+    setReviewEntries((current) =>
+      registerSessionReviewMiss(current, question, "listening"),
+    );
   }
 
   function handleNext() {
@@ -179,6 +243,70 @@ export function ListeningQuiz({
     setProgressionComparison(null);
     setNewlyEarnedBadges([]);
     setProgressionStudentName("");
+    setReviewEntries([]);
+    setReviewPhase("idle");
+    setReviewQuestions([]);
+    setReviewIndex(0);
+    setReviewScore(0);
+    setReviewSelectedAnswer("");
+    setReviewStatus("idle");
+    setReviewSummary(null);
+  }
+
+  function handleStartReview() {
+    if (availableReviewItems.length === 0) {
+      return;
+    }
+
+    speech.cancel();
+    announcedQuestionIdRef.current = "";
+    setReviewQuestions(createListeningQuestions(availableReviewItems, items));
+    setReviewIndex(0);
+    setReviewScore(0);
+    setReviewSelectedAnswer("");
+    setReviewStatus("idle");
+    setReviewSummary(null);
+    setReviewPhase("playing");
+  }
+
+  function handleSelectReviewChoice(choice) {
+    if (!reviewQuestion || hasReviewAnswered) {
+      return;
+    }
+
+    const isCorrect = choice === reviewQuestion.meaning;
+    setReviewSelectedAnswer(choice);
+    setReviewStatus(isCorrect ? "correct" : "incorrect");
+
+    if (isCorrect) {
+      setReviewScore((current) => current + 1);
+      void celebration?.playSuccess?.();
+    }
+  }
+
+  function handleNextReviewQuestion() {
+    if (!reviewQuestion) {
+      return;
+    }
+
+    if (reviewIndex === reviewQuestions.length - 1) {
+      setReviewSummary({
+        total: reviewQuestions.length,
+        correctedCount: reviewScore,
+      });
+      setReviewPhase("complete");
+      speech.cancel();
+      return;
+    }
+
+    setReviewIndex((current) => current + 1);
+    setReviewSelectedAnswer("");
+    setReviewStatus("idle");
+    announcedQuestionIdRef.current = "";
+  }
+
+  function handleReturnToResult() {
+    setReviewPhase("idle");
   }
 
   async function handleSaveProgress() {
@@ -245,52 +373,55 @@ export function ListeningQuiz({
   const hasSavedProgress = Boolean(progressionStudentName);
 
   const progressionContent = (
-    <section className="result-progression-block">
-      <div className="result-progression-form">
-        <label className="matching-save-field">
-          <span>학생 이름</span>
-          <input
-            type="text"
-            value={studentNameDraft}
-            maxLength={20}
-            placeholder="이름을 입력하세요"
-            onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
-            disabled={progressionLoading || hasSavedProgress}
-          />
-        </label>
-        <div className="matching-leaderboard-actions">
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => void handleSaveProgress()}
-            disabled={
-              progressionLoading ||
-              hasSavedProgress ||
-              !String(studentNameDraft ?? "").trim()
-            }
-          >
-            {progressionLoading
-              ? "저장 중..."
-              : hasSavedProgress
-                ? "저장 완료"
-                : "개인 기록 저장"}
-          </button>
+    <>
+      {reviewCard}
+      <section className="result-progression-block">
+        <div className="result-progression-form">
+          <label className="matching-save-field">
+            <span>학생 이름</span>
+            <input
+              type="text"
+              value={studentNameDraft}
+              maxLength={20}
+              placeholder="이름을 입력하세요"
+              onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
+              disabled={progressionLoading || hasSavedProgress}
+            />
+          </label>
+          <div className="matching-leaderboard-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => void handleSaveProgress()}
+              disabled={
+                progressionLoading ||
+                hasSavedProgress ||
+                !String(studentNameDraft ?? "").trim()
+              }
+            >
+              {progressionLoading
+                ? "저장 중..."
+                : hasSavedProgress
+                  ? "저장 완료"
+                  : "개인 기록 저장"}
+            </button>
+          </div>
         </div>
-      </div>
-      {progressionStatus ? (
-        <p className="matching-leaderboard-status">{progressionStatus}</p>
-      ) : null}
-      {progressionError ? (
-        <p className="matching-leaderboard-error">{progressionError}</p>
-      ) : null}
-      <StudentProgressPanel
-        comparison={progressionComparison}
-        newlyEarnedBadges={newlyEarnedBadges}
-        disabledReason={!progressionComparison ? progressionDisabledReason : ""}
-        loading={progressionLoading}
-        title="듣기 성장 기록"
-      />
-    </section>
+        {progressionStatus ? (
+          <p className="matching-leaderboard-status">{progressionStatus}</p>
+        ) : null}
+        {progressionError ? (
+          <p className="matching-leaderboard-error">{progressionError}</p>
+        ) : null}
+        <StudentProgressPanel
+          comparison={progressionComparison}
+          newlyEarnedBadges={newlyEarnedBadges}
+          disabledReason={!progressionComparison ? progressionDisabledReason : ""}
+          loading={progressionLoading}
+          title="듣기 성장 기록"
+        />
+      </section>
+    </>
   );
 
   if (items.length === 0) {
@@ -318,6 +449,172 @@ export function ListeningQuiz({
             </button>
           </div>
         </article>
+      </section>
+    );
+  }
+
+  if (isReviewComplete) {
+    return (
+      <section className="workspace-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Listening Review</p>
+            <h2>듣기 오답 복습 완료</h2>
+          </div>
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+        </div>
+
+        <ResultSummary
+          title="듣기 오답 복습 완료"
+          score={reviewSummary?.correctedCount ?? 0}
+          total={reviewSummary?.total ?? 0}
+          summaryCopy={`틀린 문제 ${reviewSummary?.total ?? 0}개 중 ${reviewSummary?.correctedCount ?? 0}개를 바로 고쳤어요.`}
+          extraContent={
+            <article className="session-review-summary-card">
+              <p className="mode-label">Session Review</p>
+              <h4>헷갈렸던 뜻을 다시 확인했어요</h4>
+              <div className="session-review-progress">
+                <span>복습 문제</span>
+                <strong>{reviewSummary?.total ?? 0}개</strong>
+              </div>
+              <div className="session-review-progress">
+                <span>다시 맞힌 문제</span>
+                <strong>{reviewSummary?.correctedCount ?? 0}개</strong>
+              </div>
+            </article>
+          }
+          footerContent={
+            <div className="toolbar-row">
+              <button className="primary-button" onClick={handleReturnToResult}>
+                원래 결과 다시 보기
+              </button>
+              <button className="ghost-button" onClick={onBack}>
+                홈으로
+              </button>
+            </div>
+          }
+          onRetry={handleReturnToResult}
+          onBack={onBack}
+        />
+      </section>
+    );
+  }
+
+  if (isReviewPlaying) {
+    return (
+      <section className="workspace-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Listening Review</p>
+            <h2>방금 틀린 문제 다시 풀기</h2>
+          </div>
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+        </div>
+
+        <div className="quiz-grid">
+          <div className="quiz-main">
+            <ScoreBoard
+              questionIndex={reviewIndex}
+              totalQuestions={reviewQuestions.length}
+              score={reviewScore}
+            />
+            <ProgressBar
+              value={reviewIndex + (hasReviewAnswered ? 1 : 0)}
+              max={reviewQuestions.length}
+            />
+
+            <article className="question-card">
+              <div className="question-head">
+                <div>
+                  <p className="mode-label">Review {reviewIndex + 1}</p>
+                  <h3>헷갈렸던 뜻을 다시 들어보고 골라보세요</h3>
+                </div>
+                <button
+                  className="secondary-button"
+                  onClick={() => announceQuestion(reviewQuestion)}
+                  disabled={!speech.supported}
+                >
+                  {speech.speaking ? "읽는 중..." : "다시 듣기"}
+                </button>
+              </div>
+
+              <p className="question-copy">
+                방금 틀린 문제만 다시 모았습니다. 이번에는 뜻을 천천히 골라보세요.
+              </p>
+
+              <div className="choices-grid">
+                {reviewQuestion?.choices.map((choice) => {
+                  const isSelected = reviewSelectedAnswer === choice;
+                  const isCorrect = choice === reviewQuestion.meaning;
+                  const choiceClassName = [
+                    "choice-button",
+                    isSelected ? "choice-selected" : "",
+                    hasReviewAnswered && isCorrect ? "choice-correct" : "",
+                    hasReviewAnswered && isSelected && !isCorrect
+                      ? "choice-incorrect"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+
+                  return (
+                    <button
+                      key={`${reviewQuestion.id}-${choice}`}
+                      className={choiceClassName}
+                      onClick={() => handleSelectReviewChoice(choice)}
+                      disabled={hasReviewAnswered}
+                    >
+                      {choice}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="feedback-card" aria-live="polite">
+                <p>{getFeedbackMessage(reviewQuestion, reviewSelectedAnswer, reviewStatus)}</p>
+                {hasReviewAnswered ? (
+                  <div className="feedback-meta">
+                    <span>정답 단어: {reviewQuestion.word}</span>
+                    {reviewQuestion.exampleSentence ? (
+                      <span>예문: {reviewQuestion.exampleSentence}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="toolbar-row">
+                <button
+                  className="primary-button"
+                  onClick={handleNextReviewQuestion}
+                  disabled={!hasReviewAnswered}
+                >
+                  {reviewIndex === reviewQuestions.length - 1
+                    ? "복습 결과 보기"
+                    : "다음 복습 문제"}
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <aside className="quiz-side">
+            <article className="session-review-card">
+              <p className="mode-label">Review Progress</p>
+              <h4>오답 복습 진행 중</h4>
+              <div className="session-review-progress">
+                <span>복습 점수</span>
+                <strong>{reviewScore} / {reviewQuestions.length}</strong>
+              </div>
+              <div className="session-review-progress">
+                <span>남은 복습 문제</span>
+                <strong>{Math.max(reviewQuestions.length - reviewIndex - 1, 0)}개</strong>
+              </div>
+            </article>
+          </aside>
+        </div>
       </section>
     );
   }

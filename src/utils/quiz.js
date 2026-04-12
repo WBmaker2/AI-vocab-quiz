@@ -32,8 +32,8 @@ function getUniqueMatchingItems(items) {
   );
 }
 
-export function createListeningQuestions(items) {
-  const uniqueMeaningItems = getUniqueMeaningItems(items);
+export function createListeningQuestions(items, choicePool = items) {
+  const uniqueMeaningItems = getUniqueMeaningItems(choicePool);
   const choiceCount = Math.min(4, uniqueMeaningItems.length);
 
   return shuffle(items).map((item) => {

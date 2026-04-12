@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.10",
+    date: "2026-04-12",
+    summary: [
+      "듣기 퀴즈, 말하기 연습, 영어 단어 타자 게임 결과 화면에서 방금 틀린 문제만 최대 3개까지 바로 다시 풀 수 있는 `세션 직후 오답 복습` 흐름을 추가했습니다.",
+      "복습 점수는 원래 활동 점수와 분리해 보여 주고, 같은 단어를 여러 번 틀려도 word + meaning 기준으로 한 번만 모아 다시 연습할 수 있게 정리했습니다.",
+    ],
+  },
+  {
     version: "v1.10.9",
     date: "2026-04-12",
     summary: [

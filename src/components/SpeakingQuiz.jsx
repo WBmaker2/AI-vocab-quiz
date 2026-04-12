@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { saveStudentProgress } from "../lib/firebase.js";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { ResultSummary } from "./ResultSummary.jsx";
@@ -6,6 +6,10 @@ import { ScoreBoard } from "./ScoreBoard.jsx";
 import { StudentProgressPanel } from "./StudentProgressPanel.jsx";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition.js";
 import { createSpeakingSequence } from "../utils/quiz.js";
+import {
+  buildSessionReviewItems,
+  registerSessionReviewMiss,
+} from "../utils/sessionReview.js";
 import { isSpeechMatch } from "../utils/normalize.js";
 
 const CONFIGURATION_ERRORS = new Set([
@@ -18,6 +22,8 @@ const CONFIGURATION_ERRORS = new Set([
   "speech-recognition-network-error",
   "speech-recognition-start-failed",
 ]);
+
+const SESSION_REVIEW_LIMIT = 3;
 
 function getGuidance(error) {
   if (error === "microphone-permission-denied") {
@@ -123,10 +129,25 @@ export function SpeakingQuiz({
   const [progressionStudentName, setProgressionStudentName] = useState("");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [blockingError, setBlockingError] = useState("");
+  const [reviewEntries, setReviewEntries] = useState([]);
+  const [reviewPhase, setReviewPhase] = useState("idle");
+  const [reviewItems, setReviewItems] = useState([]);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewScore, setReviewScore] = useState(0);
+  const [reviewStatus, setReviewStatus] = useState("idle");
+  const [reviewAttemptTranscript, setReviewAttemptTranscript] = useState("");
+  const [reviewFailedAttempts, setReviewFailedAttempts] = useState(0);
+  const [reviewBlockingError, setReviewBlockingError] = useState("");
+  const [reviewSummary, setReviewSummary] = useState(null);
 
   function resetQuestionFailureState() {
     setFailedAttempts(0);
     setBlockingError("");
+  }
+
+  function resetReviewQuestionFailureState() {
+    setReviewFailedAttempts(0);
+    setReviewBlockingError("");
   }
 
   useEffect(() => {
@@ -144,6 +165,15 @@ export function SpeakingQuiz({
     setNewlyEarnedBadges([]);
     setProgressionStudentName("");
     resetQuestionFailureState();
+    setReviewEntries([]);
+    setReviewPhase("idle");
+    setReviewItems([]);
+    setReviewIndex(0);
+    setReviewScore(0);
+    setReviewStatus("idle");
+    setReviewAttemptTranscript("");
+    resetReviewQuestionFailureState();
+    setReviewSummary(null);
     recognition.reset();
   }, [items]);
 
@@ -168,16 +198,56 @@ export function SpeakingQuiz({
 
   const totalQuestions = questions.length;
   const question = questions[questionIndex];
+  const reviewQuestion = reviewItems[reviewIndex];
+  const isReviewPlaying = reviewPhase === "playing";
+  const isReviewComplete = reviewPhase === "complete";
   const isComplete = status === "complete";
   const canAdvance =
     status === "correct" ||
     failedAttempts >= 3 ||
     Boolean(blockingError);
   const isLockedAfterCorrect = status === "correct";
+  const canAdvanceReview =
+    reviewStatus === "correct" ||
+    reviewFailedAttempts >= 3 ||
+    Boolean(reviewBlockingError);
   const guidance = getGuidance(recognition.error);
+  const reviewGuidance = getGuidance(reviewBlockingError || recognition.error);
+  const availableReviewItems = useMemo(
+    () => buildSessionReviewItems(reviewEntries, SESSION_REVIEW_LIMIT),
+    [reviewEntries],
+  );
+  const hasReviewAvailable = recognition.supported && availableReviewItems.length > 0;
+  const reviewCard = reviewSummary ? (
+    <article className="session-review-summary-card">
+      <p className="mode-label">Session Review</p>
+      <h4>오답 복습을 마쳤어요</h4>
+      <p className="result-copy">
+        틀린 문제 {reviewSummary.total}개 중 {reviewSummary.correctedCount}개를 바로 다시 말했어요.
+      </p>
+    </article>
+  ) : hasReviewAvailable ? (
+    <article className="session-review-card">
+      <p className="mode-label">Session Review</p>
+      <h4>헷갈렸던 말하기 단어를 다시 연습할까요?</h4>
+      <p className="result-copy">
+        방금 틀린 {availableReviewItems.length}문제를 바로 다시 말해볼 수 있어요.
+      </p>
+      <div className="toolbar-row">
+        <button className="primary-button" onClick={handleStartReview}>
+          오답 복습 시작
+        </button>
+        <button className="ghost-button" onClick={onBack}>
+          이번에는 건너뛰기
+        </button>
+      </div>
+    </article>
+  ) : null;
 
   useEffect(() => {
-    if (!question || recognition.listening) {
+    const activeQuestion = isReviewPlaying ? reviewQuestion : question;
+
+    if (!activeQuestion || recognition.listening) {
       return;
     }
 
@@ -186,9 +256,29 @@ export function SpeakingQuiz({
     }
 
     const transcript = recognition.transcript.trim();
+    if (isReviewPlaying) {
+      setReviewAttemptTranscript(transcript);
+
+      if (isSpeechMatch(transcript, activeQuestion.word)) {
+        resetReviewQuestionFailureState();
+        setReviewStatus((current) => {
+          if (current !== "correct") {
+            setReviewScore((scoreValue) => scoreValue + 1);
+          }
+          return "correct";
+        });
+        return;
+      }
+
+      setReviewBlockingError("");
+      setReviewFailedAttempts((current) => current + 1);
+      setReviewStatus("incorrect");
+      return;
+    }
+
     setAttemptTranscript(transcript);
 
-    if (isSpeechMatch(transcript, question.word)) {
+    if (isSpeechMatch(transcript, activeQuestion.word)) {
       resetQuestionFailureState();
       setStatus((current) => {
         if (current !== "correct") {
@@ -202,14 +292,31 @@ export function SpeakingQuiz({
     setBlockingError("");
     setFailedAttempts((current) => current + 1);
     setStatus("incorrect");
-  }, [question?.id, question?.word, recognition.listening, recognition.transcript]);
+  }, [
+    isReviewPlaying,
+    question?.id,
+    question?.word,
+    recognition.listening,
+    recognition.transcript,
+    reviewQuestion?.id,
+    reviewQuestion?.word,
+  ]);
 
   useEffect(() => {
-    if (!question || !recognition.error) {
+    const activeQuestion = isReviewPlaying ? reviewQuestion : question;
+
+    if (!activeQuestion || !recognition.error) {
       return;
     }
 
     if (recognition.error === "no-speech") {
+      if (isReviewPlaying) {
+        setReviewBlockingError("");
+        setReviewFailedAttempts((current) => current + 1);
+        setReviewStatus("empty");
+        return;
+      }
+
       setBlockingError("");
       setFailedAttempts((current) => current + 1);
       setStatus("empty");
@@ -217,14 +324,26 @@ export function SpeakingQuiz({
     }
 
     if (CONFIGURATION_ERRORS.has(recognition.error)) {
+      if (isReviewPlaying) {
+        setReviewBlockingError(recognition.error);
+        setReviewStatus("idle");
+        return;
+      }
+
       setBlockingError(recognition.error);
       setStatus("idle");
       return;
     }
 
+    if (isReviewPlaying) {
+      setReviewBlockingError("");
+      setReviewStatus("incorrect");
+      return;
+    }
+
     setBlockingError("");
     setStatus("incorrect");
-  }, [question?.id, recognition.error]);
+  }, [isReviewPlaying, question?.id, recognition.error, reviewQuestion?.id]);
 
   useEffect(() => {
     if (status !== "correct" || !question) {
@@ -249,7 +368,24 @@ export function SpeakingQuiz({
   }, [celebration, completionCelebrated, isComplete]);
 
   function handleStartListening() {
-    if (!recognition.supported || isLockedAfterCorrect) {
+    if (!recognition.supported) {
+      return;
+    }
+
+    if (isReviewPlaying) {
+      if (reviewStatus === "correct") {
+        return;
+      }
+
+      setReviewStatus("idle");
+      setReviewAttemptTranscript("");
+      setReviewBlockingError("");
+      recognition.reset();
+      recognition.start();
+      return;
+    }
+
+    if (isLockedAfterCorrect) {
       return;
     }
 
@@ -260,7 +396,13 @@ export function SpeakingQuiz({
   }
 
   function handleReplayWord() {
-    speech.speak(question.word, {
+    const targetQuestion = isReviewPlaying ? reviewQuestion : question;
+
+    if (!targetQuestion) {
+      return;
+    }
+
+    speech.speak(targetQuestion.word, {
       lang: "en-US",
       rate: 0.9,
     });
@@ -270,6 +412,12 @@ export function SpeakingQuiz({
     recognition.stop();
     recognition.reset();
     resetQuestionFailureState();
+
+    if (status !== "correct" && question) {
+      setReviewEntries((current) =>
+        registerSessionReviewMiss(current, question, "speaking"),
+      );
+    }
 
     if (questionIndex === totalQuestions - 1) {
       setStatus("complete");
@@ -297,6 +445,15 @@ export function SpeakingQuiz({
     setNewlyEarnedBadges([]);
     setProgressionStudentName("");
     resetQuestionFailureState();
+    setReviewEntries([]);
+    setReviewPhase("idle");
+    setReviewItems([]);
+    setReviewIndex(0);
+    setReviewScore(0);
+    setReviewStatus("idle");
+    setReviewAttemptTranscript("");
+    resetReviewQuestionFailureState();
+    setReviewSummary(null);
     recognition.stop();
     recognition.reset();
   }
@@ -306,6 +463,55 @@ export function SpeakingQuiz({
     setAttemptTranscript("");
     setBlockingError("");
     recognition.reset();
+  }
+
+  function handleStartReview() {
+    if (!hasReviewAvailable) {
+      return;
+    }
+
+    recognition.stop();
+    recognition.reset();
+    setReviewItems(createSpeakingSequence(availableReviewItems));
+    setReviewIndex(0);
+    setReviewScore(0);
+    setReviewStatus("idle");
+    setReviewAttemptTranscript("");
+    resetReviewQuestionFailureState();
+    setReviewSummary(null);
+    setReviewPhase("playing");
+  }
+
+  function handleResetReviewAttempt() {
+    setReviewStatus("idle");
+    setReviewAttemptTranscript("");
+    setReviewBlockingError("");
+    recognition.reset();
+  }
+
+  function handleNextReviewQuestion() {
+    recognition.stop();
+    recognition.reset();
+    resetReviewQuestionFailureState();
+
+    if (reviewIndex === reviewItems.length - 1) {
+      setReviewSummary({
+        total: reviewItems.length,
+        correctedCount: reviewScore,
+      });
+      setReviewPhase("complete");
+      return;
+    }
+
+    setReviewIndex((current) => current + 1);
+    setReviewStatus("idle");
+    setReviewAttemptTranscript("");
+  }
+
+  function handleReturnToResult() {
+    recognition.stop();
+    recognition.reset();
+    setReviewPhase("idle");
   }
 
   async function handleSaveProgress() {
@@ -373,52 +579,55 @@ export function SpeakingQuiz({
   const hasSavedProgress = Boolean(progressionStudentName);
 
   const progressionContent = (
-    <section className="result-progression-block">
-      <div className="result-progression-form">
-        <label className="matching-save-field">
-          <span>학생 이름</span>
-          <input
-            type="text"
-            value={studentNameDraft}
-            maxLength={20}
-            placeholder="이름을 입력하세요"
-            onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
-            disabled={progressionLoading || hasSavedProgress}
-          />
-        </label>
-        <div className="matching-leaderboard-actions">
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => void handleSaveProgress()}
-            disabled={
-              progressionLoading ||
-              hasSavedProgress ||
-              !String(studentNameDraft ?? "").trim()
-            }
-          >
-            {progressionLoading
-              ? "저장 중..."
-              : hasSavedProgress
-                ? "저장 완료"
-                : "개인 기록 저장"}
-          </button>
+    <>
+      {reviewCard}
+      <section className="result-progression-block">
+        <div className="result-progression-form">
+          <label className="matching-save-field">
+            <span>학생 이름</span>
+            <input
+              type="text"
+              value={studentNameDraft}
+              maxLength={20}
+              placeholder="이름을 입력하세요"
+              onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
+              disabled={progressionLoading || hasSavedProgress}
+            />
+          </label>
+          <div className="matching-leaderboard-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => void handleSaveProgress()}
+              disabled={
+                progressionLoading ||
+                hasSavedProgress ||
+                !String(studentNameDraft ?? "").trim()
+              }
+            >
+              {progressionLoading
+                ? "저장 중..."
+                : hasSavedProgress
+                  ? "저장 완료"
+                  : "개인 기록 저장"}
+            </button>
+          </div>
         </div>
-      </div>
-      {progressionStatus ? (
-        <p className="matching-leaderboard-status">{progressionStatus}</p>
-      ) : null}
-      {progressionError ? (
-        <p className="matching-leaderboard-error">{progressionError}</p>
-      ) : null}
-      <StudentProgressPanel
-        comparison={progressionComparison}
-        newlyEarnedBadges={newlyEarnedBadges}
-        disabledReason={!progressionComparison ? progressionDisabledReason : ""}
-        loading={progressionLoading}
-        title="말하기 성장 기록"
-      />
-    </section>
+        {progressionStatus ? (
+          <p className="matching-leaderboard-status">{progressionStatus}</p>
+        ) : null}
+        {progressionError ? (
+          <p className="matching-leaderboard-error">{progressionError}</p>
+        ) : null}
+        <StudentProgressPanel
+          comparison={progressionComparison}
+          newlyEarnedBadges={newlyEarnedBadges}
+          disabledReason={!progressionComparison ? progressionDisabledReason : ""}
+          loading={progressionLoading}
+          title="말하기 성장 기록"
+        />
+      </section>
+    </>
   );
 
   if (items.length === 0) {
@@ -475,6 +684,183 @@ export function SpeakingQuiz({
             </button>
           </div>
         </article>
+      </section>
+    );
+  }
+
+  if (isReviewComplete) {
+    return (
+      <section className="workspace-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Speaking Review</p>
+            <h2>말하기 오답 복습 완료</h2>
+          </div>
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+        </div>
+
+        <ResultSummary
+          title="말하기 오답 복습 완료"
+          score={reviewSummary?.correctedCount ?? 0}
+          total={reviewSummary?.total ?? 0}
+          summaryCopy={`틀린 문제 ${reviewSummary?.total ?? 0}개 중 ${reviewSummary?.correctedCount ?? 0}개를 바로 다시 말했어요.`}
+          extraContent={
+            <article className="session-review-summary-card">
+              <p className="mode-label">Session Review</p>
+              <h4>헷갈렸던 발음을 바로 복습했어요</h4>
+              <div className="session-review-progress">
+                <span>복습 문제</span>
+                <strong>{reviewSummary?.total ?? 0}개</strong>
+              </div>
+              <div className="session-review-progress">
+                <span>다시 맞힌 문제</span>
+                <strong>{reviewSummary?.correctedCount ?? 0}개</strong>
+              </div>
+            </article>
+          }
+          footerContent={
+            <div className="toolbar-row">
+              <button className="primary-button" onClick={handleReturnToResult}>
+                원래 결과 다시 보기
+              </button>
+              <button className="ghost-button" onClick={onBack}>
+                홈으로
+              </button>
+            </div>
+          }
+          onRetry={handleReturnToResult}
+          onBack={onBack}
+        />
+      </section>
+    );
+  }
+
+  if (isReviewPlaying) {
+    return (
+      <section className="workspace-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Speaking Review</p>
+            <h2>방금 틀린 단어 다시 말하기</h2>
+          </div>
+          <button className="ghost-button" onClick={onBack}>
+            홈으로
+          </button>
+        </div>
+
+        <div className="quiz-grid">
+          <div className="quiz-main">
+            <ScoreBoard
+              questionIndex={reviewIndex}
+              totalQuestions={reviewItems.length}
+              score={reviewScore}
+            />
+            <ProgressBar
+              value={reviewIndex + (reviewStatus === "correct" ? 1 : 0)}
+              max={reviewItems.length}
+            />
+
+            <article className="question-card">
+              <div className="question-head">
+                <div>
+                  <p className="mode-label">Review {reviewIndex + 1}</p>
+                  <h3>헷갈렸던 단어를 다시 보고 말해보세요</h3>
+                </div>
+                <button
+                  className="secondary-button"
+                  onClick={handleReplayWord}
+                  disabled={!speech.supported}
+                >
+                  {speech.speaking ? "읽는 중..." : "원어민 발음 듣기"}
+                </button>
+              </div>
+
+              <div className="speaking-word-card">
+                <p className="speaking-word">{reviewQuestion?.word ?? ""}</p>
+                <p className="speaking-meaning">{reviewQuestion?.meaning ?? ""}</p>
+              </div>
+
+              <div className="toolbar-row">
+                <button
+                  className="primary-button"
+                  onClick={handleStartListening}
+                  disabled={recognition.listening || reviewStatus === "correct"}
+                >
+                  {recognition.listening ? "듣는 중..." : "마이크로 다시 말하기"}
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={handleResetReviewAttempt}
+                  disabled={recognition.listening || reviewStatus === "correct"}
+                >
+                  다시 시도 준비
+                </button>
+              </div>
+
+              <div className="feedback-card" aria-live="polite">
+                <p>
+                  {getStatusMessage({
+                    supported: recognition.supported,
+                    listening: recognition.listening,
+                    transcript: reviewAttemptTranscript,
+                    question: reviewQuestion,
+                    status: reviewStatus,
+                  })}
+                </p>
+                <div className="feedback-meta">
+                  <span>
+                    인식 결과: {reviewAttemptTranscript || recognition.transcript || "아직 없음"}
+                  </span>
+                  {reviewQuestion?.exampleSentence ? (
+                    <span>예문: {reviewQuestion.exampleSentence}</span>
+                  ) : null}
+                  {recognition.error ? (
+                    <span>인식 상태: {recognition.error}</span>
+                  ) : null}
+                  {recognition.microphoneState !== "unknown" ? (
+                    <span>마이크 상태: {recognition.microphoneState}</span>
+                  ) : null}
+                </div>
+              </div>
+
+              {reviewGuidance ? (
+                <article className="guidance-card" aria-live="polite">
+                  <strong>{reviewGuidance.title}</strong>
+                  <p>{reviewGuidance.body}</p>
+                </article>
+              ) : null}
+
+              <div className="toolbar-row">
+                <button
+                  className="primary-button"
+                  onClick={handleNextReviewQuestion}
+                  disabled={!canAdvanceReview}
+                >
+                  {reviewIndex === reviewItems.length - 1
+                    ? "복습 결과 보기"
+                    : "다음 복습 단어"}
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <aside className="quiz-side">
+            <article className="session-review-card">
+              <p className="mode-label">Review Progress</p>
+              <h4>말하기 오답 복습 진행 중</h4>
+              <div className="session-review-progress">
+                <span>복습 정답 수</span>
+                <strong>{reviewScore} / {reviewItems.length}</strong>
+              </div>
+              <div className="session-review-progress">
+                <span>남은 복습 문제</span>
+                <strong>{Math.max(reviewItems.length - reviewIndex - 1, 0)}개</strong>
+              </div>
+            </article>
+          </aside>
+        </div>
       </section>
     );
   }
