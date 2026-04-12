@@ -4,6 +4,7 @@
 
 이 문서는 새 스레드에서 이 프로젝트를 빠르게 이해하고 바로 작업을 이어가기 위한 요약 문서입니다.
 초기 `README.md`와 `docs/prd.md`는 MVP 기준 설명이 많아서, 현재 제품 상태는 이 문서를 먼저 보는 편이 더 정확합니다.
+반복 운영 선호는 `docs/agent-memory.md`에 함께 누적합니다.
 
 ## 2. 프로젝트 한 줄 요약
 
@@ -33,7 +34,11 @@
 
 ### 3.3 교사 관리 화면 구조
 
-현재 교사 관리 화면은 상단 공통 정보 + 4개 탭 구조입니다.
+현재 교사 관리 화면은 **축약된 상단 정보 + 4개 탭 구조**입니다.
+
+- 교사 모드로 들어가면 홈 화면용 큰 Hero 대신 **교사용 compact 헤더**가 먼저 보입니다.
+- 학교/선생님 정보는 기본 상태에서 **얇은 프로필 스트립**으로 보이고, `정보 수정`을 누를 때만 전체 수정 카드가 펼쳐집니다.
+- 등록 단어 / 예문 포함 / 공개 상태는 큰 카드 대신 **요약 칩**으로 압축되어 탭 위 공간을 덜 차지합니다.
 
 - **기본 관리**
   - 학년과 단원 선택
@@ -50,8 +55,31 @@
 
 상단 공통 영역에는 아래 정보가 유지됩니다.
 
-- 학교/선생님 정보 수정 카드
-- 요약 통계 카드
+- 학교/선생님 현재 정보
+- 정보 수정 진입 버튼
+- 현재 단어 세트 요약 칩
+
+### 3.4 최근 구조 분리 상태
+
+2026-04-12 기준으로 큰 파일이던 교사/학생 상태 로직은 아래처럼 분리되어 있습니다.
+
+- `src/hooks/useVocabularyLibrary.js`
+  - 최상위 조립 허브 역할
+- `src/hooks/teacher/useTeacherSetManager.js`
+  - 교사 기본 단어 세트 관리
+- `src/hooks/teacher/useTeacherLeaderboards.js`
+  - 교사 리더보드 상태와 동작
+- `src/hooks/teacher/useTeacherBingoPreparation.js`
+  - 교사 빙고 준비 상태와 동작
+- `src/hooks/student/useStudentSetLoader.js`
+  - 학생 학교/선생님/학년/단원 선택과 세트 로딩
+
+교사 UI도 탭별로 나뉘어 있습니다.
+
+- `src/components/teacher/TeacherManageTab.jsx`
+- `src/components/teacher/TeacherBulkTab.jsx`
+- `src/components/teacher/TeacherBingoTab.jsx`
+- `src/components/teacher/TeacherLeaderboardTab.jsx`
 
 ## 4. 핵심 기능 목록
 
@@ -192,13 +220,55 @@
 
 - 홈 랜딩을 학생 우선 구조로 정리
 - 교사 관리화면을 4개 탭 구조로 재구성
+- 교사 관리화면의 상단 Hero/프로필/요약 영역을 더 작게 압축
 - update info 버튼/버전 기록 체계 유지
 
 ## 8. 현재 버전 기준 핵심 상태
 
-- 현재 반영 버전: **v1.10.6**
+- 현재 반영 버전: **v1.10.9**
 - 배포 대상: **Vercel production**
 - 라이브 주소: <https://talking-vacab-quiz.vercel.app>
+
+### 8.1 2026-04-12 작업 기록
+
+오늘 한 작업은 아래 5개 축으로 정리됩니다.
+
+1. **영어 타자 게임 규칙 조정**
+   - 같은 단어/뜻 조합도 수업 세트에 들어온 순서대로 유지
+   - 3번째 시도 정답에도 점수 부여
+   - 콤보 보너스는 연속 2개부터 시작
+
+2. **Firestore rules 정합성 수정**
+   - `studentProfiles`의 타자 최고 기록 갱신 규칙을 프런트 최고 기록 계산 기준과 맞춤
+   - 불필요한 `firestore (1).rules` 복사본 제거
+
+3. **Firestore 규칙 테스트 자동화**
+   - Firestore Emulator 기반 계약 테스트 추가
+   - `studentProfiles`, `matchingLeaderboards`, `fishingLeaderboards`, `typingLeaderboards`, `bingoSessions/players` 핵심 흐름 검증
+   - GitHub Actions CI에서 `npm test`, `npm run test:rules`, `npm run build` 자동 실행
+
+4. **학생 최근 선택 복원**
+   - 학생이 같은 학교/선생님으로 돌아오면 최근에 사용한 학년/단원을 자동 복원
+   - `localStorage`에 학교 + 선생님 기준으로 저장
+   - 저장된 단원이 더 이상 없으면 학년만 복원하고 단원은 비워서 재선택 가능
+
+5. **교사 관리 화면 상단 압축**
+   - 교사 모드에서는 큰 Hero 대신 compact 헤더 사용
+   - 브라우저 안내 카드는 teacher 화면에서 숨김
+   - Teacher Profile은 기본 상태에서 스트립으로 축소
+   - 요약 카드 3개는 작은 칩으로 압축
+   - 실제 조작 탭이 화면에 더 빨리 보이도록 정리
+
+### 8.2 오늘 추가되거나 중요해진 파일
+
+- `src/utils/appChrome.js`
+- `src/utils/appChrome.test.js`
+- `src/components/teacher/teacherWorkspaceView.js`
+- `src/components/teacher/teacherWorkspaceView.test.js`
+- `src/utils/studentRecentSelection.js`
+- `src/utils/studentRecentSelection.test.js`
+- `tests/firestore.rules.test.js`
+- `.github/workflows/ci.yml`
 
 버전 기록은 아래 파일이 기준입니다.
 
@@ -213,11 +283,16 @@
 - `src/constants/app.js`
 - `src/components/TeacherWorkspace.jsx`
 - `src/App.jsx`
+- `src/hooks/useVocabularyLibrary.js`
 - `src/lib/firebase.js`
 - `firestore.rules`
 
 ### 기능별 참고
 
+- `src/hooks/teacher/useTeacherSetManager.js`
+- `src/hooks/teacher/useTeacherLeaderboards.js`
+- `src/hooks/teacher/useTeacherBingoPreparation.js`
+- `src/hooks/student/useStudentSetLoader.js`
 - `docs/firebase-architecture.md`
 - `docs/deployment-policy.md`
 - `docs/superpowers/specs/2026-03-28-word-bingo-design.md`
@@ -229,8 +304,10 @@
 
 - 학생 화면과 교사 화면은 동선이 완전히 다르므로, 버튼 노출 위치를 섞지 않는 것이 중요합니다.
 - Firestore rules와 프런트 저장 payload는 함께 봐야 합니다. 권한 오류는 UI보다 규칙/경로 불일치에서 자주 발생했습니다.
+- Firestore 저장 관련 회귀는 `npm test`보다 `npm run test:rules`가 더 직접적으로 잡아줍니다. 에뮬레이터가 가능하면 이 명령을 우선 확인하는 편이 안전합니다.
 - 학급 빙고는 실시간 상태, 교사 호스트 화면, 학생 보드, Firestore rules가 함께 얽혀 있으므로 작은 수정도 전체 흐름을 같이 확인해야 합니다.
 - 버전 번호와 update info 기록은 사용자에게 실제로 보이므로, 사용자-visible 변경이 있으면 같이 올려주는 것이 좋습니다.
+- 교사 화면 상단은 최근에 compact 구조로 줄였으므로, 상단 카드/안내를 다시 키우는 변경은 teacher 화면의 세로 공간에 직접 영향을 줍니다.
 - 배포는 Vercel 기준으로 운영하고, 로컬 확인 후 push -> production deploy 순서를 지키는 편이 안전합니다.
 
 ## 11. 추천 사용 방식
