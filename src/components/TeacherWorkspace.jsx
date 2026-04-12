@@ -3,6 +3,10 @@ import { TeacherBingoTab } from "./teacher/TeacherBingoTab.jsx";
 import { TeacherBulkTab } from "./teacher/TeacherBulkTab.jsx";
 import { TeacherLeaderboardTab } from "./teacher/TeacherLeaderboardTab.jsx";
 import { TeacherManageTab } from "./teacher/TeacherManageTab.jsx";
+import {
+  buildTeacherWorkspaceSummaryChips,
+  getTeacherProfilePanelMode,
+} from "./teacher/teacherWorkspaceView.js";
 
 const EMPTY_FORM = {
   word: "",
@@ -293,6 +297,12 @@ export function TeacherWorkspace({
   const activeTeacherTab =
     TEACHER_WORKSPACE_TABS.find((tab) => tab.id === activeTab) ??
     TEACHER_WORKSPACE_TABS[0];
+  const profilePanelMode = getTeacherProfilePanelMode(profileEditorOpen);
+  const summaryChips = buildTeacherWorkspaceSummaryChips({
+    total: stats.total,
+    withExamples: stats.withExamples,
+    published,
+  });
 
   if (!remoteConfigured) {
     return (
@@ -479,7 +489,7 @@ export function TeacherWorkspace({
   }
 
   return (
-    <section className="workspace-panel">
+    <section className="workspace-panel workspace-panel-compact">
       <div className="section-heading">
         <div>
           <p className="mode-label">Teacher Mode</p>
@@ -498,29 +508,26 @@ export function TeacherWorkspace({
         </div>
       </div>
 
-      <article className="form-card">
-        <div className="section-heading compact">
-          <div>
-            <p className="mode-label">Teacher Profile</p>
-            <h3>학교와 선생님 정보</h3>
+      {profilePanelMode === "expanded" ? (
+        <article className="form-card">
+          <div className="section-heading compact">
+            <div>
+              <p className="mode-label">Teacher Profile</p>
+              <h3>학교와 선생님 정보</h3>
+            </div>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={handleCancelProfileEditor}
+            >
+              수정 닫기
+            </button>
           </div>
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={
-              profileEditorOpen ? handleCancelProfileEditor : handleOpenProfileEditor
-            }
-          >
-            {profileEditorOpen ? "수정 닫기" : "정보 수정"}
-          </button>
-        </div>
 
-        <p className="inline-hint">
-          현재 등록 정보: {profile.schoolName} · {profile.teacherName}
-        </p>
+          <p className="inline-hint">
+            현재 등록 정보: {profile.schoolName} · {profile.teacherName}
+          </p>
 
-        {profileEditorOpen ? (
-          <>
             <div className="form-grid compact-grid">
               <label className="field field-wide">
                 <span>학교 이름</span>
@@ -607,26 +614,33 @@ export function TeacherWorkspace({
                 학교 정보 삭제
               </button>
             </div>
-          </>
-        ) : null}
-      </article>
-
-      <div className="teacher-summary">
-        <div className="summary-card">
-          <span>등록 단어</span>
-          <strong>{stats.total}</strong>
-        </div>
-        <div className="summary-card">
-          <span>예문 포함</span>
-          <strong>{stats.withExamples}</strong>
-        </div>
-        <div className="summary-card">
-          <span>공개 상태</span>
-          <strong>{published ? "ON" : "OFF"}</strong>
-        </div>
-      </div>
+        </article>
+      ) : (
+        <article className="teacher-profile-strip">
+          <div className="teacher-profile-strip-copy">
+            <p className="mode-label">Teacher Profile</p>
+            <p className="teacher-profile-strip-meta">
+              {profile.schoolName} · {profile.teacherName}
+            </p>
+          </div>
+          <button
+            className="ghost-button ghost-button-compact"
+            type="button"
+            onClick={handleOpenProfileEditor}
+          >
+            정보 수정
+          </button>
+        </article>
+      )}
 
       <div className="teacher-workspace-tabs-wrap">
+        <div className="teacher-summary-chips" aria-label="현재 단어 세트 요약">
+          {summaryChips.map((chip) => (
+            <span key={chip.id} className="teacher-summary-chip">
+              {chip.label}
+            </span>
+          ))}
+        </div>
         <div
           className="teacher-workspace-tabs"
           role="tablist"
@@ -651,9 +665,6 @@ export function TeacherWorkspace({
             </button>
           ))}
         </div>
-        <p className="inline-hint teacher-workspace-tab-copy">
-          {activeTeacherTab.description}
-        </p>
       </div>
 
       <div

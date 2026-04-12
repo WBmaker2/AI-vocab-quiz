@@ -18,6 +18,7 @@ import { useCelebrationAudio } from "./hooks/useCelebrationAudio.js";
 import { isSpeechRecognitionSupported } from "./hooks/useSpeechRecognition.js";
 import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis.js";
 import { useVocabularyLibrary } from "./hooks/useVocabularyLibrary.js";
+import { getAppChromeLayout } from "./utils/appChrome.js";
 
 const APP_VIEWS = {
   HOME: "home",
@@ -64,6 +65,7 @@ function App() {
     tts: speechSynthesis.supported,
     stt: isSpeechRecognitionSupported(),
   };
+  const chromeLayout = getAppChromeLayout(view);
 
   const hasStudentVocabulary = library.student.items.length > 0;
   const canStartTeacherBingo = library.teacher.bingo.canStart;
@@ -142,30 +144,64 @@ function App() {
       <div className="app-backdrop app-backdrop-right" />
 
       <main className="app-frame">
-        <header className="hero-card">
-          <div className="hero-meta">
-            <p className="eyebrow">Elementary English Classroom App</p>
-            <span className="app-version">{APP_VERSION}</span>
-            <button
-              type="button"
-              className="update-info-button"
-              onClick={() => setUpdateHistoryOpen(true)}
-            >
-              update info
-            </button>
-          </div>
-          <h1 className="hero-title">AI 원어민 단어 퀴즈 쇼</h1>
-          <p className="hero-subtitle">
-            오늘의 단어를 불러오면 듣기·말하기·게임 활동을 바로 시작할 수 있습니다.
-          </p>
-          <div className="hero-badges" aria-label="핵심 기능">
-            <span>TTS 듣기 퀴즈</span>
-            <span>STT 말하기 연습</span>
-            <span>교실 공유 저장</span>
-          </div>
+        <header
+          className={
+            chromeLayout.heroVariant === "compact"
+              ? "hero-card hero-card-compact"
+              : "hero-card"
+          }
+        >
+          {chromeLayout.heroVariant === "compact" ? (
+            <div className="hero-compact-row">
+              <div className="hero-compact-copy">
+                <p className="eyebrow">Teacher Workspace</p>
+                <h1 className="hero-title hero-title-compact">
+                  AI 원어민 단어 퀴즈 쇼
+                </h1>
+                <p className="hero-subtitle hero-subtitle-compact">
+                  내 단어 세트와 수업용 활동 도구를 바로 관리하세요.
+                </p>
+              </div>
+              <div className="hero-compact-meta">
+                <span className="app-version">{APP_VERSION}</span>
+                <button
+                  type="button"
+                  className="update-info-button"
+                  onClick={() => setUpdateHistoryOpen(true)}
+                >
+                  update info
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="hero-meta">
+                <p className="eyebrow">Elementary English Classroom App</p>
+                <span className="app-version">{APP_VERSION}</span>
+                <button
+                  type="button"
+                  className="update-info-button"
+                  onClick={() => setUpdateHistoryOpen(true)}
+                >
+                  update info
+                </button>
+              </div>
+              <h1 className="hero-title">AI 원어민 단어 퀴즈 쇼</h1>
+              <p className="hero-subtitle">
+                오늘의 단어를 불러오면 듣기·말하기·게임 활동을 바로 시작할 수 있습니다.
+              </p>
+              <div className="hero-badges" aria-label="핵심 기능">
+                <span>TTS 듣기 퀴즈</span>
+                <span>STT 말하기 연습</span>
+                <span>교실 공유 저장</span>
+              </div>
+            </>
+          )}
         </header>
 
-        <BrowserSupportNotice support={support} />
+        {chromeLayout.showSupportNotice ? (
+          <BrowserSupportNotice support={support} />
+        ) : null}
 
         {view === APP_VIEWS.HOME ? (
           <ModeSelector

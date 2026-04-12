@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.9",
+    date: "2026-04-12",
+    summary: [
+      "교사 단어 세트 관리 화면에서는 상단 브랜드 영역을 축약하고 브라우저 안내 카드를 숨겨, 실제 관리 탭이 더 빨리 보이도록 세로 공간을 줄였습니다.",
+      "학교·선생님 정보는 기본 상태에서 얇은 프로필 줄로 정리하고, 등록 단어·예문·공개 상태는 작은 요약 칩으로 압축해 상단 정보는 유지하면서도 탭 조작 영역을 더 넓게 확보했습니다.",
+    ],
+  },
+  {
     version: "v1.10.8",
     date: "2026-04-12",
     summary: [
