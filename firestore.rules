@@ -152,6 +152,53 @@ service cloud.firestore {
         ) == 1;
     }
 
+    function isTypingProfileBestBundleUnchanged() {
+      return request.resource.data.typingBestScore
+          == studentProfileNumber(resource.data, 'typingBestScore')
+        && request.resource.data.typingBestCorrectCount
+          == studentProfileNumber(resource.data, 'typingBestCorrectCount')
+        && request.resource.data.typingBestAccuracy
+          == studentProfileNumber(resource.data, 'typingBestAccuracy')
+        && request.resource.data.typingBestQuestionCount
+          == studentProfileNumber(resource.data, 'typingBestQuestionCount')
+        && request.resource.data.typingBestHintUsedCount
+          == studentProfileNumber(resource.data, 'typingBestHintUsedCount')
+        && request.resource.data.typingBestCombo
+          == studentProfileNumber(resource.data, 'typingBestCombo')
+        && request.resource.data.typingBestElapsedSeconds
+          == studentProfileNumber(resource.data, 'typingBestElapsedSeconds');
+    }
+
+    function isTypingProfileBestImprovement() {
+      return isTypingProfileBestBundleUnchanged()
+        || request.resource.data.typingBestScore
+          > studentProfileNumber(resource.data, 'typingBestScore')
+        || (
+          request.resource.data.typingBestScore
+            == studentProfileNumber(resource.data, 'typingBestScore')
+          && request.resource.data.typingBestAccuracy
+            > studentProfileNumber(resource.data, 'typingBestAccuracy')
+        )
+        || (
+          request.resource.data.typingBestScore
+            == studentProfileNumber(resource.data, 'typingBestScore')
+          && request.resource.data.typingBestAccuracy
+            == studentProfileNumber(resource.data, 'typingBestAccuracy')
+          && request.resource.data.typingBestElapsedSeconds
+            < studentProfileNumber(resource.data, 'typingBestElapsedSeconds')
+        )
+        || (
+          request.resource.data.typingBestScore
+            == studentProfileNumber(resource.data, 'typingBestScore')
+          && request.resource.data.typingBestAccuracy
+            == studentProfileNumber(resource.data, 'typingBestAccuracy')
+          && request.resource.data.typingBestElapsedSeconds
+            == studentProfileNumber(resource.data, 'typingBestElapsedSeconds')
+          && request.resource.data.typingBestCombo
+            > studentProfileNumber(resource.data, 'typingBestCombo')
+        );
+    }
+
     function isMatchingLeaderboardScopeKey(scopeKey, schoolId, grade, periodType, periodKey) {
       return scopeKey == schoolId + "__" + grade + "__" + periodType + "__" + periodKey;
     }
@@ -456,10 +503,7 @@ service cloud.firestore {
           request.resource.data.matchingBestScore > resource.data.matchingBestScore
           || request.resource.data.matchingBestTime <= resource.data.matchingBestTime
         )
-        && request.resource.data.typingBestScore >= studentProfileNumber(resource.data, 'typingBestScore')
-        && request.resource.data.typingBestCorrectCount >= studentProfileNumber(resource.data, 'typingBestCorrectCount')
-        && request.resource.data.typingBestAccuracy >= studentProfileNumber(resource.data, 'typingBestAccuracy')
-        && request.resource.data.typingBestCombo >= studentProfileNumber(resource.data, 'typingBestCombo')
+        && isTypingProfileBestImprovement()
         && request.resource.data.typingBestElapsedSeconds >= 0
         && (request.resource.data.typingLastPlayedAt == null || request.resource.data.typingLastPlayedAt is timestamp)
         && request.resource.data.earnedBadges.hasAll(resource.data.earnedBadges)
