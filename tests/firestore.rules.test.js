@@ -125,6 +125,46 @@ function createTypingLeaderboardDoc(overrides = {}) {
   };
 }
 
+function createMatchingLeaderboardDoc(overrides = {}) {
+  return {
+    scopeKey: "school-1__3__week__2026-w15",
+    schoolId: "school-1",
+    schoolName: "테스트초",
+    grade: "3",
+    studentName: "민수",
+    studentNameNormalized: "민수",
+    periodType: "week",
+    periodKey: "2026-w15",
+    score: 80,
+    elapsedSeconds: 55,
+    solvedPairs: 8,
+    createdAt: createTimestamp(10),
+    updatedAt: createTimestamp(100),
+    ...overrides,
+  };
+}
+
+function createFishingLeaderboardDoc(overrides = {}) {
+  return {
+    scopeKey: "school-1__3__week__2026-w15",
+    schoolId: "school-1",
+    schoolName: "테스트초",
+    grade: "3",
+    studentName: "민수",
+    studentNameNormalized: "민수",
+    periodType: "week",
+    periodKey: "2026-w15",
+    score: 150,
+    elapsedSeconds: 48,
+    correctCount: 12,
+    wrongCount: 1,
+    missCount: 2,
+    createdAt: createTimestamp(10),
+    updatedAt: createTimestamp(100),
+    ...overrides,
+  };
+}
+
 function createBingoVocabularyItems() {
   return Array.from({ length: 9 }, (_, index) => ({
     id: `word-${index + 1}`,
@@ -243,6 +283,111 @@ rulesTest(
         typingBestElapsedSeconds: 38,
         typingLastPlayedAt: createTimestamp(200),
         updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "matchingLeaderboards allows a student update when the score improves",
+  async () => {
+    const entryRefPath = [
+      "matchingLeaderboards",
+      "school-1__3__week__2026-w15",
+      "entries",
+      "민수",
+    ];
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), ...entryRefPath), createMatchingLeaderboardDoc());
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(
+      updateDoc(doc(studentDb, ...entryRefPath), {
+        score: 92,
+        elapsedSeconds: 49,
+        solvedPairs: 9,
+        updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "matchingLeaderboards rejects a student update when only elapsed time improves",
+  async () => {
+    const entryRefPath = [
+      "matchingLeaderboards",
+      "school-1__3__week__2026-w15",
+      "entries",
+      "민수",
+    ];
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), ...entryRefPath), createMatchingLeaderboardDoc());
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      updateDoc(doc(studentDb, ...entryRefPath), {
+        elapsedSeconds: 42,
+        solvedPairs: 8,
+        updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "fishingLeaderboards allows a student update when the score improves",
+  async () => {
+    const entryRefPath = [
+      "fishingLeaderboards",
+      "school-1__3__week__2026-w15",
+      "entries",
+      "민수",
+    ];
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), ...entryRefPath), createFishingLeaderboardDoc());
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(
+      updateDoc(doc(studentDb, ...entryRefPath), {
+        score: 170,
+        elapsedSeconds: 46,
+        correctCount: 13,
+        wrongCount: 1,
+        missCount: 1,
+        updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "fishingLeaderboards rejects a student update when only accuracy-related counts improve",
+  async () => {
+    const entryRefPath = [
+      "fishingLeaderboards",
+      "school-1__3__week__2026-w15",
+      "entries",
+      "민수",
+    ];
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), ...entryRefPath), createFishingLeaderboardDoc());
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      updateDoc(doc(studentDb, ...entryRefPath), {
+        correctCount: 14,
+        wrongCount: 0,
+        missCount: 1,
+        updatedAt: createTimestamp(201),
       }),
     );
   },
