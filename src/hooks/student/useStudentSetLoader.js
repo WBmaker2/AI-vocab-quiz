@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   DEFAULT_STUDENT_SELECTION,
+  GRADE_OPTIONS,
   formatSetLabel,
 } from "../../constants/vocabulary.js";
 import {
@@ -16,6 +17,62 @@ import {
   buildStudentMatchingItems,
   toggleStudentMatchingUnits,
 } from "../../utils/studentSetLoader.js";
+import {
+  readStudentRecentSelection,
+  resolveStudentRecentSelection,
+  upsertStudentRecentSelection,
+} from "../../utils/studentRecentSelection.js";
+
+const STUDENT_RECENT_SELECTION_STORAGE_KEY = "studentRecentSelections.v1";
+const STUDENT_GRADE_VALUES = GRADE_OPTIONS.map((option) => option.value);
+
+function getStudentUnitsStatusMessage(grade, nextUnits) {
+  return nextUnits.length > 0
+    ? `${grade}학년에서 공개된 ${nextUnits.length}개 단원을 찾았습니다.`
+    : "선택한 학년에서 공개된 단원이 아직 없습니다.";
+}
+
+function buildRecentSelectionStatus({
+  school,
+  teacher,
+  recentSelection,
+  resolvedSelection,
+  autoTeacherSelected,
+}) {
+  const teacherName = String(teacher?.teacherName ?? "").trim();
+  const schoolName = String(school?.name ?? "").trim();
+
+  if (!teacherName) {
+    return "";
+  }
+
+  if (
+    recentSelection &&
+    resolvedSelection.grade === recentSelection.grade &&
+    resolvedSelection.unit === recentSelection.unit &&
+    resolvedSelection.unit
+  ) {
+    return autoTeacherSelected
+      ? `${schoolName}의 선생님 ${teacherName}님을 자동 선택했고 최근 학습한 ${formatSetLabel(resolvedSelection)}을 불러왔습니다.`
+      : `${teacherName} 선생님의 최근 학습한 ${formatSetLabel(resolvedSelection)}을 불러왔습니다.`;
+  }
+
+  if (
+    recentSelection &&
+    resolvedSelection.grade === recentSelection.grade &&
+    !resolvedSelection.unit
+  ) {
+    return autoTeacherSelected
+      ? `${schoolName}의 선생님 ${teacherName}님을 자동 선택했고 최근 학습한 ${resolvedSelection.grade}학년을 불러왔습니다. 단원은 다시 선택해 주세요.`
+      : `${teacherName} 선생님의 최근 학습한 ${resolvedSelection.grade}학년을 불러왔습니다. 단원은 다시 선택해 주세요.`;
+  }
+
+  if (autoTeacherSelected && schoolName) {
+    return `${schoolName}의 선생님 ${teacherName}님을 자동 선택했습니다.`;
+  }
+
+  return "";
+}
 
 export function useStudentSetLoader({ formatErrorMessage }) {
   const [schoolQuery, setSchoolQuery] = useState("");
@@ -39,6 +96,45 @@ export function useStudentSetLoader({ formatErrorMessage }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+
+  function readRecentSelectionFromStorage(schoolId, teacherUserId) {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    try {
+      return readStudentRecentSelection(
+        window.localStorage.getItem(STUDENT_RECENT_SELECTION_STORAGE_KEY),
+        { schoolId, teacherUserId },
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  function writeRecentSelectionToStorage({ schoolId, teacherUserId, grade, unit }) {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const nextValue = upsertStudentRecentSelection(
+        window.localStorage.getItem(STUDENT_RECENT_SELECTION_STORAGE_KEY),
+        {
+          schoolId,
+          teacherUserId,
+          grade,
+          unit,
+        },
+      );
+      window.localStorage.setItem(
+        STUDENT_RECENT_SELECTION_STORAGE_KEY,
+        nextValue,
+      );
+    } catch {
+      // localStorage 접근 실패는 학생 선택 흐름을 막지 않습니다.
+    }
+  }
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -162,15 +258,21 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     }
   }
 
-  async function refreshUnits(nextTeacher = selectedTeacher, nextGrade) {
+  async function refreshUnits(
+    nextTeacher = selectedTeacher,
+    nextGrade,
+    { suppressStatus = false } = {},
+  ) {
     if (!isFirebaseConfigured || !nextTeacher?.userId) {
       setUnits([]);
-      return;
+      return [];
     }
 
     setUnitsLoading(true);
     setError("");
-    setStatus("");
+    if (!suppressStatus) {
+      setStatus("");
+    }
 
     try {
       const nextUnits = await listPublishedUnitsForTeacher(
@@ -178,18 +280,59 @@ export function useStudentSetLoader({ formatErrorMessage }) {
         nextGrade,
       );
       setUnits(nextUnits);
-      setStatus(
-        nextUnits.length > 0
-          ? `${nextGrade}학년에서 공개된 ${nextUnits.length}개 단원을 찾았습니다.`
-          : "선택한 학년에서 공개된 단원이 아직 없습니다.",
-      );
+      if (!suppressStatus) {
+        setStatus(getStudentUnitsStatusMessage(nextGrade, nextUnits));
+      }
+      return nextUnits;
     } catch (nextError) {
       setError(
         formatErrorMessage(nextError, "공개 단원 목록을 불러오지 못했습니다."),
       );
+      return [];
     } finally {
       setUnitsLoading(false);
     }
+  }
+
+  async function restoreSelectionForTeacher({
+    school,
+    teacher,
+    autoTeacherSelected = false,
+  }) {
+    const recentSelection = readRecentSelectionFromStorage(
+      school?.id,
+      teacher?.userId,
+    );
+    const seededSelection = resolveStudentRecentSelection({
+      defaultSelection: DEFAULT_STUDENT_SELECTION,
+      recentSelection,
+      availableGrades: STUDENT_GRADE_VALUES,
+      availableUnits: [],
+    });
+
+    setSelection(seededSelection);
+
+    const nextUnits = await refreshUnits(teacher, seededSelection.grade, {
+      suppressStatus: true,
+    });
+    const resolvedSelection = resolveStudentRecentSelection({
+      defaultSelection: DEFAULT_STUDENT_SELECTION,
+      recentSelection,
+      availableGrades: STUDENT_GRADE_VALUES,
+      availableUnits: nextUnits,
+    });
+
+    setSelection(resolvedSelection);
+
+    return (
+      buildRecentSelectionStatus({
+        school,
+        teacher,
+        recentSelection,
+        resolvedSelection,
+        autoTeacherSelected,
+      }) || getStudentUnitsStatusMessage(resolvedSelection.grade, nextUnits)
+    );
   }
 
   async function chooseSchool(school) {
@@ -216,10 +359,12 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       if (nextTeachers.length === 1) {
         const onlyTeacher = nextTeachers[0];
         setSelectedTeacher(onlyTeacher);
-        await refreshUnits(onlyTeacher, DEFAULT_STUDENT_SELECTION.grade);
-        setStatus(
-          `${school.name}의 선생님 ${onlyTeacher.teacherName}님을 자동 선택했습니다.`,
-        );
+        const nextStatus = await restoreSelectionForTeacher({
+          school,
+          teacher: onlyTeacher,
+          autoTeacherSelected: true,
+        });
+        setStatus(nextStatus);
         return;
       }
 
@@ -244,13 +389,16 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     setItems([]);
     resetMatchingState();
     setUnits([]);
-    setSelection((current) => ({
-      ...current,
-      unit: "",
-    }));
+    setSelection(DEFAULT_STUDENT_SELECTION);
+    setStatus("");
+    setError("");
 
-    if (teacher) {
-      await refreshUnits(teacher, selection.grade);
+    if (teacher && selectedSchool) {
+      const nextStatus = await restoreSelectionForTeacher({
+        school: selectedSchool,
+        teacher,
+      });
+      setStatus(nextStatus);
     }
   }
 
@@ -309,6 +457,14 @@ export function useStudentSetLoader({ formatErrorMessage }) {
           ? `${selectedTeacher.teacherName} 선생님의 ${formatSetLabel(selection)} 세트를 불러왔습니다.`
           : "선택한 조건에 공개된 단어가 없습니다.",
       );
+      if (nextItems.length > 0) {
+        writeRecentSelectionToStorage({
+          schoolId: selectedSchool.id,
+          teacherUserId: selectedTeacher.userId,
+          grade: selection.grade,
+          unit: selection.unit,
+        });
+      }
     } catch (nextError) {
       setError(
         formatErrorMessage(nextError, "학생용 단어 세트를 불러오지 못했습니다."),

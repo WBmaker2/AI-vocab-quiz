@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.8",
+    date: "2026-04-12",
+    summary: [
+      "학생이 학교와 선생님을 다시 선택하면 최근에 공부했던 학년과 단원이 자동으로 복원되도록 바꿔, 같은 수업 세트를 더 빠르게 다시 열 수 있게 했습니다.",
+      "최근 선택은 학교와 선생님 기준으로 따로 기억하고, 저장된 단원이 더 이상 없을 때는 학년만 복원한 뒤 단원은 드롭다운에서 다시 고를 수 있게 안전하게 정리했습니다.",
+    ],
+  },
+  {
     version: "v1.10.7",
     date: "2026-04-12",
     summary: [
