@@ -82,6 +82,8 @@ export function GameLeaderboardPanel({
   studentNameDraft,
   onStudentNameDraftChange,
   metrics = {},
+  allowSaving = true,
+  refreshVersion = 0,
 }) {
   const [leaderboards, setLeaderboards] = useState({});
   const [activePeriodType, setActivePeriodType] = useState("week");
@@ -161,7 +163,7 @@ export function GameLeaderboardPanel({
     return () => {
       cancelled = true;
     };
-  }, [canUseLeaderboard, grade, handlers, schoolId]);
+  }, [canUseLeaderboard, grade, handlers, refreshVersion, schoolId]);
 
   useEffect(() => {
     setShowSaveForm(false);
@@ -257,7 +259,7 @@ export function GameLeaderboardPanel({
       <div className="matching-leaderboard-head">
         <div>
           <p className="mode-label">{definition.label} Leaderboard</p>
-          <h4>리더보드에 점수를 등록하시겠습니까?</h4>
+          <h4>{allowSaving ? "리더보드에 점수를 등록하시겠습니까?" : "현재 리더보드"}</h4>
         </div>
         {contextLabel ? (
           <span className="matching-leaderboard-context">{contextLabel}</span>
@@ -278,52 +280,19 @@ export function GameLeaderboardPanel({
 
       {canUseLeaderboard ? (
         <>
-          {!showSaveForm ? (
-            <div className="matching-leaderboard-actions">
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => {
-                  setShowSaveForm(true);
-                  setLeaderboardError("");
-                  setLeaderboardStatus("");
-                }}
-              >
-                네, 등록할게요
-              </button>
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => {
-                  setShowSaveForm(false);
-                  setLeaderboardError("");
-                  setLeaderboardStatus("원할 때 아래 리더보드만 확인할 수 있습니다.");
-                }}
-              >
-                아니요, 이번에는 괜찮아요
-              </button>
-            </div>
-          ) : (
-            <div className="matching-save-form">
-              <label className="matching-save-field">
-                <span>학생 이름</span>
-                <input
-                  type="text"
-                  value={studentNameDraft}
-                  maxLength={20}
-                  placeholder="이름을 입력하세요"
-                  onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
-                  disabled={savingScore}
-                />
-              </label>
+          {allowSaving ? (
+            !showSaveForm ? (
               <div className="matching-leaderboard-actions">
                 <button
-                  className="primary-button"
+                  className="secondary-button"
                   type="button"
-                  onClick={() => void handleSaveScore()}
-                  disabled={savingScore}
+                  onClick={() => {
+                    setShowSaveForm(true);
+                    setLeaderboardError("");
+                    setLeaderboardStatus("");
+                  }}
                 >
-                  {savingScore ? "저장 중..." : "점수 저장"}
+                  네, 등록할게요
                 </button>
                 <button
                   className="ghost-button"
@@ -331,14 +300,49 @@ export function GameLeaderboardPanel({
                   onClick={() => {
                     setShowSaveForm(false);
                     setLeaderboardError("");
+                    setLeaderboardStatus("원할 때 아래 리더보드만 확인할 수 있습니다.");
                   }}
-                  disabled={savingScore}
                 >
-                  취소
+                  아니요, 이번에는 괜찮아요
                 </button>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="matching-save-form">
+                <label className="matching-save-field">
+                  <span>학생 이름</span>
+                  <input
+                    type="text"
+                    value={studentNameDraft}
+                    maxLength={20}
+                    placeholder="이름을 입력하세요"
+                    onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
+                    disabled={savingScore}
+                  />
+                </label>
+                <div className="matching-leaderboard-actions">
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={() => void handleSaveScore()}
+                    disabled={savingScore}
+                  >
+                    {savingScore ? "저장 중..." : "점수 저장"}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => {
+                      setShowSaveForm(false);
+                      setLeaderboardError("");
+                    }}
+                    disabled={savingScore}
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )
+          ) : null}
 
           {leaderboardStatus ? (
             <p className="matching-leaderboard-status">{leaderboardStatus}</p>

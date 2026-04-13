@@ -1,5 +1,8 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
-import { saveStudentProgress } from "../lib/firebase.js";
+import {
+  saveStudentProgress,
+  saveTypingLeaderboardScore,
+} from "../lib/firebase.js";
 import { GameLeaderboardPanel } from "./GameLeaderboardPanel.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { ResultSummary } from "./ResultSummary.jsx";
@@ -15,6 +18,10 @@ import {
   isTypingAnswerCorrect,
   normalizeTypingItems,
 } from "../utils/wordTyping.js";
+import {
+  createCombinedStudentResultStatus,
+  saveCombinedStudentResult,
+} from "../utils/studentResultSave.js";
 
 const ATTEMPT_LIMIT = 3;
 const NEXT_QUESTION_DELAY_MS = 800;
@@ -140,15 +147,22 @@ function TypingResultCard({
   const [progressionComparison, setProgressionComparison] = useState(null);
   const [newlyEarnedBadges, setNewlyEarnedBadges] = useState([]);
   const [progressionStudentName, setProgressionStudentName] = useState("");
+  const [leaderboardRefreshVersion, setLeaderboardRefreshVersion] = useState(0);
 
   const progressionSchoolId = String(progressionContext?.schoolId ?? "").trim();
   const progressionSchoolName = String(progressionContext?.schoolName ?? "").trim();
   const progressionGrade = String(progressionContext?.grade ?? "").trim();
-  const canSaveProgress =
+  const leaderboardSchoolId = String(leaderboardContext?.schoolId ?? "").trim();
+  const leaderboardSchoolName = String(leaderboardContext?.schoolName ?? "").trim();
+  const leaderboardGrade = String(leaderboardContext?.grade ?? "").trim();
+  const canSaveRecords =
     remoteConfigured &&
     progressionSchoolId &&
     progressionSchoolName &&
-    progressionGrade;
+    progressionGrade &&
+    leaderboardSchoolId &&
+    leaderboardSchoolName &&
+    leaderboardGrade;
 
   useEffect(() => {
     setProgressionLoading(false);
@@ -193,18 +207,9 @@ function TypingResultCard({
     }
   }, [progressionStudentName, studentNameDraft]);
 
-  async function handleSaveProgress() {
-    const cleanStudentName = String(studentNameDraft ?? "")
-      .trim()
-      .replace(/\s+/g, " ");
-
-    if (!canSaveProgress) {
+  async function handleSaveRecords() {
+    if (!canSaveRecords) {
       setProgressionError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
-      return;
-    }
-
-    if (!cleanStudentName) {
-      setProgressionError("학생 이름을 입력해 주세요.");
       return;
     }
 
@@ -213,43 +218,71 @@ function TypingResultCard({
     setProgressionStatus("");
 
     try {
-      const saved = await saveStudentProgress({
-        schoolId: progressionSchoolId,
-        schoolName: progressionSchoolName,
-        grade: progressionGrade,
-        studentName: cleanStudentName,
-        activityType: "typing",
-        result: {
-          score,
-          elapsedSeconds,
-          correctCount,
-          questionCount,
-          accuracy,
-          hintUsedCount,
-          bestCombo,
-        },
+      const saved = await saveCombinedStudentResult({
+        studentName: studentNameDraft,
+        saveLeaderboard: (cleanStudentName) =>
+          saveTypingLeaderboardScore({
+            schoolId: leaderboardSchoolId,
+            schoolName: leaderboardSchoolName,
+            grade: leaderboardGrade,
+            studentName: cleanStudentName,
+            score,
+            elapsedSeconds,
+            questionCount,
+            correctCount,
+            accuracy,
+            hintUsedCount,
+            bestCombo,
+          }),
+        saveProgress: (cleanStudentName) =>
+          saveStudentProgress({
+            schoolId: progressionSchoolId,
+            schoolName: progressionSchoolName,
+            grade: progressionGrade,
+            studentName: cleanStudentName,
+            activityType: "typing",
+            result: {
+              score,
+              elapsedSeconds,
+              correctCount,
+              questionCount,
+              accuracy,
+              hintUsedCount,
+              bestCombo,
+            },
+          }),
       });
 
-      onStudentNameDraftChange?.(cleanStudentName);
-      setProgressionStudentName(cleanStudentName);
-      setProgressionComparison(saved.comparison);
-      setNewlyEarnedBadges(saved.newlyEarnedBadges ?? []);
+      onStudentNameDraftChange?.(saved.studentName);
+      setLeaderboardRefreshVersion((current) => current + 1);
+
+      if (saved.progress) {
+        setProgressionStudentName(saved.studentName);
+        setProgressionComparison(saved.progress.comparison);
+        setNewlyEarnedBadges(saved.progress.newlyEarnedBadges ?? []);
+      }
+
       setProgressionStatus(
-        `${cleanStudentName} 학생의 영어 타자 성장 기록을 저장했습니다.`,
+        createCombinedStudentResultStatus({
+          activityLabel: "영어 타자",
+          studentName: saved.studentName,
+          leaderboard: saved.leaderboard,
+          progressSaved: Boolean(saved.progress),
+        }),
       );
     } catch (error) {
-      setProgressionError(error?.message || "개인 기록을 저장하지 못했습니다.");
+      setProgressionError(error?.message || "기록을 저장하지 못했습니다.");
     } finally {
       setProgressionLoading(false);
     }
   }
 
   const progressionDisabledReason = !remoteConfigured
-    ? "Firebase 연결이 없어 이 기기에서는 개인 기록을 저장할 수 없습니다."
-    : !progressionSchoolId || !progressionSchoolName || !progressionGrade
-      ? "학교와 학년을 먼저 선택하면 개인 최고 기록과 배지를 저장할 수 있어요."
+    ? "Firebase 연결이 없어 이 기기에서는 기록을 저장할 수 없습니다."
+    : !canSaveRecords
+      ? "학교와 학년을 먼저 선택하면 개인 최고 기록과 리더보드를 함께 저장할 수 있어요."
       : !String(studentNameDraft ?? "").trim()
-        ? "학생 이름을 입력하면 개인 최고 기록과 배지를 저장할 수 있어요."
+        ? "학생 이름을 입력하면 개인 최고 기록과 리더보드를 함께 저장할 수 있어요."
         : "";
   const hasSavedProgress = Boolean(progressionStudentName);
 
@@ -306,6 +339,62 @@ function TypingResultCard({
             : "모든 문제를 한 번 이상 맞혔습니다. 다음에는 더 빠르게 써 보는 연습을 해 보세요."}
         </p>
 
+        <section className="result-progression-block">
+          <div className="matching-leaderboard-head">
+            <div>
+              <p className="mode-label">Student Progress</p>
+              <h4>개인 최고 기록과 리더보드 점수를 함께 저장할까요?</h4>
+            </div>
+          </div>
+
+          <div className="matching-save-form">
+            <label className="matching-save-field">
+              <span>학생 이름</span>
+              <input
+                type="text"
+                value={studentNameDraft}
+                maxLength={20}
+                placeholder="이름을 입력하세요"
+                onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
+                disabled={progressionLoading || hasSavedProgress}
+              />
+            </label>
+            <div className="matching-leaderboard-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void handleSaveRecords()}
+                disabled={
+                  progressionLoading ||
+                  hasSavedProgress ||
+                  !String(studentNameDraft ?? "").trim()
+                }
+              >
+                {progressionLoading
+                  ? "저장 중..."
+                  : hasSavedProgress
+                    ? "저장 완료"
+                    : "기록 저장"}
+              </button>
+            </div>
+          </div>
+
+          {progressionStatus ? (
+            <p className="matching-leaderboard-status">{progressionStatus}</p>
+          ) : null}
+          {progressionError ? (
+            <p className="matching-leaderboard-error">{progressionError}</p>
+          ) : null}
+
+          <StudentProgressPanel
+            comparison={progressionComparison}
+            newlyEarnedBadges={newlyEarnedBadges}
+            disabledReason={!progressionComparison ? progressionDisabledReason : ""}
+            loading={progressionLoading}
+            title="영어 타자 성장 기록"
+          />
+        </section>
+
         {reviewSummary ? (
           <article className="session-review-summary-card">
             <p className="mode-label">Session Review</p>
@@ -332,62 +421,6 @@ function TypingResultCard({
           </article>
         ) : null}
 
-        <section className="result-progression-block">
-          <div className="matching-leaderboard-head">
-            <div>
-              <p className="mode-label">Student Progress</p>
-              <h4>개인 최고 기록과 배지를 저장할까요?</h4>
-            </div>
-          </div>
-
-          <div className="matching-save-form">
-            <label className="matching-save-field">
-              <span>학생 이름</span>
-              <input
-                type="text"
-                value={studentNameDraft}
-                maxLength={20}
-                placeholder="이름을 입력하세요"
-                onChange={(event) => onStudentNameDraftChange?.(event.target.value)}
-                disabled={progressionLoading || hasSavedProgress}
-              />
-            </label>
-            <div className="matching-leaderboard-actions">
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => void handleSaveProgress()}
-                disabled={
-                  progressionLoading ||
-                  hasSavedProgress ||
-                  !String(studentNameDraft ?? "").trim()
-                }
-              >
-                {progressionLoading
-                  ? "저장 중..."
-                  : hasSavedProgress
-                    ? "저장 완료"
-                    : "개인 기록 저장"}
-              </button>
-            </div>
-          </div>
-
-          {progressionStatus ? (
-            <p className="matching-leaderboard-status">{progressionStatus}</p>
-          ) : null}
-          {progressionError ? (
-            <p className="matching-leaderboard-error">{progressionError}</p>
-          ) : null}
-
-          <StudentProgressPanel
-            comparison={progressionComparison}
-            newlyEarnedBadges={newlyEarnedBadges}
-            disabledReason={!progressionComparison ? progressionDisabledReason : ""}
-            loading={progressionLoading}
-            title="영어 타자 성장 기록"
-          />
-        </section>
-
         <GameLeaderboardPanel
           activityType="typing"
           finalScore={score}
@@ -396,6 +429,8 @@ function TypingResultCard({
           remoteConfigured={remoteConfigured}
           studentNameDraft={studentNameDraft}
           onStudentNameDraftChange={onStudentNameDraftChange}
+          allowSaving={false}
+          refreshVersion={leaderboardRefreshVersion}
           metrics={{
             correctCount,
             questionCount,

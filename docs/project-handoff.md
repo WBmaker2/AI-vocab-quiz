@@ -228,11 +228,24 @@
 
 ## 8. 현재 버전 기준 핵심 상태
 
-- 현재 반영 버전: **v1.10.10**
+- 현재 반영 버전: **v1.10.11**
 - 배포 대상: **Vercel production**
 - 라이브 주소: <https://talking-vacab-quiz.vercel.app>
 
-### 8.1 2026-04-12 작업 기록
+### 8.1 2026-04-13 작업 기록
+
+오늘 한 작업은 아래 2개 축으로 정리됩니다.
+
+1. **결과 화면 기록 저장 흐름 통합**
+   - `단어 짝 맞추기`와 `영어 단어 타자 게임` 결과 화면에서 학생 이름을 한 번만 입력하면 개인 성장 기록과 리더보드 점수를 함께 저장하도록 통합
+   - 공통 저장 흐름은 `src/utils/studentResultSave.js`로 분리해 이름 정규화, 순차 저장, 부분 실패 메시지를 재사용 가능하게 정리
+   - 아래 리더보드 패널은 결과 저장 후 최신 순위가 다시 보이도록 읽기 중심 패널로 전환
+
+2. **오답 복습 카드 위치 조정**
+   - `듣기 / 말하기 / 영어 단어 타자 게임` 결과 화면에서 개인 기록 저장 블록을 먼저 보여주고, 그 아래에 오답 복습 시작 카드를 배치
+   - 학생이 학습 직후 이름 기록과 저장을 마친 뒤 바로 복습을 이어가는 흐름으로 정리
+
+### 8.2 2026-04-12 작업 기록
 
 오늘 한 작업은 아래 6개 축으로 정리됩니다.
 
@@ -269,7 +282,7 @@
    - 말하기는 같은 단어를 여러 번 잘못 인식해도 문제 종료 시점에만 1번 기록되도록 정리
    - 타자는 메인 점수와 복습 정답 수를 분리해 결과 요약이 흔들리지 않도록 phase를 확장
 
-### 8.2 오늘 추가되거나 중요해진 파일
+### 8.3 오늘 추가되거나 중요해진 파일
 
 - `src/utils/appChrome.js`
 - `src/utils/appChrome.test.js`
@@ -279,6 +292,8 @@
 - `src/utils/studentRecentSelection.test.js`
 - `src/utils/sessionReview.js`
 - `src/utils/sessionReview.test.js`
+- `src/utils/studentResultSave.js`
+- `src/utils/studentResultSave.test.js`
 - `src/utils/quiz.test.js`
 - `tests/firestore.rules.test.js`
 - `.github/workflows/ci.yml`

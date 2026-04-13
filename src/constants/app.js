@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.11",
+    date: "2026-04-13",
+    summary: [
+      "단어 짝 맞추기와 영어 타자 결과 화면에서는 학생 이름을 한 번만 입력하고 `기록 저장`을 누르면 개인 성장 기록과 리더보드 점수가 함께 저장되도록 정리했습니다.",
+      "듣기·말하기·영어 타자 결과 화면에서는 개인 기록 저장 영역을 오답 복습 카드보다 위에 배치해, 학습을 마친 뒤 기록 저장을 먼저 하고 바로 아래에서 오답 복습을 이어서 시작할 수 있게 조정했습니다.",
+    ],
+  },
+  {
     version: "v1.10.10",
     date: "2026-04-12",
     summary: [

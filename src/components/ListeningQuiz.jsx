@@ -374,7 +374,6 @@ export function ListeningQuiz({
 
   const progressionContent = (
     <>
-      {reviewCard}
       <section className="result-progression-block">
         <div className="result-progression-form">
           <label className="matching-save-field">
@@ -421,6 +420,7 @@ export function ListeningQuiz({
           title="듣기 성장 기록"
         />
       </section>
+      {reviewCard}
     </>
   );
 

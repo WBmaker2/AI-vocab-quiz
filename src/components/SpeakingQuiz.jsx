@@ -580,7 +580,6 @@ export function SpeakingQuiz({
 
   const progressionContent = (
     <>
-      {reviewCard}
       <section className="result-progression-block">
         <div className="result-progression-form">
           <label className="matching-save-field">
@@ -627,6 +626,7 @@ export function SpeakingQuiz({
           title="말하기 성장 기록"
         />
       </section>
+      {reviewCard}
     </>
   );
 
