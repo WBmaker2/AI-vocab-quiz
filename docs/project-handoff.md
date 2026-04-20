@@ -228,11 +228,20 @@
 
 ## 8. 현재 버전 기준 핵심 상태
 
-- 현재 반영 버전: **v1.10.11**
+- 현재 반영 버전: **v1.10.12**
 - 배포 대상: **Vercel production**
 - 라이브 주소: <https://talking-vacab-quiz.vercel.app>
 
-### 8.1 2026-04-13 작업 기록
+### 8.1 2026-04-20 작업 기록
+
+오늘 한 작업은 아래 1개 축으로 정리됩니다.
+
+1. **듣기 퀴즈 다시 듣기 버튼 안정화**
+   - 메인 듣기 퀴즈의 `다시 듣기` 버튼이 React 클릭 이벤트를 문제 객체처럼 받아 음성이 재생되지 않을 수 있던 원인을 수정
+   - 버튼 클릭 시 현재 문제를 명시적으로 전달하고, 이벤트 객체가 들어와도 현재 문제 단어로 fallback 되도록 `src/utils/listeningQuiz.js`에 안전장치 추가
+   - 회귀 테스트는 `src/utils/listeningQuiz.test.js`에 추가하고 `npm test`에 포함
+
+### 8.2 2026-04-13 작업 기록
 
 오늘 한 작업은 아래 2개 축으로 정리됩니다.
 
@@ -245,7 +254,7 @@
    - `듣기 / 말하기 / 영어 단어 타자 게임` 결과 화면에서 개인 기록 저장 블록을 먼저 보여주고, 그 아래에 오답 복습 시작 카드를 배치
    - 학생이 학습 직후 이름 기록과 저장을 마친 뒤 바로 복습을 이어가는 흐름으로 정리
 
-### 8.2 2026-04-12 작업 기록
+### 8.3 2026-04-12 작업 기록
 
 오늘 한 작업은 아래 6개 축으로 정리됩니다.
 
@@ -282,7 +291,7 @@
    - 말하기는 같은 단어를 여러 번 잘못 인식해도 문제 종료 시점에만 1번 기록되도록 정리
    - 타자는 메인 점수와 복습 정답 수를 분리해 결과 요약이 흔들리지 않도록 phase를 확장
 
-### 8.3 오늘 추가되거나 중요해진 파일
+### 8.4 오늘 추가되거나 중요해진 파일
 
 - `src/utils/appChrome.js`
 - `src/utils/appChrome.test.js`
@@ -292,6 +301,8 @@
 - `src/utils/studentRecentSelection.test.js`
 - `src/utils/sessionReview.js`
 - `src/utils/sessionReview.test.js`
+- `src/utils/listeningQuiz.js`
+- `src/utils/listeningQuiz.test.js`
 - `src/utils/studentResultSave.js`
 - `src/utils/studentResultSave.test.js`
 - `src/utils/quiz.test.js`

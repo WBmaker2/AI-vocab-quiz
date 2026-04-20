@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.12",
+    date: "2026-04-20",
+    summary: [
+      "듣기 퀴즈의 메인 문제 화면에서 `다시 듣기` 버튼이 클릭 이벤트를 단어처럼 받아 음성이 재생되지 않을 수 있던 문제를 수정했습니다.",
+      "다시 듣기 재생 단어를 안전하게 고르는 공통 유틸과 회귀 테스트를 추가해, 자동 재생·메인 다시 듣기·오답 복습 다시 듣기 흐름이 같은 기준으로 동작하도록 정리했습니다.",
+    ],
+  },
+  {
     version: "v1.10.11",
     date: "2026-04-13",
     summary: [

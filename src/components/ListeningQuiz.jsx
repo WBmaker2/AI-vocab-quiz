@@ -5,6 +5,7 @@ import { ResultSummary } from "./ResultSummary.jsx";
 import { ScoreBoard } from "./ScoreBoard.jsx";
 import { StudentProgressPanel } from "./StudentProgressPanel.jsx";
 import { createListeningQuestions } from "../utils/quiz.js";
+import { getListeningAnnouncementWord } from "../utils/listeningQuiz.js";
 import {
   buildSessionReviewItems,
   registerSessionReviewMiss,
@@ -141,12 +142,14 @@ export function ListeningQuiz({
     </article>
   ) : null;
 
-  const announceQuestion = useEffectEvent((targetQuestion = question) => {
-    if (!targetQuestion) {
+  const announceQuestion = useEffectEvent((targetQuestion) => {
+    const announcementWord = getListeningAnnouncementWord(targetQuestion, question);
+
+    if (!announcementWord) {
       return;
     }
 
-    speech.speak(targetQuestion.word, {
+    speech.speak(announcementWord, {
       lang: "en-US",
       rate: 0.9,
     });
@@ -676,7 +679,7 @@ export function ListeningQuiz({
               </div>
               <button
                 className="secondary-button"
-                onClick={announceQuestion}
+                onClick={() => announceQuestion(question)}
                 disabled={!speech.supported}
               >
                 {speech.speaking ? "읽는 중..." : "다시 듣기"}
