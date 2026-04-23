@@ -11,17 +11,11 @@ import {
   registerSessionReviewMiss,
 } from "../utils/sessionReview.js";
 import { isSpeechMatch } from "../utils/normalize.js";
-
-const CONFIGURATION_ERRORS = new Set([
-  "microphone-permission-denied",
-  "microphone-device-missing",
-  "microphone-device-busy",
-  "microphone-access-failed",
-  "speech-recognition-safari-limited",
-  "speech-recognition-service-unavailable",
-  "speech-recognition-network-error",
-  "speech-recognition-start-failed",
-]);
+import {
+  canAdvanceSpeakingQuestion,
+  isSpeakingConfigurationError,
+  shouldCountSpeechRecognitionErrorAsAttempt,
+} from "../utils/speakingAttempts.js";
 
 const SESSION_REVIEW_LIMIT = 3;
 
@@ -202,15 +196,17 @@ export function SpeakingQuiz({
   const isReviewPlaying = reviewPhase === "playing";
   const isReviewComplete = reviewPhase === "complete";
   const isComplete = status === "complete";
-  const canAdvance =
-    status === "correct" ||
-    failedAttempts >= 3 ||
-    Boolean(blockingError);
+  const canAdvance = canAdvanceSpeakingQuestion({
+    status,
+    failedAttempts,
+    blockingError,
+  });
   const isLockedAfterCorrect = status === "correct";
-  const canAdvanceReview =
-    reviewStatus === "correct" ||
-    reviewFailedAttempts >= 3 ||
-    Boolean(reviewBlockingError);
+  const canAdvanceReview = canAdvanceSpeakingQuestion({
+    status: reviewStatus,
+    failedAttempts: reviewFailedAttempts,
+    blockingError: reviewBlockingError,
+  });
   const guidance = getGuidance(recognition.error);
   const reviewGuidance = getGuidance(reviewBlockingError || recognition.error);
   const availableReviewItems = useMemo(
@@ -309,7 +305,7 @@ export function SpeakingQuiz({
       return;
     }
 
-    if (recognition.error === "no-speech") {
+    if (shouldCountSpeechRecognitionErrorAsAttempt(recognition.error)) {
       if (isReviewPlaying) {
         setReviewBlockingError("");
         setReviewFailedAttempts((current) => current + 1);
@@ -323,7 +319,7 @@ export function SpeakingQuiz({
       return;
     }
 
-    if (CONFIGURATION_ERRORS.has(recognition.error)) {
+    if (isSpeakingConfigurationError(recognition.error)) {
       if (isReviewPlaying) {
         setReviewBlockingError(recognition.error);
         setReviewStatus("idle");

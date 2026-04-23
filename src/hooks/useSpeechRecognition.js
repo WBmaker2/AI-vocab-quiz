@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getSpeechRecognitionEndFallbackError } from "../utils/speakingAttempts.js";
 
 function getRecognitionConstructor() {
   if (typeof window === "undefined") {
@@ -100,6 +101,9 @@ export function useSpeechRecognition(config = {}) {
   const recognitionRef = useRef(null);
   const browserNameRef = useRef(detectBrowserName());
   const microphoneStateRef = useRef("unknown");
+  const stopRequestedRef = useRef(false);
+  const resultReceivedRef = useRef(false);
+  const errorReceivedRef = useRef(false);
   const [supported, setSupported] = useState(isSpeechRecognitionSupported());
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -166,17 +170,37 @@ export function useSpeechRecognition(config = {}) {
     recognition.continuous = config.continuous ?? false;
 
     recognition.onstart = () => {
+      stopRequestedRef.current = false;
+      resultReceivedRef.current = false;
+      errorReceivedRef.current = false;
       setListening(true);
       setError("");
     };
 
     recognition.onend = () => {
       setListening(false);
+      const fallbackError = getSpeechRecognitionEndFallbackError({
+        stopRequested: stopRequestedRef.current,
+        resultReceived: resultReceivedRef.current,
+        errorReceived: errorReceivedRef.current,
+      });
+
+      if (fallbackError) {
+        errorReceivedRef.current = true;
+        setError(fallbackError);
+      }
     };
 
     recognition.onerror = (event) => {
+      errorReceivedRef.current = true;
       setListening(false);
       void resolveRecognitionError(event.error);
+    };
+
+    recognition.onnomatch = () => {
+      errorReceivedRef.current = true;
+      setListening(false);
+      setError("no-match");
     };
 
     recognition.onresult = (event) => {
@@ -186,6 +210,7 @@ export function useSpeechRecognition(config = {}) {
         .join(" ")
         .trim();
 
+      resultReceivedRef.current = Boolean(value);
       setTranscript(value);
       config.onResult?.(value, event);
     };
@@ -196,7 +221,9 @@ export function useSpeechRecognition(config = {}) {
       recognition.onstart = null;
       recognition.onend = null;
       recognition.onerror = null;
+      recognition.onnomatch = null;
       recognition.onresult = null;
+      stopRequestedRef.current = true;
       recognition.stop();
       recognitionRef.current = null;
     };
@@ -216,6 +243,9 @@ export function useSpeechRecognition(config = {}) {
 
     try {
       microphoneStateRef.current = "unknown";
+      stopRequestedRef.current = false;
+      resultReceivedRef.current = false;
+      errorReceivedRef.current = false;
       setMicrophoneState("unknown");
       setTranscript("");
       setError("");
@@ -229,6 +259,7 @@ export function useSpeechRecognition(config = {}) {
 
   function stop() {
     try {
+      stopRequestedRef.current = true;
       recognitionRef.current?.stop();
     } catch {
       setError("speech-recognition-stop-failed");

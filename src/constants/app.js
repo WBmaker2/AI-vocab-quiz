@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.10.13",
+    date: "2026-04-23",
+    summary: [
+      "말하기 퀴즈에서 발음 오답과 음성인식 실패 횟수를 하나의 실패 시도 카운터로 합산해, 총 3회 실패하면 `다음 단어` 버튼이 안정적으로 활성화되도록 수정했습니다.",
+      "`no-speech`뿐 아니라 결과 없이 종료된 음성인식, `no-match`, `aborted` 같은 재시도 가능한 STT 실패도 실패 시도 1회로 계산하도록 공통 규칙과 회귀 테스트를 추가했습니다.",
+    ],
+  },
+  {
     version: "v1.10.12",
     date: "2026-04-20",
     summary: [
