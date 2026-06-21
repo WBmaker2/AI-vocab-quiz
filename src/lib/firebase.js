@@ -32,7 +32,7 @@ import {
   normalizeStudentName,
   normalizeStudentNameKey,
   pickBetterMatchingLeaderboardEntry,
-} from "../utils/leaderboard";
+} from "../utils/leaderboard.js";
 import { normalizeActivityLeaderboardType } from "../utils/activityLeaderboard.js";
 import { BADGE_IDS } from "../constants/badges.js";
 import {
@@ -61,7 +61,7 @@ import {
 } from "../utils/bingo.js";
 
 function getEnvValue(name) {
-  return String(import.meta.env[name] ?? "").trim();
+  return String(import.meta.env?.[name] ?? "").trim();
 }
 
 const firebaseConfig = {
@@ -686,6 +686,29 @@ function pickBetterTypingLeaderboardEntry(left, right) {
   return left;
 }
 
+export function shouldReplaceElapsedLeaderboardEntry({
+  nextScore,
+  nextElapsedSeconds,
+  existingScore,
+  existingElapsedSeconds,
+}) {
+  const cleanNextScore = Number(nextScore ?? 0);
+  const cleanExistingScore = Number(existingScore ?? 0);
+
+  if (cleanNextScore !== cleanExistingScore) {
+    return cleanNextScore > cleanExistingScore;
+  }
+
+  const cleanNextElapsedSeconds = Number(
+    nextElapsedSeconds ?? Number.POSITIVE_INFINITY,
+  );
+  const cleanExistingElapsedSeconds = Number(
+    existingElapsedSeconds ?? Number.POSITIVE_INFINITY,
+  );
+
+  return cleanNextElapsedSeconds < cleanExistingElapsedSeconds;
+}
+
 async function upsertMatchingLeaderboardPeriod({
   firestore,
   schoolId,
@@ -737,8 +760,17 @@ async function upsertMatchingLeaderboardPeriod({
     }
 
     const existingScore = Number(snapshot.data().score ?? 0);
+    const existingElapsedSeconds = Number(
+      snapshot.data().elapsedSeconds ?? Number.POSITIVE_INFINITY,
+    );
+    const shouldUpdate = shouldReplaceElapsedLeaderboardEntry({
+      nextScore: payload.score,
+      nextElapsedSeconds: payload.elapsedSeconds,
+      existingScore,
+      existingElapsedSeconds,
+    });
 
-    if (payload.score > existingScore) {
+    if (shouldUpdate) {
       transaction.update(leaderboardRef, {
         score: payload.score,
         elapsedSeconds: payload.elapsedSeconds,
@@ -807,8 +839,17 @@ async function upsertFishingLeaderboardPeriod({
     }
 
     const existingScore = Number(snapshot.data().score ?? 0);
+    const existingElapsedSeconds = Number(
+      snapshot.data().elapsedSeconds ?? Number.POSITIVE_INFINITY,
+    );
+    const shouldUpdate = shouldReplaceElapsedLeaderboardEntry({
+      nextScore: payload.score,
+      nextElapsedSeconds: payload.elapsedSeconds,
+      existingScore,
+      existingElapsedSeconds,
+    });
 
-    if (payload.score > existingScore) {
+    if (shouldUpdate) {
       transaction.update(leaderboardRef, {
         score: payload.score,
         elapsedSeconds: payload.elapsedSeconds,

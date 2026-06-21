@@ -10,6 +10,7 @@ import {
   calculateMatchingScore,
   createMatchingGameState,
   formatElapsedSeconds,
+  isMatchingCompleteAfterMatch,
 } from "../utils/quiz.js";
 import {
   createCombinedStudentResultStatus,
@@ -302,6 +303,7 @@ export function WordMatchingGame({
         }
 
         const nextState = advanceMatchingBoard({
+          totalPairs: current.totalPairs,
           leftCards: current.leftCards,
           rightCards: current.rightCards,
           remainingPairs: current.remainingPairs,
@@ -403,6 +405,10 @@ export function WordMatchingGame({
     }
 
     if (meaningCard.pairId === wordCard.pairId) {
+      const matchCompletesGame = isMatchingCompleteAfterMatch({
+        solvedPairs,
+        totalPairs: gameState.totalPairs,
+      });
       const matchEntry = {
         id: crypto.randomUUID(),
         leftSlotId: meaningCard.slotId,
@@ -414,7 +420,13 @@ export function WordMatchingGame({
       setSelectedMeaningSlotId("");
       setSelectedWordSlotId("");
       void celebration?.playSuccess?.();
-      scheduleMatchedPairRemoval(matchEntry);
+
+      if (matchCompletesGame) {
+        clearPendingMatchTimeouts();
+        setIsComplete(true);
+      } else {
+        scheduleMatchedPairRemoval(matchEntry);
+      }
 
       return undefined;
     }
@@ -429,9 +441,11 @@ export function WordMatchingGame({
     gameState.leftCards,
     gameState.remainingPairs,
     gameState.rightCards,
+    gameState.totalPairs,
     mismatchPair,
     selectedMeaningSlotId,
     selectedWordSlotId,
+    solvedPairs,
   ]);
 
   useEffect(() => {

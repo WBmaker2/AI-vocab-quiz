@@ -109,6 +109,7 @@ export function createMatchingGameState(items, visiblePairCount = 5) {
 }
 
 export function advanceMatchingBoard({
+  totalPairs,
   leftCards,
   rightCards,
   remainingPairs,
@@ -129,6 +130,7 @@ export function advanceMatchingBoard({
   }
 
   return {
+    totalPairs,
     leftCards: nextLeftCards,
     rightCards: nextRightCards,
     remainingPairs: nextRemainingPairs,
@@ -154,4 +156,11 @@ export function formatElapsedSeconds(totalSeconds) {
 
 export function calculateMatchingScore({ solvedPairs, elapsedSeconds }) {
   return Math.max(0, solvedPairs * 100 - Math.floor(elapsedSeconds));
+}
+
+export function isMatchingCompleteAfterMatch({ solvedPairs, totalPairs }) {
+  const safeSolvedPairs = Math.max(0, Math.floor(Number(solvedPairs) || 0));
+  const safeTotalPairs = Math.max(0, Math.floor(Number(totalPairs) || 0));
+
+  return safeTotalPairs > 0 && safeSolvedPairs + 1 >= safeTotalPairs;
 }

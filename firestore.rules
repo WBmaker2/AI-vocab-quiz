@@ -152,51 +152,82 @@ service cloud.firestore {
         ) == 1;
     }
 
-    function isTypingProfileBestBundleUnchanged() {
-      return request.resource.data.typingBestScore
-          == studentProfileNumber(resource.data, 'typingBestScore')
-        && request.resource.data.typingBestCorrectCount
-          == studentProfileNumber(resource.data, 'typingBestCorrectCount')
-        && request.resource.data.typingBestAccuracy
-          == studentProfileNumber(resource.data, 'typingBestAccuracy')
-        && request.resource.data.typingBestQuestionCount
-          == studentProfileNumber(resource.data, 'typingBestQuestionCount')
-        && request.resource.data.typingBestHintUsedCount
-          == studentProfileNumber(resource.data, 'typingBestHintUsedCount')
-        && request.resource.data.typingBestCombo
-          == studentProfileNumber(resource.data, 'typingBestCombo')
-        && request.resource.data.typingBestElapsedSeconds
-          == studentProfileNumber(resource.data, 'typingBestElapsedSeconds');
+    function isMatchingProfileBestImprovement() {
+      return request.resource.data.matchingSessions == resource.data.matchingSessions + 1
+        && (
+          request.resource.data.matchingBestScore > resource.data.matchingBestScore
+          || (
+            request.resource.data.matchingBestScore == resource.data.matchingBestScore
+            && (
+              (
+                resource.data.matchingSessions == 0
+                && request.resource.data.matchingSessions == resource.data.matchingSessions + 1
+              )
+              || request.resource.data.matchingBestTime <= resource.data.matchingBestTime
+            )
+          )
+        );
+    }
+
+    function isMatchingProfileBestUnchanged() {
+      return request.resource.data.matchingBestScore == resource.data.matchingBestScore
+        && request.resource.data.matchingBestTime == resource.data.matchingBestTime;
+    }
+
+    function isMatchingProfileBestUpdateAllowed() {
+      return request.resource.data.matchingSessions == resource.data.matchingSessions
+        ? isMatchingProfileBestUnchanged()
+        : isMatchingProfileBestImprovement();
+    }
+
+    function isFirstTypingProfileSessionAdvance() {
+      return studentProfileNumber(resource.data, 'typingSessions') == 0
+        && request.resource.data.typingSessions == 1;
+    }
+
+    function isTypingProfileBestImprovementAfterBaseline() {
+      let previousScore = studentProfileNumber(resource.data, 'typingBestScore');
+      let previousCorrectCount = studentProfileNumber(resource.data, 'typingBestCorrectCount');
+      let previousAccuracy = studentProfileNumber(resource.data, 'typingBestAccuracy');
+      let previousQuestionCount = studentProfileNumber(resource.data, 'typingBestQuestionCount');
+      let previousHintUsedCount = studentProfileNumber(resource.data, 'typingBestHintUsedCount');
+      let previousCombo = studentProfileNumber(resource.data, 'typingBestCombo');
+      let previousElapsedSeconds = studentProfileNumber(resource.data, 'typingBestElapsedSeconds');
+      return (
+          request.resource.data.typingBestScore == previousScore
+          && request.resource.data.typingBestCorrectCount == previousCorrectCount
+          && request.resource.data.typingBestAccuracy == previousAccuracy
+          && request.resource.data.typingBestQuestionCount == previousQuestionCount
+          && request.resource.data.typingBestHintUsedCount == previousHintUsedCount
+          && request.resource.data.typingBestCombo == previousCombo
+          && request.resource.data.typingBestElapsedSeconds == previousElapsedSeconds
+        )
+        || request.resource.data.typingBestScore > previousScore
+        || (
+          request.resource.data.typingBestScore == previousScore
+          && request.resource.data.typingBestAccuracy > previousAccuracy
+        )
+        || (
+          request.resource.data.typingBestScore == previousScore
+          && request.resource.data.typingBestAccuracy == previousAccuracy
+          && (
+            previousElapsedSeconds == 0
+            ? request.resource.data.typingBestElapsedSeconds > 0
+            : request.resource.data.typingBestElapsedSeconds
+              < previousElapsedSeconds
+          )
+        )
+        || (
+          request.resource.data.typingBestScore == previousScore
+          && request.resource.data.typingBestAccuracy == previousAccuracy
+          && request.resource.data.typingBestElapsedSeconds == previousElapsedSeconds
+          && request.resource.data.typingBestCombo > previousCombo
+        );
     }
 
     function isTypingProfileBestImprovement() {
-      return isTypingProfileBestBundleUnchanged()
-        || request.resource.data.typingBestScore
-          > studentProfileNumber(resource.data, 'typingBestScore')
-        || (
-          request.resource.data.typingBestScore
-            == studentProfileNumber(resource.data, 'typingBestScore')
-          && request.resource.data.typingBestAccuracy
-            > studentProfileNumber(resource.data, 'typingBestAccuracy')
-        )
-        || (
-          request.resource.data.typingBestScore
-            == studentProfileNumber(resource.data, 'typingBestScore')
-          && request.resource.data.typingBestAccuracy
-            == studentProfileNumber(resource.data, 'typingBestAccuracy')
-          && request.resource.data.typingBestElapsedSeconds
-            < studentProfileNumber(resource.data, 'typingBestElapsedSeconds')
-        )
-        || (
-          request.resource.data.typingBestScore
-            == studentProfileNumber(resource.data, 'typingBestScore')
-          && request.resource.data.typingBestAccuracy
-            == studentProfileNumber(resource.data, 'typingBestAccuracy')
-          && request.resource.data.typingBestElapsedSeconds
-            == studentProfileNumber(resource.data, 'typingBestElapsedSeconds')
-          && request.resource.data.typingBestCombo
-            > studentProfileNumber(resource.data, 'typingBestCombo')
-        );
+      return isFirstTypingProfileSessionAdvance()
+        || isTypingProfileBestImprovementAfterBaseline();
     }
 
     function isMatchingLeaderboardScopeKey(scopeKey, schoolId, grade, periodType, periodKey) {
@@ -447,6 +478,14 @@ service cloud.firestore {
         );
     }
 
+    function isLeaderboardTiedScoreFasterElapsed() {
+      return request.resource.data.score > resource.data.score
+        || (
+          request.resource.data.score == resource.data.score
+          && request.resource.data.elapsedSeconds < resource.data.elapsedSeconds
+        );
+    }
+
     match /schools/{schoolId} {
       allow read: if true;
       allow create: if isSignedIn()
@@ -487,7 +526,8 @@ service cloud.firestore {
         && request.resource.data.totalSessions == 1
         && isStudentProfileFirstSessionShape(request.resource.data);
 
-      allow update: if isStudentProfileWrite(profileId)
+      allow update: if isMatchingProfileBestUpdateAllowed()
+        && isStudentProfileWrite(profileId)
         && resource.data.schoolId == request.resource.data.schoolId
         && resource.data.grade == request.resource.data.grade
         && resource.data.studentNameNormalized == request.resource.data.studentNameNormalized
@@ -498,11 +538,6 @@ service cloud.firestore {
         && request.resource.data.listeningBestCorrectCount >= resource.data.listeningBestCorrectCount
         && request.resource.data.speakingBestScore >= resource.data.speakingBestScore
         && request.resource.data.speakingBestCorrectCount >= resource.data.speakingBestCorrectCount
-        && request.resource.data.matchingBestScore >= resource.data.matchingBestScore
-        && (
-          request.resource.data.matchingBestScore > resource.data.matchingBestScore
-          || request.resource.data.matchingBestTime <= resource.data.matchingBestTime
-        )
         && isTypingProfileBestImprovement()
         && request.resource.data.typingBestElapsedSeconds >= 0
         && (request.resource.data.typingLastPlayedAt == null || request.resource.data.typingLastPlayedAt is timestamp)
@@ -574,7 +609,7 @@ service cloud.firestore {
           && resource.data.studentNameNormalized == request.resource.data.studentNameNormalized
           && resource.data.periodType == request.resource.data.periodType
           && resource.data.periodKey == request.resource.data.periodKey
-          && request.resource.data.score > resource.data.score;
+          && isLeaderboardTiedScoreFasterElapsed();
 
         allow update: if isMatchingLeaderboardTeacherUpdate(studentKey)
           && scopeKey == request.resource.data.scopeKey
@@ -609,7 +644,7 @@ service cloud.firestore {
           && resource.data.studentNameNormalized == request.resource.data.studentNameNormalized
           && resource.data.periodType == request.resource.data.periodType
           && resource.data.periodKey == request.resource.data.periodKey
-          && request.resource.data.score > resource.data.score;
+          && isLeaderboardTiedScoreFasterElapsed();
 
         allow update: if isFishingLeaderboardTeacherUpdate(studentKey)
           && scopeKey == request.resource.data.scopeKey
@@ -656,6 +691,10 @@ service cloud.firestore {
 
     function bingoSessionDoc(sessionId) {
       return get(/databases/$(database)/documents/bingoSessions/$(sessionId));
+    }
+
+    function bingoSessionActiveWordId(sessionId) {
+      return bingoSessionDoc(sessionId).data.activeWordId;
     }
 
     function bingoSessionExists(sessionId) {
@@ -843,55 +882,648 @@ service cloud.firestore {
         && data.setupCompletedAt == null;
     }
 
-    function isBingoPlayerMarkedUpdateDocument(data) {
-      return isBingoPlayerCommonKeys(data)
-        && data.setupStatus == 'ready'
-        && data.boardWordIds.size() == data.boardSize * data.boardSize
-        && data.completedLineKeys.size() == data.bingoLines
-        && data.hasBingo == (data.bingoLines >= 3);
+    function isBingoPlayerSetupCreateDocument3(boardCells) {
+      return boardCells[0].wordId == ""
+        && boardCells[0].word == ""
+        && boardCells[1].wordId == ""
+        && boardCells[1].word == ""
+        && boardCells[2].wordId == ""
+        && boardCells[2].word == ""
+        && boardCells[3].wordId == ""
+        && boardCells[3].word == ""
+        && boardCells[4].wordId == ""
+        && boardCells[4].word == ""
+        && boardCells[5].wordId == ""
+        && boardCells[5].word == ""
+        && boardCells[6].wordId == ""
+        && boardCells[6].word == ""
+        && boardCells[7].wordId == ""
+        && boardCells[7].word == ""
+        && boardCells[8].wordId == ""
+        && boardCells[8].word == "";
     }
 
-    function isBingoPlayerDocument(data) {
-      return isBingoPlayerSetupDraftDocument(data) || isBingoPlayerMarkedUpdateDocument(data);
+    function isBingoPlayerSetupCreateDocument4(boardCells) {
+      return isBingoPlayerSetupCreateDocument3(boardCells)
+        && boardCells[9].wordId == ""
+        && boardCells[9].word == ""
+        && boardCells[10].wordId == ""
+        && boardCells[10].word == ""
+        && boardCells[11].wordId == ""
+        && boardCells[11].word == ""
+        && boardCells[12].wordId == ""
+        && boardCells[12].word == ""
+        && boardCells[13].wordId == ""
+        && boardCells[13].word == ""
+        && boardCells[14].wordId == ""
+        && boardCells[14].word == ""
+        && boardCells[15].wordId == ""
+        && boardCells[15].word == "";
     }
 
-    function bingoCellMarked(boardCells, markedWordIds, index) {
-      return boardCells[index].wordId is string
-        && markedWordIds.hasAny([boardCells[index].wordId]);
+    function isBingoPlayerSetupCreateDocument(boardCells, boardSize) {
+      return boardSize == 3
+        ? isBingoPlayerSetupCreateDocument3(boardCells)
+        : boardSize == 4
+          ? isBingoPlayerSetupCreateDocument4(boardCells)
+          : false;
     }
 
-    function bingoLineCount3(boardCells, markedWordIds) {
-      return (
-        (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 1) && bingoCellMarked(boardCells, markedWordIds, 2) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 3) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 5) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 6) && bingoCellMarked(boardCells, markedWordIds, 7) && bingoCellMarked(boardCells, markedWordIds, 8) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 3) && bingoCellMarked(boardCells, markedWordIds, 6) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 1) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 7) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 2) && bingoCellMarked(boardCells, markedWordIds, 5) && bingoCellMarked(boardCells, markedWordIds, 8) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 8) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 2) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 6) ? 1 : 0)
-      );
+    function isBingoPlayerCreateDocument(data) {
+      return isBingoPlayerSetupDraftDocument(data)
+        && data.boardWordIds.size() == 0
+        && data.boardCells.size() == data.boardSize * data.boardSize
+        && isBingoPlayerSetupCreateDocument(data.boardCells, data.boardSize);
     }
 
-    function bingoLineCount4(boardCells, markedWordIds) {
-      return (
-        (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 1) && bingoCellMarked(boardCells, markedWordIds, 2) && bingoCellMarked(boardCells, markedWordIds, 3) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 5) && bingoCellMarked(boardCells, markedWordIds, 6) && bingoCellMarked(boardCells, markedWordIds, 7) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 8) && bingoCellMarked(boardCells, markedWordIds, 9) && bingoCellMarked(boardCells, markedWordIds, 10) && bingoCellMarked(boardCells, markedWordIds, 11) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 12) && bingoCellMarked(boardCells, markedWordIds, 13) && bingoCellMarked(boardCells, markedWordIds, 14) && bingoCellMarked(boardCells, markedWordIds, 15) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 4) && bingoCellMarked(boardCells, markedWordIds, 8) && bingoCellMarked(boardCells, markedWordIds, 12) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 1) && bingoCellMarked(boardCells, markedWordIds, 5) && bingoCellMarked(boardCells, markedWordIds, 9) && bingoCellMarked(boardCells, markedWordIds, 13) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 2) && bingoCellMarked(boardCells, markedWordIds, 6) && bingoCellMarked(boardCells, markedWordIds, 10) && bingoCellMarked(boardCells, markedWordIds, 14) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 3) && bingoCellMarked(boardCells, markedWordIds, 7) && bingoCellMarked(boardCells, markedWordIds, 11) && bingoCellMarked(boardCells, markedWordIds, 15) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 0) && bingoCellMarked(boardCells, markedWordIds, 5) && bingoCellMarked(boardCells, markedWordIds, 10) && bingoCellMarked(boardCells, markedWordIds, 15) ? 1 : 0)
-        + (bingoCellMarked(boardCells, markedWordIds, 3) && bingoCellMarked(boardCells, markedWordIds, 6) && bingoCellMarked(boardCells, markedWordIds, 9) && bingoCellMarked(boardCells, markedWordIds, 12) ? 1 : 0)
-      );
+    function isBingoAvailableWordData(word) {
+      return word is map
+        && word.id is string
+        && word.id.size() > 0;
     }
 
-    function bingoLineCount(boardCells, markedWordIds, boardSize) {
-      return boardSize == 3 ? bingoLineCount3(boardCells, markedWordIds)
-        : boardSize == 4 ? bingoLineCount4(boardCells, markedWordIds)
-        : 0;
+    function isBingoAvailableWordDataByBoardSize3(availableWords) {
+      return availableWords.size() >= 9
+        && isBingoAvailableWordData(availableWords[0])
+        && isBingoAvailableWordData(availableWords[1])
+        && isBingoAvailableWordData(availableWords[2])
+        && isBingoAvailableWordData(availableWords[3])
+        && isBingoAvailableWordData(availableWords[4])
+        && isBingoAvailableWordData(availableWords[5])
+        && isBingoAvailableWordData(availableWords[6])
+        && isBingoAvailableWordData(availableWords[7])
+        && isBingoAvailableWordData(availableWords[8]);
+    }
+
+    function isBingoAvailableWordDataByBoardSize4(availableWords) {
+      return availableWords.size() >= 16
+        && isBingoAvailableWordData(availableWords[0])
+        && isBingoAvailableWordData(availableWords[1])
+        && isBingoAvailableWordData(availableWords[2])
+        && isBingoAvailableWordData(availableWords[3])
+        && isBingoAvailableWordData(availableWords[4])
+        && isBingoAvailableWordData(availableWords[5])
+        && isBingoAvailableWordData(availableWords[6])
+        && isBingoAvailableWordData(availableWords[7])
+        && isBingoAvailableWordData(availableWords[8])
+        && isBingoAvailableWordData(availableWords[9])
+        && isBingoAvailableWordData(availableWords[10])
+        && isBingoAvailableWordData(availableWords[11])
+        && isBingoAvailableWordData(availableWords[12])
+        && isBingoAvailableWordData(availableWords[13])
+        && isBingoAvailableWordData(availableWords[14])
+        && isBingoAvailableWordData(availableWords[15]);
+    }
+
+    function isBingoAvailableWordDataByBoardSize(availableWords, boardSize) {
+      return boardSize == 3
+        ? isBingoAvailableWordDataByBoardSize3(availableWords)
+        : boardSize == 4
+          ? isBingoAvailableWordDataByBoardSize4(availableWords)
+          : false;
+    }
+
+    function isBingoAvailableWordIdsUniqueByBoardSize3(availableWords) {
+      return [
+          availableWords[0].id,
+          availableWords[1].id,
+          availableWords[2].id,
+          availableWords[3].id,
+          availableWords[4].id,
+          availableWords[5].id,
+          availableWords[6].id,
+          availableWords[7].id,
+          availableWords[8].id,
+        ].toSet().size() == 9;
+    }
+
+    function isBingoAvailableWordIdsUniqueByBoardSize4(availableWords) {
+      return [
+          availableWords[0].id,
+          availableWords[1].id,
+          availableWords[2].id,
+          availableWords[3].id,
+          availableWords[4].id,
+          availableWords[5].id,
+          availableWords[6].id,
+          availableWords[7].id,
+          availableWords[8].id,
+          availableWords[9].id,
+          availableWords[10].id,
+          availableWords[11].id,
+          availableWords[12].id,
+          availableWords[13].id,
+          availableWords[14].id,
+          availableWords[15].id,
+        ].toSet().size() == 16;
+    }
+
+    function isBingoAvailableWordIdsUniqueByBoardSize(availableWords, boardSize) {
+      return boardSize == 3
+        ? isBingoAvailableWordIdsUniqueByBoardSize3(availableWords)
+        : boardSize == 4
+          ? isBingoAvailableWordIdsUniqueByBoardSize4(availableWords)
+          : false;
+    }
+
+    function isBingoPlayerAvailableWordsAllowedBySession(availableWords, sessionVocabularyItems, boardSize) {
+      return availableWords.size() == boardSize * boardSize
+        && isBingoAvailableWordIdsUniqueByBoardSize(availableWords, boardSize)
+        && availableWords.hasOnly(sessionVocabularyItems);
+    }
+
+    function isBingoPlayerBoardWordIdsAllowedByBoardSize3(boardWordIds, availableWords) {
+      return availableWords.size() >= 9
+        && boardWordIds.hasOnly([
+          availableWords[0].id,
+          availableWords[1].id,
+          availableWords[2].id,
+          availableWords[3].id,
+          availableWords[4].id,
+          availableWords[5].id,
+          availableWords[6].id,
+          availableWords[7].id,
+          availableWords[8].id,
+        ]);
+    }
+
+    function isBingoPlayerAvailableWordIdsMatchBoardSize3(boardWordIds, availableWords) {
+      return boardWordIds.size() == 9
+        && boardWordIds.hasAll([
+          availableWords[0].id,
+          availableWords[1].id,
+          availableWords[2].id,
+          availableWords[3].id,
+          availableWords[4].id,
+          availableWords[5].id,
+          availableWords[6].id,
+          availableWords[7].id,
+          availableWords[8].id,
+        ]);
+    }
+
+    function isBingoPlayerBoardWordIdsAllowedByBoardSize4(boardWordIds, availableWords) {
+      return availableWords.size() >= 16
+        && boardWordIds.hasOnly([
+          availableWords[0].id,
+          availableWords[1].id,
+          availableWords[2].id,
+          availableWords[3].id,
+          availableWords[4].id,
+          availableWords[5].id,
+          availableWords[6].id,
+          availableWords[7].id,
+          availableWords[8].id,
+          availableWords[9].id,
+          availableWords[10].id,
+          availableWords[11].id,
+          availableWords[12].id,
+          availableWords[13].id,
+          availableWords[14].id,
+          availableWords[15].id,
+        ]);
+    }
+
+    function isBingoPlayerAvailableWordIdsMatchBoardSize4(boardWordIds, availableWords) {
+      return boardWordIds.size() == 16
+        && boardWordIds.hasAll([
+          availableWords[0].id,
+          availableWords[1].id,
+          availableWords[2].id,
+          availableWords[3].id,
+          availableWords[4].id,
+          availableWords[5].id,
+          availableWords[6].id,
+          availableWords[7].id,
+          availableWords[8].id,
+          availableWords[9].id,
+          availableWords[10].id,
+          availableWords[11].id,
+          availableWords[12].id,
+          availableWords[13].id,
+          availableWords[14].id,
+          availableWords[15].id
+        ]);
+    }
+
+    function isBingoPlayerBoardWordIdsMatchAvailableByBoardSize(boardWordIds, availableWords, boardSize) {
+      return boardSize == 3
+        ? isBingoPlayerAvailableWordIdsMatchBoardSize3(boardWordIds, availableWords)
+        : boardSize == 4
+          ? isBingoPlayerAvailableWordIdsMatchBoardSize4(boardWordIds, availableWords)
+          : false;
+    }
+
+    function isBingoPlayerBoardWordIdsAllowedByBoardSize(boardWordIds, availableWords, boardSize) {
+      return boardSize == 3
+        ? isBingoPlayerBoardWordIdsAllowedByBoardSize3(boardWordIds, availableWords)
+        : boardSize == 4
+          ? isBingoPlayerBoardWordIdsAllowedByBoardSize4(boardWordIds, availableWords)
+          : false;
+    }
+
+    function isBingoBoardCellsMatchBoardWordIds3(boardCells, boardWordIds) {
+      return boardCells[0] is map
+        && boardCells[0].wordId is string
+        && boardWordIds[0] == boardCells[0].wordId
+        && boardCells[1] is map
+        && boardCells[1].wordId is string
+        && boardWordIds[1] == boardCells[1].wordId
+        && boardCells[2] is map
+        && boardCells[2].wordId is string
+        && boardWordIds[2] == boardCells[2].wordId
+        && boardCells[3] is map
+        && boardCells[3].wordId is string
+        && boardWordIds[3] == boardCells[3].wordId
+        && boardCells[4] is map
+        && boardCells[4].wordId is string
+        && boardWordIds[4] == boardCells[4].wordId
+        && boardCells[5] is map
+        && boardCells[5].wordId is string
+        && boardWordIds[5] == boardCells[5].wordId
+        && boardCells[6] is map
+        && boardCells[6].wordId is string
+        && boardWordIds[6] == boardCells[6].wordId
+        && boardCells[7] is map
+        && boardCells[7].wordId is string
+        && boardWordIds[7] == boardCells[7].wordId
+        && boardCells[8] is map
+        && boardCells[8].wordId is string
+        && boardWordIds[8] == boardCells[8].wordId;
+    }
+
+    function isBingoBoardCellsMatchBoardWordIds4(boardCells, boardWordIds) {
+      return boardCells[0] is map
+        && boardCells[0].wordId is string
+        && boardWordIds[0] == boardCells[0].wordId
+        && boardCells[1] is map
+        && boardCells[1].wordId is string
+        && boardWordIds[1] == boardCells[1].wordId
+        && boardCells[2] is map
+        && boardCells[2].wordId is string
+        && boardWordIds[2] == boardCells[2].wordId
+        && boardCells[3] is map
+        && boardCells[3].wordId is string
+        && boardWordIds[3] == boardCells[3].wordId
+        && boardCells[4] is map
+        && boardCells[4].wordId is string
+        && boardWordIds[4] == boardCells[4].wordId
+        && boardCells[5] is map
+        && boardCells[5].wordId is string
+        && boardWordIds[5] == boardCells[5].wordId
+        && boardCells[6] is map
+        && boardCells[6].wordId is string
+        && boardWordIds[6] == boardCells[6].wordId
+        && boardCells[7] is map
+        && boardCells[7].wordId is string
+        && boardWordIds[7] == boardCells[7].wordId
+        && boardCells[8] is map
+        && boardCells[8].wordId is string
+        && boardWordIds[8] == boardCells[8].wordId
+        && boardCells[9] is map
+        && boardCells[9].wordId is string
+        && boardWordIds[9] == boardCells[9].wordId
+        && boardCells[10] is map
+        && boardCells[10].wordId is string
+        && boardWordIds[10] == boardCells[10].wordId
+        && boardCells[11] is map
+        && boardCells[11].wordId is string
+        && boardWordIds[11] == boardCells[11].wordId
+        && boardCells[12] is map
+        && boardCells[12].wordId is string
+        && boardWordIds[12] == boardCells[12].wordId
+        && boardCells[13] is map
+        && boardCells[13].wordId is string
+        && boardWordIds[13] == boardCells[13].wordId
+        && boardCells[14] is map
+        && boardCells[14].wordId is string
+        && boardWordIds[14] == boardCells[14].wordId
+        && boardCells[15] is map
+        && boardCells[15].wordId is string
+        && boardWordIds[15] == boardCells[15].wordId;
+    }
+
+    function isBingoDraftBoardCellListsMatch3(boardWordIds, boardCells) {
+      return boardWordIds.hasOnly([
+          boardCells[0].wordId,
+          boardCells[1].wordId,
+          boardCells[2].wordId,
+          boardCells[3].wordId,
+          boardCells[4].wordId,
+          boardCells[5].wordId,
+          boardCells[6].wordId,
+          boardCells[7].wordId,
+          boardCells[8].wordId,
+        ]);
+    }
+
+    function isBingoDraftBoardCellListsMatch4(boardWordIds, boardCells) {
+      return boardWordIds.hasOnly([
+          boardCells[0].wordId,
+          boardCells[1].wordId,
+          boardCells[2].wordId,
+          boardCells[3].wordId,
+          boardCells[4].wordId,
+          boardCells[5].wordId,
+          boardCells[6].wordId,
+          boardCells[7].wordId,
+          boardCells[8].wordId,
+          boardCells[9].wordId,
+          boardCells[10].wordId,
+          boardCells[11].wordId,
+          boardCells[12].wordId,
+          boardCells[13].wordId,
+          boardCells[14].wordId,
+          boardCells[15].wordId,
+        ]);
+    }
+
+    function isBingoDraftBoardCellsMatch3(boardCells, boardWordIds) {
+      return boardCells[0] is map
+        && boardCells[0].wordId is string
+        && (boardCells[0].wordId == "" || boardWordIds.hasAny([boardCells[0].wordId]))
+        && boardCells[1] is map
+        && boardCells[1].wordId is string
+        && (boardCells[1].wordId == "" || boardWordIds.hasAny([boardCells[1].wordId]))
+        && boardCells[2] is map
+        && boardCells[2].wordId is string
+        && (boardCells[2].wordId == "" || boardWordIds.hasAny([boardCells[2].wordId]))
+        && boardCells[3] is map
+        && boardCells[3].wordId is string
+        && (boardCells[3].wordId == "" || boardWordIds.hasAny([boardCells[3].wordId]))
+        && boardCells[4] is map
+        && boardCells[4].wordId is string
+        && (boardCells[4].wordId == "" || boardWordIds.hasAny([boardCells[4].wordId]))
+        && boardCells[5] is map
+        && boardCells[5].wordId is string
+        && (boardCells[5].wordId == "" || boardWordIds.hasAny([boardCells[5].wordId]))
+        && boardCells[6] is map
+        && boardCells[6].wordId is string
+        && (boardCells[6].wordId == "" || boardWordIds.hasAny([boardCells[6].wordId]))
+        && boardCells[7] is map
+        && boardCells[7].wordId is string
+        && (boardCells[7].wordId == "" || boardWordIds.hasAny([boardCells[7].wordId]))
+        && boardCells[8] is map
+        && boardCells[8].wordId is string
+        && (boardCells[8].wordId == "" || boardWordIds.hasAny([boardCells[8].wordId]))
+        && isBingoDraftBoardCellListsMatch3(boardWordIds, boardCells);
+    }
+
+    function isBingoDraftBoardCellsMatch4(boardCells, boardWordIds) {
+      return boardCells[0] is map
+        && boardCells[0].wordId is string
+        && (boardCells[0].wordId == "" || boardWordIds.hasAny([boardCells[0].wordId]))
+        && boardCells[1] is map
+        && boardCells[1].wordId is string
+        && (boardCells[1].wordId == "" || boardWordIds.hasAny([boardCells[1].wordId]))
+        && boardCells[2] is map
+        && boardCells[2].wordId is string
+        && (boardCells[2].wordId == "" || boardWordIds.hasAny([boardCells[2].wordId]))
+        && boardCells[3] is map
+        && boardCells[3].wordId is string
+        && (boardCells[3].wordId == "" || boardWordIds.hasAny([boardCells[3].wordId]))
+        && boardCells[4] is map
+        && boardCells[4].wordId is string
+        && (boardCells[4].wordId == "" || boardWordIds.hasAny([boardCells[4].wordId]))
+        && boardCells[5] is map
+        && boardCells[5].wordId is string
+        && (boardCells[5].wordId == "" || boardWordIds.hasAny([boardCells[5].wordId]))
+        && boardCells[6] is map
+        && boardCells[6].wordId is string
+        && (boardCells[6].wordId == "" || boardWordIds.hasAny([boardCells[6].wordId]))
+        && boardCells[7] is map
+        && boardCells[7].wordId is string
+        && (boardCells[7].wordId == "" || boardWordIds.hasAny([boardCells[7].wordId]))
+        && boardCells[8] is map
+        && boardCells[8].wordId is string
+        && (boardCells[8].wordId == "" || boardWordIds.hasAny([boardCells[8].wordId]))
+        && boardCells[9] is map
+        && boardCells[9].wordId is string
+        && (boardCells[9].wordId == "" || boardWordIds.hasAny([boardCells[9].wordId]))
+        && boardCells[10] is map
+        && boardCells[10].wordId is string
+        && (boardCells[10].wordId == "" || boardWordIds.hasAny([boardCells[10].wordId]))
+        && boardCells[11] is map
+        && boardCells[11].wordId is string
+        && (boardCells[11].wordId == "" || boardWordIds.hasAny([boardCells[11].wordId]))
+        && boardCells[12] is map
+        && boardCells[12].wordId is string
+        && (boardCells[12].wordId == "" || boardWordIds.hasAny([boardCells[12].wordId]))
+        && boardCells[13] is map
+        && boardCells[13].wordId is string
+        && (boardCells[13].wordId == "" || boardWordIds.hasAny([boardCells[13].wordId]))
+        && boardCells[14] is map
+        && boardCells[14].wordId is string
+        && (boardCells[14].wordId == "" || boardWordIds.hasAny([boardCells[14].wordId]))
+        && boardCells[15] is map
+        && boardCells[15].wordId is string
+        && (boardCells[15].wordId == "" || boardWordIds.hasAny([boardCells[15].wordId]))
+        && isBingoDraftBoardCellListsMatch4(boardWordIds, boardCells);
+    }
+
+    function isBingoDraftBoardCellsMatchByBoardSize(boardCells, boardWordIds, boardSize) {
+      return boardSize == 3
+        ? isBingoDraftBoardCellsMatch3(boardCells, boardWordIds)
+        : boardSize == 4
+          ? isBingoDraftBoardCellsMatch4(boardCells, boardWordIds)
+          : false;
+    }
+
+    function isBingoBoardCellsMatchBoardWordIdsByBoardSize(boardCells, boardWordIds, boardSize) {
+      return boardSize == 3
+        ? isBingoBoardCellsMatchBoardWordIds3(boardCells, boardWordIds)
+        : boardSize == 4
+          ? isBingoBoardCellsMatchBoardWordIds4(boardCells, boardWordIds)
+          : false;
+    }
+
+    function isBingoPlayerBoardLinesCompleted3(boardWordIds, markedWordIds) {
+      return (markedWordIds.hasAll([boardWordIds[0], boardWordIds[1], boardWordIds[2]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[3], boardWordIds[4], boardWordIds[5]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[6], boardWordIds[7], boardWordIds[8]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[0], boardWordIds[3], boardWordIds[6]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[1], boardWordIds[4], boardWordIds[7]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[2], boardWordIds[5], boardWordIds[8]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[0], boardWordIds[4], boardWordIds[8]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[2], boardWordIds[4], boardWordIds[6]]) ? 1 : 0);
+    }
+
+    function isBingoPlayerBoardLinesCompleted4(boardWordIds, markedWordIds) {
+      return (markedWordIds.hasAll([boardWordIds[0], boardWordIds[1], boardWordIds[2], boardWordIds[3]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[4], boardWordIds[5], boardWordIds[6], boardWordIds[7]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[8], boardWordIds[9], boardWordIds[10], boardWordIds[11]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[12], boardWordIds[13], boardWordIds[14], boardWordIds[15]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[0], boardWordIds[4], boardWordIds[8], boardWordIds[12]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[1], boardWordIds[5], boardWordIds[9], boardWordIds[13]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[2], boardWordIds[6], boardWordIds[10], boardWordIds[14]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[3], boardWordIds[7], boardWordIds[11], boardWordIds[15]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[0], boardWordIds[5], boardWordIds[10], boardWordIds[15]]) ? 1 : 0)
+        + (markedWordIds.hasAll([boardWordIds[3], boardWordIds[6], boardWordIds[9], boardWordIds[12]]) ? 1 : 0);
+    }
+
+    function isBingoPlayerBoardLinesCompletedByBoardSize(boardWordIds, markedWordIds, boardSize) {
+      return boardSize == 3
+        ? isBingoPlayerBoardLinesCompleted3(boardWordIds, markedWordIds)
+        : boardSize == 4
+          ? isBingoPlayerBoardLinesCompleted4(boardWordIds, markedWordIds)
+          : 0;
+    }
+
+    function isBingoPlayerCompletedLineKeysAllowed3(completedLineKeys) {
+      return completedLineKeys.hasOnly([
+        'line-0',
+        'line-1',
+        'line-2',
+        'line-3',
+        'line-4',
+        'line-5',
+        'line-6',
+        'line-7',
+      ]);
+    }
+
+    function isBingoPlayerCompletedLineKeysAllowed4(completedLineKeys) {
+      return completedLineKeys.hasOnly([
+        'line-0',
+        'line-1',
+        'line-2',
+        'line-3',
+        'line-4',
+        'line-5',
+        'line-6',
+        'line-7',
+        'line-8',
+        'line-9',
+      ]);
+    }
+
+    function isBingoPlayerCompletedLineKeysAllowedByBoardSize(completedLineKeys, boardSize) {
+      return boardSize == 3
+        ? isBingoPlayerCompletedLineKeysAllowed3(completedLineKeys)
+        : boardSize == 4
+          ? isBingoPlayerCompletedLineKeysAllowed4(completedLineKeys)
+          : false;
+    }
+
+    function isBingoPlayerCompletedLineKeyComplete3(boardWordIds, markedWordIds, lineKey) {
+      return lineKey == 'line-0'
+        ? markedWordIds.hasAll([boardWordIds[0], boardWordIds[1], boardWordIds[2]])
+        : lineKey == 'line-1'
+          ? markedWordIds.hasAll([boardWordIds[3], boardWordIds[4], boardWordIds[5]])
+          : lineKey == 'line-2'
+            ? markedWordIds.hasAll([boardWordIds[6], boardWordIds[7], boardWordIds[8]])
+            : lineKey == 'line-3'
+              ? markedWordIds.hasAll([boardWordIds[0], boardWordIds[3], boardWordIds[6]])
+              : lineKey == 'line-4'
+                ? markedWordIds.hasAll([boardWordIds[1], boardWordIds[4], boardWordIds[7]])
+                : lineKey == 'line-5'
+                  ? markedWordIds.hasAll([boardWordIds[2], boardWordIds[5], boardWordIds[8]])
+                  : lineKey == 'line-6'
+                    ? markedWordIds.hasAll([boardWordIds[0], boardWordIds[4], boardWordIds[8]])
+                    : lineKey == 'line-7'
+                      ? markedWordIds.hasAll([boardWordIds[2], boardWordIds[4], boardWordIds[6]])
+                      : false;
+    }
+
+    function isBingoPlayerCompletedLineKeyComplete4(boardWordIds, markedWordIds, lineKey) {
+      return lineKey == 'line-0'
+        ? markedWordIds.hasAll([boardWordIds[0], boardWordIds[1], boardWordIds[2], boardWordIds[3]])
+        : lineKey == 'line-1'
+          ? markedWordIds.hasAll([boardWordIds[4], boardWordIds[5], boardWordIds[6], boardWordIds[7]])
+          : lineKey == 'line-2'
+            ? markedWordIds.hasAll([boardWordIds[8], boardWordIds[9], boardWordIds[10], boardWordIds[11]])
+            : lineKey == 'line-3'
+              ? markedWordIds.hasAll([boardWordIds[12], boardWordIds[13], boardWordIds[14], boardWordIds[15]])
+              : lineKey == 'line-4'
+                ? markedWordIds.hasAll([boardWordIds[0], boardWordIds[4], boardWordIds[8], boardWordIds[12]])
+                : lineKey == 'line-5'
+                  ? markedWordIds.hasAll([boardWordIds[1], boardWordIds[5], boardWordIds[9], boardWordIds[13]])
+                  : lineKey == 'line-6'
+                    ? markedWordIds.hasAll([boardWordIds[2], boardWordIds[6], boardWordIds[10], boardWordIds[14]])
+                    : lineKey == 'line-7'
+                      ? markedWordIds.hasAll([boardWordIds[3], boardWordIds[7], boardWordIds[11], boardWordIds[15]])
+                      : lineKey == 'line-8'
+                        ? markedWordIds.hasAll([boardWordIds[0], boardWordIds[5], boardWordIds[10], boardWordIds[15]])
+                        : lineKey == 'line-9'
+                          ? markedWordIds.hasAll([boardWordIds[3], boardWordIds[6], boardWordIds[9], boardWordIds[12]])
+                          : false;
+    }
+
+    function isBingoPlayerCompletedLineKeyCompleteByBoardSize(boardWordIds, markedWordIds, lineKey, boardSize) {
+      return boardSize == 3
+        ? isBingoPlayerCompletedLineKeyComplete3(boardWordIds, markedWordIds, lineKey)
+        : boardSize == 4
+          ? isBingoPlayerCompletedLineKeyComplete4(boardWordIds, markedWordIds, lineKey)
+          : false;
+    }
+
+    function isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, addedIndex, boardSize) {
+      return !previousLineKeys.hasAny([completedLineKeys[previousLineKeys.size() + addedIndex]])
+        && isBingoPlayerCompletedLineKeyCompleteByBoardSize(
+          boardWordIds,
+          markedWordIds,
+          completedLineKeys[previousLineKeys.size() + addedIndex],
+          boardSize
+        );
+    }
+
+    function isBingoPlayerCompletedLineKeysVerified(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, boardSize) {
+      return completedLineKeys.size() == previousLineKeys.size()
+        ? completedLineKeys == previousLineKeys
+        : completedLineKeys.hasAll(previousLineKeys)
+          && (
+            completedLineKeys.size() == previousLineKeys.size() + 1
+              ? isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 0, boardSize)
+              : completedLineKeys.size() == previousLineKeys.size() + 2
+                ? completedLineKeys[previousLineKeys.size()] != completedLineKeys[previousLineKeys.size() + 1]
+                  && isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 0, boardSize)
+                  && isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 1, boardSize)
+                : completedLineKeys.size() == previousLineKeys.size() + 3
+                  ? completedLineKeys[previousLineKeys.size()] != completedLineKeys[previousLineKeys.size() + 1]
+                    && completedLineKeys[previousLineKeys.size()] != completedLineKeys[previousLineKeys.size() + 2]
+                    && completedLineKeys[previousLineKeys.size() + 1] != completedLineKeys[previousLineKeys.size() + 2]
+                    && isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 0, boardSize)
+                    && isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 1, boardSize)
+                    && isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 2, boardSize)
+                  : completedLineKeys.size() == previousLineKeys.size() + 4
+                    ? completedLineKeys[previousLineKeys.size()] != completedLineKeys[previousLineKeys.size() + 1]
+                      && completedLineKeys[previousLineKeys.size()] != completedLineKeys[previousLineKeys.size() + 2]
+                      && completedLineKeys[previousLineKeys.size()] != completedLineKeys[previousLineKeys.size() + 3]
+                      && completedLineKeys[previousLineKeys.size() + 1] != completedLineKeys[previousLineKeys.size() + 2]
+                      && completedLineKeys[previousLineKeys.size() + 1] != completedLineKeys[previousLineKeys.size() + 3]
+                      && completedLineKeys[previousLineKeys.size() + 2] != completedLineKeys[previousLineKeys.size() + 3]
+                      && isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 0, boardSize)
+                      && isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 1, boardSize)
+                      && isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 2, boardSize)
+                      && isBingoPlayerCompletedLineKeyAddedAndComplete(boardWordIds, markedWordIds, completedLineKeys, previousLineKeys, 3, boardSize)
+                    : false
+          );
+    }
+
+    function isBingoPlayerCompletedLineKeysUpdateAllowed() {
+      return request.resource.data.completedLineKeys is list
+        && request.resource.data.completedLineKeys.size() == request.resource.data.bingoLines
+        && request.resource.data.completedLineKeys.hasAll(resource.data.completedLineKeys)
+        && isBingoPlayerCompletedLineKeysAllowedByBoardSize(
+          request.resource.data.completedLineKeys,
+          resource.data.boardSize
+        )
+        && isBingoPlayerCompletedLineKeysVerified(
+          resource.data.boardWordIds,
+          request.resource.data.markedWordIds,
+          request.resource.data.completedLineKeys,
+          resource.data.completedLineKeys,
+          resource.data.boardSize
+        );
+    }
+
+    function isBingoPlayerRankUpdateAllowed() {
+      return request.resource.data.bingoRank == resource.data.bingoRank
+        || (
+          resource.data.bingoRank == null
+          && request.resource.data.hasBingo == true
+          && request.resource.data.bingoRank == 1
+        );
     }
 
     function isBingoPlayerCreate(sessionId, playerId) {
@@ -900,8 +1532,13 @@ service cloud.firestore {
         && request.resource.data.studentNameNormalized == playerId
         && request.resource.data.boardSize == bingoSessionDoc(sessionId).data.boardSize
         && request.resource.data.requiredCellCount == bingoSessionDoc(sessionId).data.requiredCellCount
+        && isBingoPlayerAvailableWordsAllowedBySession(
+          request.resource.data.availableWords,
+          bingoSessionDoc(sessionId).data.vocabularyItems,
+          request.resource.data.boardSize
+        )
         && request.resource.data.setupStatus == 'arranging'
-        && isBingoPlayerSetupDraftDocument(request.resource.data)
+        && isBingoPlayerCreateDocument(request.resource.data)
         && request.resource.data.markedWordIds.size() == 0
         && request.resource.data.bingoLines == 0
         && request.resource.data.completedLineKeys.size() == 0
@@ -914,24 +1551,62 @@ service cloud.firestore {
         && bingoSessionDoc(sessionId).data.status == 'live'
         && resource.data.setupStatus == 'arranging'
         && request.resource.data.studentNameNormalized == playerId
+        && request.resource.data.keys().hasOnly([
+          'studentName',
+          'studentNameNormalized',
+          'boardSize',
+          'requiredCellCount',
+          'setupStatus',
+          'availableWords',
+          'boardCells',
+          'boardWordIds',
+          'markedWordIds',
+          'bingoLines',
+          'completedLineKeys',
+          'hasBingo',
+          'bingoRank',
+          'setupStartedAt',
+          'setupCompletedAt',
+          'joinedAt',
+          'updatedAt'
+        ])
+        && request.resource.data.updatedAt is timestamp
         && request.resource.data.studentNameNormalized == resource.data.studentNameNormalized
+        && request.resource.data.studentName == resource.data.studentName
         && request.resource.data.boardSize == resource.data.boardSize
         && request.resource.data.requiredCellCount == resource.data.requiredCellCount
+        && request.resource.data.boardSize == bingoSessionDoc(sessionId).data.boardSize
+        && request.resource.data.requiredCellCount == bingoSessionDoc(sessionId).data.requiredCellCount
         && request.resource.data.setupStatus == 'arranging'
         && request.resource.data.availableWords == resource.data.availableWords
+        && isBingoPlayerAvailableWordsAllowedBySession(
+          request.resource.data.availableWords,
+          bingoSessionDoc(sessionId).data.vocabularyItems,
+          request.resource.data.boardSize
+        )
+        && request.resource.data.boardWordIds is list
         && request.resource.data.boardCells is list
         && request.resource.data.boardCells.size() == resource.data.boardCells.size()
-        && request.resource.data.boardWordIds is list
+        && isBingoPlayerBoardWordIdsAllowedByBoardSize(
+          request.resource.data.boardWordIds,
+          request.resource.data.availableWords,
+          request.resource.data.boardSize
+        )
+        && isBingoDraftBoardCellsMatchByBoardSize(
+          request.resource.data.boardCells,
+          request.resource.data.boardWordIds,
+          request.resource.data.boardSize
+        )
         && request.resource.data.boardWordIds.size() <= request.resource.data.boardSize * request.resource.data.boardSize
         && request.resource.data.markedWordIds == resource.data.markedWordIds
         && request.resource.data.bingoLines == 0
+        && request.resource.data.completedLineKeys is list
         && request.resource.data.completedLineKeys.size() == 0
         && request.resource.data.hasBingo == false
         && request.resource.data.bingoRank == null
         && request.resource.data.joinedAt == resource.data.joinedAt
         && request.resource.data.setupStartedAt == resource.data.setupStartedAt
         && request.resource.data.setupCompletedAt == null
-        && isBingoPlayerDocument(request.resource.data);
     }
 
     function isBingoPlayerFinalizeUpdate(sessionId, playerId) {
@@ -939,41 +1614,81 @@ service cloud.firestore {
         && bingoSessionDoc(sessionId).data.status == 'live'
         && resource.data.setupStatus == 'arranging'
         && request.resource.data.studentNameNormalized == playerId
+        && isBingoPlayerCommonKeys(request.resource.data)
         && request.resource.data.studentNameNormalized == resource.data.studentNameNormalized
+        && request.resource.data.studentName == resource.data.studentName
         && request.resource.data.boardSize == resource.data.boardSize
         && request.resource.data.requiredCellCount == resource.data.requiredCellCount
-        && request.resource.data.setupStatus == 'ready'
         && request.resource.data.availableWords == resource.data.availableWords
+        && request.resource.data.setupStatus == 'ready'
         && request.resource.data.boardCells is list
         && request.resource.data.boardCells.size() == resource.data.boardCells.size()
         && request.resource.data.boardWordIds is list
         && request.resource.data.boardWordIds.size() == request.resource.data.boardSize * request.resource.data.boardSize
+        && isBingoPlayerBoardWordIdsMatchAvailableByBoardSize(
+          request.resource.data.boardWordIds,
+          request.resource.data.availableWords,
+          request.resource.data.boardSize
+        )
+        && isBingoBoardCellsMatchBoardWordIdsByBoardSize(
+          request.resource.data.boardCells,
+          request.resource.data.boardWordIds,
+          request.resource.data.boardSize
+        )
         && request.resource.data.markedWordIds.size() == 0
         && request.resource.data.bingoLines == 0
+        && request.resource.data.completedLineKeys is list
         && request.resource.data.completedLineKeys.size() == 0
         && request.resource.data.hasBingo == false
         && request.resource.data.bingoRank == null
         && request.resource.data.joinedAt == resource.data.joinedAt
         && request.resource.data.setupStartedAt == resource.data.setupStartedAt
         && request.resource.data.setupCompletedAt is timestamp
-        && isBingoPlayerMarkedUpdateDocument(request.resource.data);
+    }
+
+    function isBingoPlayerMarkUpdate(sessionId, playerId) {
+      return bingoSessionExists(sessionId)
+        && bingoSessionDoc(sessionId).data.status == 'live'
+        && resource.data.setupStatus == 'ready'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'markedWordIds',
+          'bingoLines',
+          'completedLineKeys',
+          'hasBingo',
+          'bingoRank',
+          'updatedAt'
+        ])
+        && resource.data.studentNameNormalized == playerId
+        && request.resource.data.updatedAt is timestamp
+        && bingoSessionDoc(sessionId).data.calledWordIds.hasAny([bingoSessionActiveWordId(sessionId)])
+        && resource.data.boardWordIds.hasAny([bingoSessionActiveWordId(sessionId)])
+        && request.resource.data.markedWordIds.hasAll(resource.data.markedWordIds)
+        && request.resource.data.markedWordIds.size() == resource.data.markedWordIds.size() + 1
+        && !resource.data.markedWordIds.hasAny([bingoSessionActiveWordId(sessionId)])
+        && request.resource.data.markedWordIds[resource.data.markedWordIds.size()] == bingoSessionActiveWordId(sessionId)
+        && request.resource.data.bingoLines == isBingoPlayerBoardLinesCompletedByBoardSize(
+          resource.data.boardWordIds,
+          request.resource.data.markedWordIds,
+          resource.data.boardSize
+        )
+        && isBingoPlayerCompletedLineKeysUpdateAllowed()
+        && request.resource.data.hasBingo == (request.resource.data.bingoLines >= 3)
+        && isBingoPlayerRankUpdateAllowed()
+        ;
     }
 
     function isBingoPlayerUpdate(sessionId, playerId) {
-      return isBingoPlayerDraftUpdate(sessionId, playerId)
-        || isBingoPlayerFinalizeUpdate(sessionId, playerId)
-        || (
-          bingoSessionExists(sessionId)
-          && bingoSessionDoc(sessionId).data.status == 'live'
-          && resource.data.setupStatus == 'ready'
-          && request.resource.data.studentNameNormalized == resource.data.studentNameNormalized
-          && request.resource.data.markedWordIds is list
-          && request.resource.data.markedWordIds.hasAll(resource.data.markedWordIds)
-          && request.resource.data.markedWordIds.size() <= resource.data.markedWordIds.size() + 1
-          && request.resource.data.bingoLines >= resource.data.bingoLines
-          && request.resource.data.bingoLines == request.resource.data.completedLineKeys.size()
-          && request.resource.data.hasBingo == (request.resource.data.bingoLines >= 3)
-        );
+      return resource.data.setupStatus == 'arranging'
+        ? request.resource.data.setupStatus == 'arranging'
+          ? isBingoPlayerDraftUpdate(sessionId, playerId)
+          : request.resource.data.setupStatus == 'ready'
+            ? isBingoPlayerFinalizeUpdate(sessionId, playerId)
+            : false
+        : resource.data.setupStatus == 'ready'
+          ? request.resource.data.setupStatus == 'ready'
+            ? isBingoPlayerMarkUpdate(sessionId, playerId)
+            : false
+          : false;
     }
 
     match /bingoSessions/{sessionId} {

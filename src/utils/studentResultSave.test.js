@@ -51,6 +51,75 @@ test("createCombinedStudentResultStatus summarizes a full save with leaderboard 
   );
 });
 
+test("createCombinedStudentResultStatus summarizes progress saved while leaderboard is skipped", () => {
+  const status = createCombinedStudentResultStatus({
+    activityLabel: "영어 타자",
+    studentName: "김홍년",
+    leaderboard: {
+      updatedPeriods: [],
+      skippedPeriods: ["week", "month", "year", "school_all"],
+      failedPeriods: [],
+    },
+    progressSaved: true,
+  });
+
+  assert.equal(
+    status,
+    "김홍년 학생의 영어 타자 성장 기록을 저장했고, 리더보드는 기존 최고 기록을 유지했습니다.",
+  );
+});
+
+test("createCombinedStudentResultStatus summarizes partial leaderboard failure", () => {
+  const status = createCombinedStudentResultStatus({
+    activityLabel: "영어 타자",
+    studentName: "김홍년",
+    leaderboard: {
+      updatedPeriods: ["week"],
+      skippedPeriods: [],
+      failedPeriods: ["month"],
+    },
+    progressSaved: true,
+  });
+
+  assert.equal(
+    status,
+    "김홍년 학생의 영어 타자 성장 기록을 저장했고, 리더보드는 일부 기간만 반영했습니다.",
+  );
+});
+
+test("createCombinedStudentResultStatus summarizes partial leaderboard failure when failed exists with skipped only", () => {
+  const status = createCombinedStudentResultStatus({
+    activityLabel: "영어 타자",
+    studentName: "김홍년",
+    leaderboard: {
+      updatedPeriods: [],
+      skippedPeriods: ["week"],
+      failedPeriods: ["month"],
+    },
+    progressSaved: true,
+  });
+
+  assert.equal(
+    status,
+    "김홍년 학생의 영어 타자 성장 기록을 저장했고, 리더보드는 일부 기간만 반영했습니다.",
+  );
+});
+
+test("createCombinedStudentResultStatus reports leaderboard failure with progress success", () => {
+  const status = createCombinedStudentResultStatus({
+    activityLabel: "영어 타자",
+    studentName: "김홍년",
+    leaderboard: null,
+    progressSaved: true,
+    leaderboardError: "리더보드 점수 저장 실패",
+  });
+
+  assert.equal(
+    status,
+    "김홍년 학생의 영어 타자 성장 기록을 저장했고, 리더보드는 반영하지 못했습니다.",
+  );
+});
+
 test("createCombinedStudentResultStatus warns when leaderboard saved but progress did not", () => {
   const status = createCombinedStudentResultStatus({
     activityLabel: "짝 맞추기",
@@ -85,4 +154,48 @@ test("saveCombinedStudentResult keeps the leaderboard result when progress savin
   assert.deepEqual(result.leaderboard.updatedPeriods, ["week"]);
   assert.equal(result.progress, null);
   assert.equal(result.progressError, "개인 기록 저장 실패");
+});
+
+test("saveCombinedStudentResult attempts progress save even when leaderboard save fails", async () => {
+  const callOrder = [];
+
+  const result = await saveCombinedStudentResult({
+    studentName: "김홍년",
+    saveLeaderboard: async () => {
+      callOrder.push("leaderboard");
+      throw new Error("리더보드 점수 저장 실패");
+    },
+    saveProgress: async (studentName) => {
+      callOrder.push(`progress:${studentName}`);
+      return {
+        comparison: { isNewBest: true },
+        newlyEarnedBadges: ["typing_starter"],
+      };
+    },
+  });
+
+  assert.deepEqual(callOrder, ["leaderboard", "progress:김홍년"]);
+  assert.equal(result.leaderboard, null);
+  assert.equal(result.leaderboardError, "리더보드 점수 저장 실패");
+  assert.equal(result.progressError, "");
+  assert.deepEqual(result.progress.newlyEarnedBadges, ["typing_starter"]);
+});
+
+test("saveCombinedStudentResult throws when both leaderboard and progress save fail", async () => {
+  await assert.rejects(
+    () =>
+      saveCombinedStudentResult({
+        studentName: "김홍년",
+        saveLeaderboard: async () => {
+          throw new Error("리더보드 점수 저장 실패");
+        },
+        saveProgress: async () => {
+          throw new Error("개인 기록 저장 실패");
+        },
+      }),
+    {
+      message:
+        "리더보드 점수 저장 실패 / 개인 기록 저장 실패",
+    },
+  );
 });
