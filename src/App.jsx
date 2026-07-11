@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BrowserSupportNotice } from "./components/BrowserSupportNotice.jsx";
 import { ListeningQuiz } from "./components/ListeningQuiz.jsx";
 import { ModeSelector } from "./components/ModeSelector.jsx";
@@ -55,6 +55,8 @@ function App() {
   const [updateHistoryOpen, setUpdateHistoryOpen] = useState(false);
   const [bingoTeacherMode, setBingoTeacherMode] = useState("manual");
   const [bingoJoinCode, setBingoJoinCode] = useState("");
+  const viewContentRef = useRef(null);
+  const hasMountedViewRef = useRef(false);
   const speechSynthesis = useSpeechSynthesis();
   const celebrationAudio = useCelebrationAudio();
   const library = useVocabularyLibrary();
@@ -66,6 +68,30 @@ function App() {
     stt: isSpeechRecognitionSupported(),
   };
   const chromeLayout = getAppChromeLayout(view);
+
+  useEffect(() => {
+    if (!hasMountedViewRef.current) {
+      hasMountedViewRef.current = true;
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const content = viewContentRef.current;
+      if (!content) {
+        return;
+      }
+
+      const reduceMotion =
+        window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+      content.focus({ preventScroll: true });
+      content.scrollIntoView({
+        behavior: reduceMotion ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [view]);
 
   const hasStudentVocabulary = library.student.items.length > 0;
   const canStartTeacherBingo = library.teacher.bingo.canStart;
@@ -154,12 +180,12 @@ function App() {
           {chromeLayout.heroVariant === "compact" ? (
             <div className="hero-compact-row">
               <div className="hero-compact-copy">
-                <p className="eyebrow">Teacher Workspace</p>
+                <p className="eyebrow">{chromeLayout.eyebrow}</p>
                 <h1 className="hero-title hero-title-compact">
-                  AI 원어민 단어 퀴즈 쇼
+                  {chromeLayout.title}
                 </h1>
                 <p className="hero-subtitle hero-subtitle-compact">
-                  내 단어 세트와 수업용 활동 도구를 바로 관리하세요.
+                  {chromeLayout.subtitle}
                 </p>
               </div>
               <div className="hero-compact-meta">
@@ -169,26 +195,26 @@ function App() {
                   className="update-info-button"
                   onClick={() => setUpdateHistoryOpen(true)}
                 >
-                  update info
+                  업데이트 내역
                 </button>
               </div>
             </div>
           ) : (
             <>
               <div className="hero-meta">
-                <p className="eyebrow">Elementary English Classroom App</p>
+                <p className="eyebrow">{chromeLayout.eyebrow}</p>
                 <span className="app-version">{APP_VERSION}</span>
                 <button
                   type="button"
                   className="update-info-button"
                   onClick={() => setUpdateHistoryOpen(true)}
                 >
-                  update info
+                  업데이트 내역
                 </button>
               </div>
-              <h1 className="hero-title">AI 원어민 단어 퀴즈 쇼</h1>
+              <h1 className="hero-title">{chromeLayout.title}</h1>
               <p className="hero-subtitle">
-                오늘의 단어를 불러오면 듣기·말하기·게임 활동을 바로 시작할 수 있습니다.
+                {chromeLayout.subtitle}
               </p>
               <div className="hero-badges" aria-label="핵심 기능">
                 <span>TTS 듣기 퀴즈</span>
@@ -203,6 +229,14 @@ function App() {
           <BrowserSupportNotice support={support} />
         ) : null}
 
+        <div
+          ref={viewContentRef}
+          className="view-content"
+          tabIndex={-1}
+          role="region"
+          aria-label={chromeLayout.focusLabel}
+          data-view={view}
+        >
         {view === APP_VIEWS.HOME ? (
           <ModeSelector
             gradeOptions={GRADE_OPTIONS}
@@ -550,6 +584,7 @@ function App() {
             onBack={() => navigateTo(APP_VIEWS.HOME)}
           />
         ) : null}
+        </div>
       </main>
 
       <UpdateHistoryModal

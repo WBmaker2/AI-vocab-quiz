@@ -46,6 +46,11 @@ export function ModeSelector({
   const showingSearchResults = schoolBrowseMode === "search";
   const visibleSchools = showingSearchResults ? schoolResults : featuredSchools;
   const setLoadBusy = vocabularyLoading || matchingLoading;
+  const studentFlowBusy =
+    schoolSearchLoading || teachersLoading || unitsLoading || setLoadBusy;
+  const readySetLabel = hasVocabulary
+    ? `${selection.grade}학년 ${selection.unit}단원 · ${currentItemCount}개 단어 준비 완료`
+    : "";
 
   useEffect(() => {
     if (initialMatchingPanelOpen) {
@@ -87,21 +92,30 @@ export function ModeSelector({
 
   return (
     <section className="panel-grid">
-      <article className="mode-card mode-card-student mode-card-priority">
+      <article
+        className="mode-card mode-card-student mode-card-priority"
+        aria-busy={studentFlowBusy}
+      >
         <div className="mode-card-top">
           <p className="mode-label">Student Mode</p>
           <h2>학생 활동 시작</h2>
           <p className="mode-card-copy">학교를 찾고 선생님·학년·단원을 선택하세요.</p>
         </div>
 
-        <form className="school-search-form" onSubmit={handleSchoolSearchSubmit}>
+        <form
+          className="school-search-form"
+          onSubmit={handleSchoolSearchSubmit}
+          aria-label="학교 검색"
+        >
           <div className="form-grid compact-grid">
             <label className="field field-wide">
               <span>학교 이름</span>
               <input
+                name="schoolName"
                 value={schoolQuery}
                 onChange={(event) => onSchoolQueryChange(event.target.value)}
                 placeholder="예: 서울초등학교"
+                autoComplete="organization"
                 disabled={!remoteConfigured}
               />
             </label>
@@ -112,6 +126,7 @@ export function ModeSelector({
               type="submit"
               className="secondary-button"
               disabled={!remoteConfigured || schoolSearchLoading}
+              aria-busy={schoolSearchLoading}
             >
               {schoolSearchLoading ? "학교 검색 중..." : "학교 검색"}
             </button>
@@ -125,6 +140,7 @@ export function ModeSelector({
             ) : visibleSchools.length > 0 ? (
               visibleSchools.map((school) => (
                 <button
+                  type="button"
                   key={school.id}
                   className={
                     selectedSchool?.id === school.id
@@ -147,6 +163,7 @@ export function ModeSelector({
             ) : visibleSchools.length > 0 ? (
               visibleSchools.map((school) => (
                 <button
+                  type="button"
                   key={school.id}
                   className={
                     selectedSchool?.id === school.id
@@ -223,6 +240,7 @@ export function ModeSelector({
 
         <div className="toolbar-row">
           <button
+            type="button"
             className="secondary-button"
             onClick={onLoadSet}
             disabled={
@@ -231,6 +249,7 @@ export function ModeSelector({
               !selection.unit ||
               setLoadBusy
             }
+            aria-busy={vocabularyLoading}
           >
             {vocabularyLoading
               ? "단어 세트 불러오는 중..."
@@ -279,6 +298,7 @@ export function ModeSelector({
 
             <div className="toolbar-row">
               <button
+                type="button"
                 className="primary-button"
                 onClick={handleStartMatching}
                 disabled={
@@ -286,6 +306,7 @@ export function ModeSelector({
                   matchingUnits.length === 0 ||
                   setLoadBusy
                 }
+                aria-busy={matchingLoading}
               >
                 {matchingLoading
                   ? "게임 준비 중..."
@@ -294,6 +315,7 @@ export function ModeSelector({
                     : "선택한 단원으로 게임 시작"}
               </button>
               <button
+                type="button"
                 className="ghost-button"
                 onClick={() => setMatchingPanelOpen(false)}
                 disabled={matchingLoading}
@@ -309,62 +331,95 @@ export function ModeSelector({
             Firebase 환경 변수가 없어서 학교와 공개 단어세트를 불러올 수 없습니다.
           </p>
         ) : null}
-        {error ? <p className="inline-hint warning-hint">{error}</p> : null}
-        {status ? <p className="inline-hint success-hint">{status}</p> : null}
-        {hasVocabulary ? (
-          <p className="inline-hint">
-            현재 {currentItemCount}개 단어가 준비되었습니다.
+        {error ? (
+          <p className="inline-hint warning-hint" role="alert">
+            {error}
           </p>
         ) : null}
+        <div
+          className="student-status-region"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {status ? <p className="inline-hint success-hint">{status}</p> : null}
+          {hasVocabulary ? (
+            <div className="student-set-ready">
+              <span className="student-set-ready-kicker">Ready to learn</span>
+              <strong>{readySetLabel}</strong>
+            </div>
+          ) : null}
+        </div>
 
-        <div className="stack-actions">
-          <button
-            className="secondary-button"
-            onClick={onOpenListening}
-            disabled={!hasVocabulary}
-          >
-            듣기 퀴즈
-          </button>
-          <button
-            className="secondary-button"
-            onClick={onOpenSpeaking}
-            disabled={!hasVocabulary}
-          >
-            말하기 연습
-          </button>
-          <button
-            className="ghost-button"
-            onClick={() => setMatchingPanelOpen((current) => !current)}
-            disabled={
-              !remoteConfigured ||
-              !selectedTeacher ||
-              unitsLoading ||
-              setLoadBusy
-            }
-          >
-            단어 짝 맞추기
-          </button>
-          <button
-            className="ghost-button"
-            onClick={onOpenFishing}
-            disabled={!hasVocabulary}
-          >
-            단어 낚시
-          </button>
-          <button
-            className="ghost-button"
-            onClick={onOpenTyping}
-            disabled={!hasVocabulary}
-          >
-            영어 단어 타자 게임
-          </button>
-          <button
-            className="ghost-button"
-            onClick={onOpenBingo}
-            disabled={!remoteConfigured}
-          >
-            학급 빙고 게임
-          </button>
+        <div className="activity-groups">
+          <section className="activity-group activity-group-primary" aria-labelledby="core-study-label">
+            <p id="core-study-label" className="activity-group-label">
+              기본 학습
+            </p>
+            <div className="stack-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onOpenListening}
+                disabled={!hasVocabulary}
+              >
+                듣기 퀴즈
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onOpenSpeaking}
+                disabled={!hasVocabulary}
+              >
+                말하기 연습
+              </button>
+            </div>
+          </section>
+
+          <section className="activity-group" aria-labelledby="game-activity-label">
+            <p id="game-activity-label" className="activity-group-label">
+              게임 활동
+            </p>
+            <div className="stack-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setMatchingPanelOpen((current) => !current)}
+                disabled={
+                  !remoteConfigured ||
+                  !selectedTeacher ||
+                  unitsLoading ||
+                  setLoadBusy
+                }
+              >
+                단어 짝 맞추기
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={onOpenFishing}
+                disabled={!hasVocabulary}
+              >
+                단어 낚시
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={onOpenTyping}
+                disabled={!hasVocabulary}
+              >
+                영어 단어 타자 게임
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={onOpenBingo}
+                disabled={!remoteConfigured}
+              >
+                학급 빙고 게임
+              </button>
+            </div>
+          </section>
         </div>
 
         {!hasVocabulary ? (
@@ -383,7 +438,7 @@ export function ModeSelector({
             Google 로그인 후 학교와 선생님 정보를 등록하면 내 단어 세트를 저장하고 공개할 수 있습니다.
           </p>
         </div>
-        <button className="primary-button" onClick={onOpenTeacher}>
+        <button type="button" className="primary-button" onClick={onOpenTeacher}>
           {auth.signedIn ? "내 단어 세트 열기" : "Google 로그인 후 시작"}
         </button>
       </article>
