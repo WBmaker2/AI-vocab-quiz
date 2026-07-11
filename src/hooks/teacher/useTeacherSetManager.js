@@ -29,12 +29,15 @@ import {
   createTeacherSetCatalogRefreshState,
   createTeacherSetSaveCoordinator,
   completeTeacherSetImport,
+  finishTeacherWorkbookImport,
   getNextTeacherSelection,
   isCurrentTeacherAutoSaveRevision,
+  loadTeacherVocabularyImportExistingSets,
   ownsTeacherAutoSaveTimer,
   recordTeacherAutoSaveEdit,
   refreshTeacherSetCatalog,
   shouldQueueTeacherAutoSave,
+  tryStartTeacherWorkbookImport,
 } from "../../utils/teacherSetManager.js";
 import { mergeVocabularyItems } from "../../utils/vocabularyMerge.js";
 import { parseVocabularyWorkbook } from "../../utils/xlsxImport.js";
@@ -79,6 +82,7 @@ export function useTeacherSetManager({
   const catalogRefreshStateRef = useRef(createTeacherSetCatalogRefreshState());
   const teacherSetSaveCoordinatorRef = useRef(null);
   const autoSaveSnapshotRef = useRef(null);
+  const workbookImportInFlightRef = useRef(false);
 
   if (!teacherSetSaveCoordinatorRef.current) {
     teacherSetSaveCoordinatorRef.current = createTeacherSetSaveCoordinator({
@@ -716,153 +720,164 @@ export function useTeacherSetManager({
     }
   }
 
-  async function importWorkbook(file, grade, publishOverride = null) {
-    if (!isFirebaseConfigured || !teacherProfile || !userId) {
-      setError("Google 로그인과 선생님 정보 등록이 필요합니다.");
-      return;
+  async function importWorkbook(file, grade) {
+    if (!tryStartTeacherWorkbookImport(workbookImportInFlightRef)) {
+      return false;
     }
-
-    if (!file) {
-      setError("업로드할 엑셀 파일을 선택하세요.");
-      return;
-    }
-
-    if (!grade) {
-      setError("엑셀 업로드용 학년을 먼저 선택하세요.");
-      return;
-    }
-
-    const cleanPublisher = publisher.trim();
-    if (!cleanPublisher) {
-      setError("출판사를 먼저 선택하세요.");
-      return;
-    }
-
-    const mutationRevision = recordTeacherSetMutation();
-    setImporting(true);
-    setStatus("");
-    setAutoSaveStatus("");
-    setError("");
-    clearTeacherAutoSaveTimer(autoSaveTimerRef);
-    setAutoSaveToken(0);
 
     try {
-      const { result: importResult } = await queueTeacherSetMutation(
-        mutationRevision,
-        async () => {
-          const importPlan = await parseVocabularyWorkbook(file);
-          const publishImportedSets =
-            publishOverride === null ? published : publishOverride;
-          let savedUnitCount = 0;
-          let addedVocabularyCount = 0;
-          let duplicateVocabularyCount = 0;
-          const savedItemsByUnit = new Map();
-          const vocabularySets = [];
+      if (!isFirebaseConfigured || !teacherProfile || !userId) {
+        setError("Google 로그인과 선생님 정보 등록이 필요합니다.");
+        return false;
+      }
 
-          // All workbook validation completes before these reads prepare the one batch write.
-          const existingSets = await Promise.all(
-            importPlan.units.map(async (groupedSet) => ({
-              groupedSet,
-              existingSet: await fetchTeacherVocabularySet(userId, {
-                grade,
-                unit: groupedSet.unit,
-              }),
-            })),
-          );
+      if (!file) {
+        setError("업로드할 엑셀 파일을 선택하세요.");
+        return false;
+      }
 
-          for (const { groupedSet, existingSet } of existingSets) {
-            const { mergedItems, addedCount, duplicateCount } = mergeVocabularyItems(
-              existingSet.items ?? [],
-              groupedSet.items,
-            );
-            const normalizedItems = normalizeDraftVocabulary(mergedItems);
+      if (!grade) {
+        setError("엑셀 업로드용 학년을 먼저 선택하세요.");
+        return false;
+      }
 
-            vocabularySets.push({
-              unit: groupedSet.unit,
-              items: normalizedItems,
-            });
-            savedUnitCount += 1;
-            addedVocabularyCount += addedCount;
-            duplicateVocabularyCount += duplicateCount;
-            savedItemsByUnit.set(groupedSet.unit, normalizedItems);
-          }
+      const cleanPublisher = publisher.trim();
+      if (!cleanPublisher) {
+        setError("출판사를 먼저 선택하세요.");
+        return false;
+      }
 
-          const nextGradePublishers = {
-            ...(teacherProfile.gradePublishers ?? {}),
-            [grade]: cleanPublisher,
-          };
-
-          await saveTeacherVocabularyImportBatch({
-            userId,
-            teacherProfile,
-            grade,
-            publisher: cleanPublisher,
-            gradePublishers: nextGradePublishers,
-            published: publishImportedSets,
-            vocabularySets,
-          });
-
-          return {
-            groupedSets: importPlan.units,
-            nextGradePublishers,
-            publishImportedSets,
-            savedUnitCount,
-            addedVocabularyCount,
-            duplicateVocabularyCount,
-            savedItemsByUnit,
-          };
-        },
+      const shouldForcePublic = window.confirm(
+        "이 학년의 모든 단원을 '학생 공개'로 저장하겠습니까?\n'확인'을 누르면 모든 단원이 학생 공개로 저장되고, '취소'를 누르면 현재 체크 상태대로 저장됩니다.",
       );
+      const mutationRevision = recordTeacherSetMutation();
+      const publishImportedSets = shouldForcePublic ? true : published;
+      setImporting(true);
+      setStatus("");
+      setAutoSaveStatus("");
+      setError("");
+      clearTeacherAutoSaveTimer(autoSaveTimerRef);
+      setAutoSaveToken(0);
 
-      await completeTeacherSetImport({
-        refreshCatalog: () => refreshCatalog(userId, mutationRevision),
-        revision: mutationRevision,
-        isCurrentRevision: (revision) =>
+      try {
+        const { result: importResult } = await queueTeacherSetMutation(
+          mutationRevision,
+          async () => {
+            const importPlan = await parseVocabularyWorkbook(file);
+            let savedUnitCount = 0;
+            let addedVocabularyCount = 0;
+            let duplicateVocabularyCount = 0;
+            const savedItemsByUnit = new Map();
+            const vocabularySets = [];
+
+            // Capacity is checked before any per-unit Firebase read is started.
+            const existingSets = await loadTeacherVocabularyImportExistingSets({
+              units: importPlan.units,
+              loadExistingSet: (groupedSet) =>
+                fetchTeacherVocabularySet(userId, {
+                  grade,
+                  unit: groupedSet.unit,
+                }),
+            });
+
+            for (const { groupedSet, existingSet } of existingSets) {
+              const { mergedItems, addedCount, duplicateCount } = mergeVocabularyItems(
+                existingSet.items ?? [],
+                groupedSet.items,
+              );
+              const normalizedItems = normalizeDraftVocabulary(mergedItems);
+
+              vocabularySets.push({
+                unit: groupedSet.unit,
+                items: normalizedItems,
+              });
+              savedUnitCount += 1;
+              addedVocabularyCount += addedCount;
+              duplicateVocabularyCount += duplicateCount;
+              savedItemsByUnit.set(groupedSet.unit, normalizedItems);
+            }
+
+            const nextGradePublishers = {
+              ...(teacherProfile.gradePublishers ?? {}),
+              [grade]: cleanPublisher,
+            };
+
+            await saveTeacherVocabularyImportBatch({
+              userId,
+              teacherProfile,
+              grade,
+              publisher: cleanPublisher,
+              gradePublishers: nextGradePublishers,
+              published: publishImportedSets,
+              vocabularySets,
+            });
+
+            return {
+              groupedSets: importPlan.units,
+              nextGradePublishers,
+              publishImportedSets,
+              savedUnitCount,
+              addedVocabularyCount,
+              duplicateVocabularyCount,
+              savedItemsByUnit,
+            };
+          },
+        );
+
+        await completeTeacherSetImport({
+          refreshCatalog: () => refreshCatalog(userId, mutationRevision),
+          revision: mutationRevision,
+          isCurrentRevision: (revision) =>
+            isCurrentTeacherAutoSaveRevision(
+              autoSaveRevisionStateRef.current,
+              revision,
+            ),
+          applyImportResult: () => {
+            const matchedSet = importResult.groupedSets.find(
+              (groupedSet) =>
+                groupedSet.unit === selection.unit && selection.grade === grade,
+            );
+
+            if (matchedSet) {
+              setItems(importResult.savedItemsByUnit.get(matchedSet.unit) ?? []);
+              setPublished(importResult.publishImportedSets);
+              setDirty(false);
+            }
+            setPublisher(cleanPublisher);
+            setTeacherProfile((current) =>
+              current
+                ? {
+                    ...current,
+                    gradePublishers: importResult.nextGradePublishers,
+                  }
+                : current,
+            );
+
+            setStatus(
+              importResult.publishImportedSets
+                ? `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰고 모든 반영 단원을 학생 공개로 설정했습니다.`
+                : `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰었습니다.`,
+            );
+          },
+        });
+      } catch (nextError) {
+        if (
           isCurrentTeacherAutoSaveRevision(
             autoSaveRevisionStateRef.current,
-            revision,
-          ),
-        applyImportResult: () => {
-          const matchedSet = importResult.groupedSets.find(
-            (groupedSet) =>
-              groupedSet.unit === selection.unit && selection.grade === grade,
+            mutationRevision,
+          )
+        ) {
+          setError(
+            formatErrorMessage(nextError, "엑셀 업로드를 처리하지 못했습니다."),
           );
-
-          if (matchedSet) {
-            setItems(importResult.savedItemsByUnit.get(matchedSet.unit) ?? []);
-            setPublished(importResult.publishImportedSets);
-            setDirty(false);
-          }
-          setPublisher(cleanPublisher);
-          setTeacherProfile((current) =>
-            current
-              ? {
-                  ...current,
-                  gradePublishers: importResult.nextGradePublishers,
-                }
-              : current,
-          );
-
-          setStatus(
-            importResult.publishImportedSets
-              ? `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰고 모든 반영 단원을 학생 공개로 설정했습니다.`
-              : `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰었습니다.`,
-          );
-        },
-      });
-    } catch (nextError) {
-      if (
-        isCurrentTeacherAutoSaveRevision(
-          autoSaveRevisionStateRef.current,
-          mutationRevision,
-        )
-      ) {
-        setError(
-          formatErrorMessage(nextError, "엑셀 업로드를 처리하지 못했습니다."),
-        );
+        }
+      } finally {
+        setImporting(false);
       }
+
+      return true;
     } finally {
-      setImporting(false);
+      finishTeacherWorkbookImport(workbookImportInFlightRef);
     }
   }
 

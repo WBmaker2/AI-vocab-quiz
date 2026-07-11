@@ -31,9 +31,9 @@ function normalizeCell(value) {
 
 function getFileExtension(file) {
   const fileName = String(file?.name ?? "").trim();
-  const extensionIndex = fileName.lastIndexOf(".");
+  const extensionMatch = fileName.match(/\.[^.]+$/);
 
-  return extensionIndex > 0 ? fileName.slice(extensionIndex).toLowerCase() : "";
+  return extensionMatch ? extensionMatch[0].toLowerCase() : "";
 }
 
 function findColumnIndex(headers, aliases) {
@@ -91,7 +91,7 @@ export async function parseVocabularyWorkbook(file, { readSheet = readBrowserShe
   }
 
   const extension = getFileExtension(file);
-  if (extension && extension !== ".xlsx") {
+  if (extension !== ".xlsx") {
     throw new Error(
       "이 파일은 지원하지 않습니다. Excel에서 파일을 다시 열어 .xlsx 형식으로 저장한 뒤 업로드하세요.",
     );
@@ -101,8 +101,15 @@ export async function parseVocabularyWorkbook(file, { readSheet = readBrowserShe
     throw new Error("엑셀 파일은 5 MiB 이하만 업로드할 수 있습니다.");
   }
 
-  // readSheet defaults to the first worksheet, matching the existing import behavior.
-  const rows = await readSheet(file);
+  let rows;
+  try {
+    // readSheet defaults to the first worksheet, matching the existing import behavior.
+    rows = await readSheet(file);
+  } catch {
+    throw new Error(
+      "엑셀 파일을 읽지 못했습니다. 파일이 손상되었거나 올바른 .xlsx 형식이 아닙니다. Excel에서 다시 열어 .xlsx 형식으로 저장한 뒤 업로드하세요.",
+    );
+  }
 
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error("엑셀 파일에서 첫 번째 시트를 읽지 못했습니다.");

@@ -198,3 +198,49 @@ test("saveTeacherVocabularyImportBatch rejects more than 500 operations before F
 
   assert.match(result?.message ?? "", /500/);
 });
+
+test("teacher vocabulary import writes publisher and all units through one batch commit", async () => {
+  const operations = [];
+  let commitCount = 0;
+  const result = await Promise.resolve()
+    .then(async () => {
+      const writeImport = firebase.createTeacherVocabularyImportBatchWriter({
+        firestore: { id: "test-firestore" },
+        createBatch: () => ({
+          set: (ref, payload, options) => operations.push({ ref, payload, options }),
+          commit: async () => {
+            commitCount += 1;
+          },
+        }),
+        createDocumentRef: (_firestore, collectionName, documentId) =>
+          `${collectionName}/${documentId}`,
+        createServerTimestamp: () => "server-timestamp",
+      });
+      await writeImport({
+        userId: "teacher-1",
+        teacherProfile: {
+          teacherName: "김선생",
+          schoolId: "school-1",
+          schoolName: "테스트초",
+        },
+        grade: "3",
+        publisher: "천재교육",
+        gradePublishers: { 3: "천재교육" },
+        published: true,
+        vocabularySets: [
+          { unit: "1", items: [{ word: "apple", meaning: "사과" }] },
+          { unit: "2", items: [{ word: "book", meaning: "책" }] },
+        ],
+      });
+      return operations;
+    })
+    .catch((error) => error);
+
+  assert.equal(commitCount, 1);
+  assert.deepEqual(result.map((operation) => operation.ref), [
+    "teachers/teacher-1",
+    "vocabularySets/teacher-1__3__1",
+    "vocabularySets/teacher-1__3__2",
+  ]);
+  assert.equal(result.every((operation) => operation.options?.merge === true), true);
+});

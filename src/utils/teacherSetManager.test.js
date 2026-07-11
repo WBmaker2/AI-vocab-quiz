@@ -14,6 +14,7 @@ import {
   refreshTeacherSetCatalog,
   shouldQueueTeacherAutoSave,
 } from "./teacherSetManager.js";
+import * as teacherSetManager from "./teacherSetManager.js";
 
 function createDeferred() {
   let resolve;
@@ -30,6 +31,62 @@ async function flushCoordinator() {
   await Promise.resolve();
   await Promise.resolve();
 }
+
+test("import preflight allows 499 units and only then starts existing-set reads", async () => {
+  let readCount = 0;
+  const units = Array.from({ length: 499 }, (_, index) => ({ unit: String(index + 1) }));
+  const result = await teacherSetManager
+    .loadTeacherVocabularyImportExistingSets({
+      units,
+      loadExistingSet: async (unit) => {
+        readCount += 1;
+        return { unit, items: [] };
+      },
+    })
+    .catch((error) => error);
+
+  assert.equal(Array.isArray(result), true);
+  assert.equal(readCount, 499);
+});
+
+test("import preflight rejects 500 units before any existing-set read", async () => {
+  let readCount = 0;
+  const result = await teacherSetManager
+    .loadTeacherVocabularyImportExistingSets({
+      units: Array.from({ length: 500 }, (_, index) => ({ unit: String(index + 1) })),
+      loadExistingSet: async () => {
+        readCount += 1;
+        return { items: [] };
+      },
+    })
+    .catch((error) => error);
+
+  assert.match(result?.message ?? "", /500/);
+  assert.equal(readCount, 0);
+});
+
+test("workbook import gate starts only one of two immediate calls and releases on completion", () => {
+  const importInFlightRef = { current: false };
+  const firstStart = (() => {
+    try {
+      return teacherSetManager.tryStartTeacherWorkbookImport(importInFlightRef);
+    } catch (error) {
+      return error;
+    }
+  })();
+  const secondStart = (() => {
+    try {
+      return teacherSetManager.tryStartTeacherWorkbookImport(importInFlightRef);
+    } catch (error) {
+      return error;
+    }
+  })();
+
+  assert.equal(firstStart, true);
+  assert.equal(secondStart, false);
+  teacherSetManager.finishTeacherWorkbookImport(importInFlightRef);
+  assert.equal(teacherSetManager.tryStartTeacherWorkbookImport(importInFlightRef), true);
+});
 
 test("getNextTeacherSelection keeps other fields for non-grade updates", () => {
   const nextSelection = getNextTeacherSelection({

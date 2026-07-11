@@ -1,5 +1,53 @@
 import { getUnitsForGrade } from "../constants/vocabulary.js";
 
+export const MAX_TEACHER_VOCABULARY_IMPORT_BATCH_OPERATIONS = 500;
+export const TEACHER_VOCABULARY_IMPORT_PUBLISHER_OPERATION_COUNT = 1;
+
+export function assertTeacherVocabularyImportBatchCapacity(unitCount) {
+  const cleanUnitCount = Number(unitCount);
+
+  if (!Number.isInteger(cleanUnitCount) || cleanUnitCount < 0) {
+    throw new Error("엑셀 가져오기 단원 수가 올바르지 않습니다.");
+  }
+
+  const operationCount =
+    cleanUnitCount + TEACHER_VOCABULARY_IMPORT_PUBLISHER_OPERATION_COUNT;
+
+  if (operationCount > MAX_TEACHER_VOCABULARY_IMPORT_BATCH_OPERATIONS) {
+    throw new Error("엑셀 가져오기는 한 번에 Firestore 배치 500개 작업을 넘길 수 없습니다.");
+  }
+
+  return operationCount;
+}
+
+export async function loadTeacherVocabularyImportExistingSets({
+  units,
+  loadExistingSet,
+}) {
+  const importUnits = Array.isArray(units) ? units : [];
+  assertTeacherVocabularyImportBatchCapacity(importUnits.length);
+
+  return Promise.all(
+    importUnits.map(async (groupedSet) => ({
+      groupedSet,
+      existingSet: await loadExistingSet(groupedSet),
+    })),
+  );
+}
+
+export function tryStartTeacherWorkbookImport(importInFlightRef) {
+  if (importInFlightRef.current) {
+    return false;
+  }
+
+  importInFlightRef.current = true;
+  return true;
+}
+
+export function finishTeacherWorkbookImport(importInFlightRef) {
+  importInFlightRef.current = false;
+}
+
 export function getNextTeacherSelection({
   currentSelection,
   field,

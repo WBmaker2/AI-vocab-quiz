@@ -65,6 +65,9 @@ import {
   normalizeBingoText,
   selectNextBingoWord,
 } from "../utils/bingo.js";
+import {
+  assertTeacherVocabularyImportBatchCapacity,
+} from "../utils/teacherSetManager.js";
 
 function getEnvValue(name) {
   return String(import.meta.env?.[name] ?? "").trim();
@@ -2358,8 +2361,6 @@ export async function saveTeacherVocabularySet({
   await setDoc(setRef, payload, { merge: true });
 }
 
-const MAX_FIRESTORE_BATCH_OPERATIONS = 500;
-
 function prepareTeacherVocabularyImportBatch({
   userId,
   teacherProfile,
@@ -2388,9 +2389,7 @@ function prepareTeacherVocabularyImportBatch({
     throw new Error("엑셀 가져오기 계획에 저장할 단원이 없습니다.");
   }
 
-  if (vocabularySets.length + 1 > MAX_FIRESTORE_BATCH_OPERATIONS) {
-    throw new Error("엑셀 가져오기는 한 번에 Firestore 배치 500개 작업을 넘길 수 없습니다.");
-  }
+  assertTeacherVocabularyImportBatchCapacity(vocabularySets.length);
 
   const units = new Set();
   const preparedSets = vocabularySets.map((set) => {
@@ -2421,11 +2420,14 @@ function prepareTeacherVocabularyImportBatch({
   };
 }
 
-export async function saveTeacherVocabularyImportBatch(input) {
-  const plan = prepareTeacherVocabularyImportBatch(input);
-  const { db: firestore } = ensureFirebase();
-  const batch = writeBatch(firestore);
-  const teacherRef = doc(firestore, "teachers", plan.userId);
+async function writeTeacherVocabularyImportBatch(plan, {
+  firestore,
+  createBatch = writeBatch,
+  createDocumentRef = doc,
+  createServerTimestamp = serverTimestamp,
+}) {
+  const batch = createBatch(firestore);
+  const teacherRef = createDocumentRef(firestore, "teachers", plan.userId);
 
   batch.set(
     teacherRef,
@@ -2437,13 +2439,13 @@ export async function saveTeacherVocabularyImportBatch(input) {
         gradePublishers: plan.gradePublishers,
         isNew: false,
       }),
-      updatedAt: serverTimestamp(),
+      updatedAt: createServerTimestamp(),
     },
     { merge: true },
   );
 
   plan.vocabularySets.forEach((set) => {
-    const setRef = doc(
+    const setRef = createDocumentRef(
       firestore,
       "vocabularySets",
       createVocabularySetId(plan.userId, plan.grade, set.unit),
@@ -2461,13 +2463,28 @@ export async function saveTeacherVocabularyImportBatch(input) {
         published: plan.published,
         sourceType: "xlsx",
         items: set.items,
-        updatedAt: serverTimestamp(),
+        updatedAt: createServerTimestamp(),
       },
       { merge: true },
     );
   });
 
   await batch.commit();
+}
+
+export function createTeacherVocabularyImportBatchWriter(dependencies) {
+  return async (input) => {
+    const plan = prepareTeacherVocabularyImportBatch(input);
+    return writeTeacherVocabularyImportBatch(plan, dependencies);
+  };
+}
+
+export async function saveTeacherVocabularyImportBatch(input) {
+  // Validate the plan before Firebase access so oversized imports never issue reads or writes.
+  const plan = prepareTeacherVocabularyImportBatch(input);
+  const { db: firestore } = ensureFirebase();
+
+  return writeTeacherVocabularyImportBatch(plan, { firestore });
 }
 
 export async function deleteTeacherVocabularySet(userId, selection) {

@@ -220,16 +220,10 @@ export function TeacherWorkspace({
   }
 
   async function handleImportWorkbook() {
-    const shouldForcePublic = window.confirm(
-      "이 학년의 모든 단원을 '학생 공개'로 저장하겠습니까?\n'확인'을 누르면 모든 단원이 학생 공개로 저장되고, '취소'를 누르면 현재 체크 상태대로 저장됩니다.",
-    );
-
-    await onImportWorkbook(
-      importFile,
-      selection.grade,
-      shouldForcePublic ? true : null,
-    );
-    clearImportSelection();
+    const didStart = await onImportWorkbook(importFile, selection.grade);
+    if (didStart) {
+      clearImportSelection();
+    }
   }
 
   function handleResetGradeSets() {
