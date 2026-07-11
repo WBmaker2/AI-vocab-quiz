@@ -12,8 +12,30 @@ export function createRequestGate() {
   };
 }
 
-export function invalidateMatchingLane(matchingGate) {
-  return matchingGate.begin();
+export function createExclusiveRequestGuard() {
+  let activeOwner = null;
+
+  return {
+    acquire(owner) {
+      if (activeOwner !== null) {
+        return false;
+      }
+
+      activeOwner = owner;
+      return true;
+    },
+    release(owner) {
+      if (activeOwner !== owner) {
+        return false;
+      }
+
+      activeOwner = null;
+      return true;
+    },
+    isBusy() {
+      return activeOwner !== null;
+    },
+  };
 }
 
 export async function runLatestRequest(
@@ -43,6 +65,29 @@ export async function runLatestRequest(
   }
 
   return result;
+}
+
+export async function runExclusiveRequest(
+  guard,
+  owner,
+  gate,
+  request,
+  { onStart, onSuccess, onError, onFinally } = {},
+) {
+  if (!guard.acquire(owner)) {
+    return { ok: false, current: false, blocked: true };
+  }
+
+  try {
+    onStart?.();
+    return await runLatestRequest(gate, request, {
+      onSuccess,
+      onError,
+      onFinally,
+    });
+  } finally {
+    guard.release(owner);
+  }
 }
 
 export function toggleStudentMatchingUnits(currentUnits, unit) {

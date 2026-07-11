@@ -45,6 +45,7 @@ export function ModeSelector({
   const [matchingPanelOpen, setMatchingPanelOpen] = useState(false);
   const showingSearchResults = schoolBrowseMode === "search";
   const visibleSchools = showingSearchResults ? schoolResults : featuredSchools;
+  const setLoadBusy = vocabularyLoading || matchingLoading;
 
   useEffect(() => {
     if (initialMatchingPanelOpen) {
@@ -228,12 +229,14 @@ export function ModeSelector({
               !remoteConfigured ||
               !selectedTeacher ||
               !selection.unit ||
-              vocabularyLoading
+              setLoadBusy
             }
           >
             {vocabularyLoading
               ? "단어 세트 불러오는 중..."
-              : "단어 세트 불러오기"}
+              : matchingLoading
+                ? "게임 준비 중..."
+                : "단어 세트 불러오기"}
           </button>
         </div>
 
@@ -260,7 +263,7 @@ export function ModeSelector({
                       type="checkbox"
                       checked={checked}
                       onChange={() => onToggleMatchingUnit(unit)}
-                      disabled={matchingLoading}
+                      disabled={setLoadBusy}
                     />
                     <span>{unit}단원</span>
                   </label>
@@ -278,9 +281,17 @@ export function ModeSelector({
               <button
                 className="primary-button"
                 onClick={handleStartMatching}
-                disabled={!selectedTeacher || matchingUnits.length === 0 || matchingLoading}
+                disabled={
+                  !selectedTeacher ||
+                  matchingUnits.length === 0 ||
+                  setLoadBusy
+                }
               >
-                {matchingLoading ? "게임 준비 중..." : "선택한 단원으로 게임 시작"}
+                {matchingLoading
+                  ? "게임 준비 중..."
+                  : vocabularyLoading
+                    ? "단어 세트 불러오는 중..."
+                    : "선택한 단원으로 게임 시작"}
               </button>
               <button
                 className="ghost-button"
@@ -324,7 +335,12 @@ export function ModeSelector({
           <button
             className="ghost-button"
             onClick={() => setMatchingPanelOpen((current) => !current)}
-            disabled={!remoteConfigured || !selectedTeacher || unitsLoading}
+            disabled={
+              !remoteConfigured ||
+              !selectedTeacher ||
+              unitsLoading ||
+              setLoadBusy
+            }
           >
             단어 짝 맞추기
           </button>

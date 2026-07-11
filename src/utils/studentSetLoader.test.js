@@ -128,36 +128,109 @@ test("production runner commits the current error and finally handlers", async (
   );
 });
 
-test("matching seed invalidation does not strand vocabulary loading", async () => {
-  assert.equal(typeof studentSetLoader.runLatestRequest, "function");
-  assert.equal(typeof studentSetLoader.invalidateMatchingLane, "function");
+test("vocabulary ownership blocks matching load and toggle until settlement", async () => {
+  assert.equal(typeof studentSetLoader.createExclusiveRequestGuard, "function");
+  assert.equal(typeof studentSetLoader.runExclusiveRequest, "function");
   if (
-    typeof studentSetLoader.runLatestRequest !== "function" ||
-    typeof studentSetLoader.invalidateMatchingLane !== "function"
+    typeof studentSetLoader.createExclusiveRequestGuard !== "function" ||
+    typeof studentSetLoader.runExclusiveRequest !== "function"
   ) {
     return;
   }
 
-  const vocabularyGate = studentSetLoader.createRequestGate();
-  const matchingGate = studentSetLoader.createRequestGate();
+  const guard = studentSetLoader.createExclusiveRequestGuard();
   const vocabularyResponse = createDeferred();
-  let vocabularyLoading = true;
-  const vocabularyRequest = studentSetLoader.runLatestRequest(
+  const vocabularyGate = studentSetLoader.createRequestGate();
+  const vocabularyRequest = studentSetLoader.runExclusiveRequest(
+    guard,
+    "vocabulary",
     vocabularyGate,
     () => vocabularyResponse.promise,
-    {
-      onFinally: () => {
-        vocabularyLoading = false;
-      },
+  );
+  let blockedMatchingRequestCalled = false;
+  const blockedMatchingRequest = studentSetLoader.runExclusiveRequest(
+    guard,
+    "matching",
+    studentSetLoader.createRequestGate(),
+    () => {
+      blockedMatchingRequestCalled = true;
+      return Promise.resolve(["matching"]);
     },
   );
 
-  studentSetLoader.invalidateMatchingLane(matchingGate);
-  vocabularyResponse.resolve(["apple"]);
-  const result = await vocabularyRequest;
+  assert.equal((await blockedMatchingRequest).blocked, true);
+  assert.equal(blockedMatchingRequestCalled, false);
+  assert.equal(guard.acquire("matching-toggle"), false);
 
-  assert.equal(result.current, true);
-  assert.equal(vocabularyLoading, false);
+  vocabularyGate.begin();
+  vocabularyResponse.resolve(["vocabulary"]);
+  const vocabularyResult = await vocabularyRequest;
+  assert.equal(vocabularyResult.ok, true);
+  assert.equal(vocabularyResult.current, false);
+  assert.equal(guard.isBusy(), false);
+
+  const nextMatchingRequest = await studentSetLoader.runExclusiveRequest(
+    guard,
+    "matching",
+    studentSetLoader.createRequestGate(),
+    () => Promise.resolve(["matching"]),
+  );
+  assert.equal(nextMatchingRequest.ok, true);
+  assert.equal(nextMatchingRequest.blocked, undefined);
+});
+
+test("matching ownership blocks vocabulary load and preserves matching items", async () => {
+  assert.equal(typeof studentSetLoader.createExclusiveRequestGuard, "function");
+  assert.equal(typeof studentSetLoader.runExclusiveRequest, "function");
+  if (
+    typeof studentSetLoader.createExclusiveRequestGuard !== "function" ||
+    typeof studentSetLoader.runExclusiveRequest !== "function"
+  ) {
+    return;
+  }
+
+  const guard = studentSetLoader.createExclusiveRequestGuard();
+  const matchingResponse = createDeferred();
+  let matchingItems = [];
+  const matchingRequest = studentSetLoader.runExclusiveRequest(
+    guard,
+    "matching",
+    studentSetLoader.createRequestGate(),
+    () => matchingResponse.promise,
+    {
+      onSuccess: (items) => {
+        matchingItems = items;
+      },
+    },
+  );
+  let blockedVocabularyRequestCalled = false;
+  const blockedVocabularyRequest = studentSetLoader.runExclusiveRequest(
+    guard,
+    "vocabulary",
+    studentSetLoader.createRequestGate(),
+    () => {
+      blockedVocabularyRequestCalled = true;
+      return Promise.resolve(["vocabulary"]);
+    },
+  );
+
+  assert.equal((await blockedVocabularyRequest).blocked, true);
+  assert.equal(blockedVocabularyRequestCalled, false);
+
+  matchingResponse.resolve(["matching-1", "matching-2"]);
+  const matchingResult = await matchingRequest;
+  assert.equal(matchingResult.ok, true);
+  assert.deepEqual(matchingItems, ["matching-1", "matching-2"]);
+  assert.equal(guard.isBusy(), false);
+
+  const nextVocabularyRequest = await studentSetLoader.runExclusiveRequest(
+    guard,
+    "vocabulary",
+    studentSetLoader.createRequestGate(),
+    () => Promise.resolve(["vocabulary"]),
+  );
+  assert.equal(nextVocabularyRequest.ok, true);
+  assert.deepEqual(matchingItems, ["matching-1", "matching-2"]);
 });
 
 test("toggleStudentMatchingUnits adds and sorts units numerically", () => {

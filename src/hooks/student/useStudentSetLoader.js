@@ -16,8 +16,9 @@ import {
   buildStudentContexts,
   buildStudentMatchingItems,
   createRequestGate,
-  invalidateMatchingLane,
+  createExclusiveRequestGuard,
   runLatestRequest,
+  runExclusiveRequest,
   toggleStudentMatchingUnits,
 } from "../../utils/studentSetLoader.js";
 import {
@@ -79,6 +80,7 @@ function buildRecentSelectionStatus({
 
 export function useStudentSetLoader({ formatErrorMessage }) {
   const requestGates = useRef(null);
+  const sharedSetLoadGuard = useRef(null);
   if (!requestGates.current) {
     requestGates.current = {
       schoolSearch: createRequestGate(),
@@ -87,6 +89,9 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       vocabularySet: createRequestGate(),
       matchingSet: createRequestGate(),
     };
+  }
+  if (!sharedSetLoadGuard.current) {
+    sharedSetLoadGuard.current = createExclusiveRequestGuard();
   }
 
   const {
@@ -191,6 +196,10 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     setMatchingLoading(false);
   }
 
+  function isSetLoadBusy() {
+    return sharedSetLoadGuard.current.isBusy();
+  }
+
   useEffect(() => {
     if (!isFirebaseConfigured) {
       return;
@@ -267,12 +276,10 @@ export function useStudentSetLoader({ formatErrorMessage }) {
   }
 
   function seedMatchingUnits(unit) {
-    if (!unit) {
+    if (!unit || isSetLoadBusy()) {
       return;
     }
 
-    invalidateMatchingLane(matchingSetGate);
-    setMatchingLoading(false);
     setMatchingUnits([unit]);
     setMatchingItems([]);
   }
@@ -610,6 +617,10 @@ export function useStudentSetLoader({ formatErrorMessage }) {
   }
 
   async function loadSet() {
+    if (isSetLoadBusy()) {
+      return;
+    }
+
     if (!isFirebaseConfigured) {
       setError("Firebase 설정이 필요합니다.");
       return;
@@ -623,11 +634,10 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     const requestSchool = selectedSchool;
     const requestTeacher = selectedTeacher;
     const requestSelection = { ...selection };
-    setVocabularyLoading(true);
-    setStatus("");
-    setError("");
 
-    await runLatestRequest(
+    await runExclusiveRequest(
+      sharedSetLoadGuard.current,
+      "vocabulary",
       vocabularySetGate,
       () =>
         fetchPublishedVocabularySet({
@@ -636,6 +646,11 @@ export function useStudentSetLoader({ formatErrorMessage }) {
           unit: requestSelection.unit,
         }),
       {
+        onStart: () => {
+          setVocabularyLoading(true);
+          setStatus("");
+          setError("");
+        },
         onSuccess: (nextItems) => {
           setItems(nextItems);
           setMatchingUnits(
@@ -672,6 +687,10 @@ export function useStudentSetLoader({ formatErrorMessage }) {
   }
 
   function toggleMatchingUnit(unit) {
+    if (isSetLoadBusy()) {
+      return;
+    }
+
     invalidateSetLanes();
     setMatchingUnits((current) => toggleStudentMatchingUnits(current, unit));
     setMatchingItems([]);
@@ -682,6 +701,10 @@ export function useStudentSetLoader({ formatErrorMessage }) {
   }
 
   async function loadMatchingSet() {
+    if (isSetLoadBusy()) {
+      return false;
+    }
+
     if (!isFirebaseConfigured) {
       setError("Firebase 설정이 필요합니다.");
       return false;
@@ -695,12 +718,11 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     const requestTeacher = selectedTeacher;
     const requestSelection = { ...selection };
     const requestUnits = [...matchingUnits];
-    setMatchingLoading(true);
-    setStatus("");
-    setError("");
 
     let combinedItems = [];
-    const result = await runLatestRequest(
+    const result = await runExclusiveRequest(
+      sharedSetLoadGuard.current,
+      "matching",
       matchingSetGate,
       () =>
         Promise.all(
@@ -713,6 +735,11 @@ export function useStudentSetLoader({ formatErrorMessage }) {
           ),
         ),
       {
+        onStart: () => {
+          setMatchingLoading(true);
+          setStatus("");
+          setError("");
+        },
         onSuccess: (unitItems) => {
           combinedItems = buildStudentMatchingItems(unitItems);
           setMatchingItems(combinedItems);
