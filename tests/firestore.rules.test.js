@@ -508,6 +508,33 @@ rulesTest(
 );
 
 rulesTest(
+  "active teacher cannot create or mutate a vocabulary set with another school name",
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context);
+      await setDoc(
+        doc(context.firestore(), "vocabularySets", "teacher-1__3__1"),
+        createVocabularySetDoc(),
+      );
+    });
+
+    const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
+
+    await assertFails(
+      setDoc(
+        doc(teacherDb, "vocabularySets", "teacher-1__3__2"),
+        createVocabularySetDoc({ schoolName: "위조초" }),
+      ),
+    );
+    await assertFails(
+      updateDoc(doc(teacherDb, "vocabularySets", "teacher-1__3__1"), {
+        schoolName: "위조초",
+      }),
+    );
+  },
+);
+
+rulesTest(
   "studentProfiles allows first matching score record when baseline is zero",
   async () => {
     const profileId = "school-1__3__민수";

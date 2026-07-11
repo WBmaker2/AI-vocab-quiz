@@ -581,6 +581,7 @@ service cloud.firestore {
 
       allow create: if isTeacherForSchool(request.resource.data.schoolId)
         && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.schoolName == teacherDoc(request.auth.uid).data.schoolName
         && request.resource.data.keys().hasOnly([
           'ownerUid',
           'schoolId',
@@ -611,6 +612,7 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.schoolId == resource.data.schoolId
+        && request.resource.data.schoolName == resource.data.schoolName
         && request.resource.data.keys().hasOnly([
           'ownerUid',
           'schoolId',
