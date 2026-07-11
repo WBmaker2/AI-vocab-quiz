@@ -107,6 +107,7 @@ Before production deployment, require:
 4. `npm run test:smoke`
 5. `npm audit --omit=dev`
 
-CI runs browser smoke and Firestore rules as separate required jobs. The local
-Chromium smoke could not launch inside the current macOS sandbox, so CI must
-provide the browser execution evidence before deployment.
+CI runs browser smoke and Firestore rules as separate required jobs. The smoke
+test now counts the school-search Enter submission directly, so it runs in both
+Firebase-configured and unconfigured environments. Local Chromium smoke passed
+after the merged-branch verification.

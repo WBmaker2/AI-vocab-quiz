@@ -101,38 +101,65 @@ async function run() {
     if ((await schoolSearchButton.getAttribute("type")) !== "submit") {
       throw new Error("School search must use a submit button.");
     }
-    await schoolSearchInput.evaluate((input) => {
+    const remoteConfigured = !(await schoolSearchInput.isDisabled());
+    await schoolSearchForm.evaluate((form) => {
+      const input = form.querySelector('input[name="schoolName"]');
+      const submitButton = form.querySelector('button[type="submit"]');
+
+      window.__schoolSearchSubmitCount = 0;
+      form.addEventListener(
+        "submit",
+        () => {
+          window.__schoolSearchSubmitCount += 1;
+        },
+        { capture: true },
+      );
       input.disabled = false;
+      submitButton.disabled = false;
     });
     await schoolSearchInput.focus();
     await page.keyboard.press("Enter");
-    await assertVisible(page, "Firebase 설정이 필요합니다.");
+    await page.waitForFunction(() => window.__schoolSearchSubmitCount === 1);
+    await page.waitForTimeout(50);
+    const submitCount = await page.evaluate(
+      () => window.__schoolSearchSubmitCount,
+    );
+    if (submitCount !== 1) {
+      throw new Error(`School search submitted ${submitCount} times.`);
+    }
+    if (!remoteConfigured) {
+      await assertVisible(page, "Firebase 설정이 필요합니다.");
+    }
 
     await updateInfoButton.focus();
     if (!(await updateInfoButton.evaluate((button) => document.activeElement === button))) {
       throw new Error("Keyboard focus did not reach the update history button.");
     }
 
+    const updateDialogHeading = page.getByRole("heading", {
+      name: "업데이트 기록",
+      exact: true,
+    });
     await updateInfoButton.click();
-    await assertVisible(page, "업데이트 기록");
+    await updateDialogHeading.waitFor({ state: "visible" });
     const dialog = page.getByRole("dialog");
     await dialog.getByText(currentVersion, { exact: true }).waitFor({ state: "visible" });
     await dialog.getByText("v1.0.0", { exact: true }).waitFor({ state: "visible" });
 
     await page.keyboard.press("Escape");
-    await assertHidden(page, "업데이트 기록");
+    await updateDialogHeading.waitFor({ state: "hidden" });
     await updateInfoButton.waitFor({ state: "visible" });
 
     await updateInfoButton.click();
-    await assertVisible(page, "업데이트 기록");
+    await updateDialogHeading.waitFor({ state: "visible" });
     await page.locator(".update-modal-backdrop").click({ position: { x: 8, y: 8 } });
-    await assertHidden(page, "업데이트 기록");
+    await updateDialogHeading.waitFor({ state: "hidden" });
     await updateInfoButton.waitFor({ state: "visible" });
 
     await updateInfoButton.click();
-    await assertVisible(page, "업데이트 기록");
+    await updateDialogHeading.waitFor({ state: "visible" });
     await page.getByRole("button", { name: "닫기" }).click();
-    await assertHidden(page, "업데이트 기록");
+    await updateDialogHeading.waitFor({ state: "hidden" });
     await updateInfoButton.waitFor({ state: "visible" });
 
     await page.getByRole("button", { name: "Google 로그인 후 시작" }).click();
