@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEFAULT_STUDENT_SELECTION,
   GRADE_OPTIONS,
@@ -15,6 +15,7 @@ import {
 import {
   buildStudentContexts,
   buildStudentMatchingItems,
+  createRequestGate,
   toggleStudentMatchingUnits,
 } from "../../utils/studentSetLoader.js";
 import {
@@ -75,6 +76,24 @@ function buildRecentSelectionStatus({
 }
 
 export function useStudentSetLoader({ formatErrorMessage }) {
+  const requestGates = useRef(null);
+  if (!requestGates.current) {
+    requestGates.current = {
+      schoolSearch: createRequestGate(),
+      teacherLookup: createRequestGate(),
+      unitLookup: createRequestGate(),
+      vocabularySet: createRequestGate(),
+      matchingSet: createRequestGate(),
+    };
+  }
+
+  const {
+    schoolSearch: schoolSearchGate,
+    teacherLookup: teacherLookupGate,
+    unitLookup: unitLookupGate,
+    vocabularySet: vocabularySetGate,
+    matchingSet: matchingSetGate,
+  } = requestGates.current;
   const [schoolQuery, setSchoolQuery] = useState("");
   const [schoolBrowseMode, setSchoolBrowseMode] = useState("featured");
   const [featuredSchools, setFeaturedSchools] = useState([]);
@@ -93,9 +112,12 @@ export function useStudentSetLoader({ formatErrorMessage }) {
   const [matchingUnits, setMatchingUnits] = useState([]);
   const [matchingItems, setMatchingItems] = useState([]);
   const [nameDraft, setNameDraft] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [vocabularyLoading, setVocabularyLoading] = useState(false);
+  const [matchingLoading, setMatchingLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+
+  const loading = vocabularyLoading || matchingLoading;
 
   function readRecentSelectionFromStorage(schoolId, teacherUserId) {
     if (typeof window === "undefined") {
@@ -136,6 +158,31 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     }
   }
 
+  function invalidateSelectionLanes() {
+    teacherLookupGate.begin();
+    unitLookupGate.begin();
+    vocabularySetGate.begin();
+    matchingSetGate.begin();
+  }
+
+  function invalidateUnitDependentLanes() {
+    unitLookupGate.begin();
+    vocabularySetGate.begin();
+    matchingSetGate.begin();
+  }
+
+  function invalidateSetLanes() {
+    vocabularySetGate.begin();
+    matchingSetGate.begin();
+  }
+
+  function clearStudentLoadingState() {
+    setTeachersLoading(false);
+    setUnitsLoading(false);
+    setVocabularyLoading(false);
+    setMatchingLoading(false);
+  }
+
   useEffect(() => {
     if (!isFirebaseConfigured) {
       return;
@@ -174,11 +221,22 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       return;
     }
 
+    const generation = schoolSearchGate.begin();
+    setSchoolSearchLoading(true);
+
     try {
       const schools = await listPopularSchools(5);
-      setFeaturedSchools(schools);
+      if (schoolSearchGate.isCurrent(generation)) {
+        setFeaturedSchools(schools);
+      }
     } catch {
-      setFeaturedSchools([]);
+      if (schoolSearchGate.isCurrent(generation)) {
+        setFeaturedSchools([]);
+      }
+    } finally {
+      if (schoolSearchGate.isCurrent(generation)) {
+        setSchoolSearchLoading(false);
+      }
     }
   }
 
@@ -188,6 +246,7 @@ export function useStudentSetLoader({ formatErrorMessage }) {
   }
 
   function resetSelectedFlow() {
+    invalidateSelectionLanes();
     setSelectedSchool(null);
     setSelectedTeacher(null);
     setNameDraft("");
@@ -196,6 +255,7 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     setItems([]);
     resetMatchingState();
     setSelection(DEFAULT_STUDENT_SELECTION);
+    clearStudentLoadingState();
   }
 
   function seedMatchingUnits(unit) {
@@ -203,11 +263,14 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       return;
     }
 
+    invalidateSetLanes();
     setMatchingUnits([unit]);
     setMatchingItems([]);
   }
 
   function updateSchoolQuery(value) {
+    schoolSearchGate.begin();
+    setSchoolSearchLoading(false);
     setSchoolQuery(value);
     if (!value.trim()) {
       setSchoolBrowseMode("featured");
@@ -225,10 +288,12 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     }
 
     const query = schoolQuery.trim();
+    const generation = schoolSearchGate.begin();
     if (!query) {
       setSchoolBrowseMode("featured");
       setSchoolResults([]);
       resetSelectedFlow();
+      setSchoolSearchLoading(false);
       setStatus("");
       setError("");
       await refreshFeaturedSchools();
@@ -242,6 +307,10 @@ export function useStudentSetLoader({ formatErrorMessage }) {
 
     try {
       const schools = await searchSchoolsByName(query);
+      if (!schoolSearchGate.isCurrent(generation)) {
+        return;
+      }
+
       setSchoolResults(schools);
       resetSelectedFlow();
       setStatus(
@@ -250,28 +319,41 @@ export function useStudentSetLoader({ formatErrorMessage }) {
           : "검색 결과가 없습니다. 학교 이름을 다시 확인하세요.",
       );
     } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "학교 목록을 불러오지 못했습니다."),
-      );
+      if (schoolSearchGate.isCurrent(generation)) {
+        setError(
+          formatErrorMessage(nextError, "학교 목록을 불러오지 못했습니다."),
+        );
+      }
     } finally {
-      setSchoolSearchLoading(false);
+      if (schoolSearchGate.isCurrent(generation)) {
+        setSchoolSearchLoading(false);
+      }
     }
   }
 
   async function refreshUnits(
     nextTeacher = selectedTeacher,
     nextGrade,
-    { suppressStatus = false } = {},
+    { suppressStatus = false, parentIsCurrent = () => true } = {},
   ) {
+    const generation = unitLookupGate.begin();
+    const isCurrent = () =>
+      unitLookupGate.isCurrent(generation) && parentIsCurrent();
+
     if (!isFirebaseConfigured || !nextTeacher?.userId) {
-      setUnits([]);
+      if (isCurrent()) {
+        setUnits([]);
+        setUnitsLoading(false);
+      }
       return [];
     }
 
-    setUnitsLoading(true);
-    setError("");
-    if (!suppressStatus) {
-      setStatus("");
+    if (isCurrent()) {
+      setUnitsLoading(true);
+      setError("");
+      if (!suppressStatus) {
+        setStatus("");
+      }
     }
 
     try {
@@ -279,18 +361,26 @@ export function useStudentSetLoader({ formatErrorMessage }) {
         nextTeacher.userId,
         nextGrade,
       );
+      if (!isCurrent()) {
+        return [];
+      }
+
       setUnits(nextUnits);
       if (!suppressStatus) {
         setStatus(getStudentUnitsStatusMessage(nextGrade, nextUnits));
       }
       return nextUnits;
     } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "공개 단원 목록을 불러오지 못했습니다."),
-      );
+      if (isCurrent()) {
+        setError(
+          formatErrorMessage(nextError, "공개 단원 목록을 불러오지 못했습니다."),
+        );
+      }
       return [];
     } finally {
-      setUnitsLoading(false);
+      if (isCurrent()) {
+        setUnitsLoading(false);
+      }
     }
   }
 
@@ -298,7 +388,12 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     school,
     teacher,
     autoTeacherSelected = false,
+    selectionGeneration,
   }) {
+    if (!teacherLookupGate.isCurrent(selectionGeneration)) {
+      return "";
+    }
+
     const recentSelection = readRecentSelectionFromStorage(
       school?.id,
       teacher?.userId,
@@ -310,11 +405,20 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       availableUnits: [],
     });
 
+    if (!teacherLookupGate.isCurrent(selectionGeneration)) {
+      return "";
+    }
     setSelection(seededSelection);
 
     const nextUnits = await refreshUnits(teacher, seededSelection.grade, {
       suppressStatus: true,
+      parentIsCurrent: () =>
+        teacherLookupGate.isCurrent(selectionGeneration),
     });
+    if (!teacherLookupGate.isCurrent(selectionGeneration)) {
+      return "";
+    }
+
     const resolvedSelection = resolveStudentRecentSelection({
       defaultSelection: DEFAULT_STUDENT_SELECTION,
       recentSelection,
@@ -322,6 +426,9 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       availableUnits: nextUnits,
     });
 
+    if (!teacherLookupGate.isCurrent(selectionGeneration)) {
+      return "";
+    }
     setSelection(resolvedSelection);
 
     return (
@@ -340,6 +447,11 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       return;
     }
 
+    const selectionGeneration = teacherLookupGate.begin();
+    schoolSearchGate.begin();
+    unitLookupGate.begin();
+    vocabularySetGate.begin();
+    matchingSetGate.begin();
     setSelectedSchool(school);
     setSelectedTeacher(null);
     setNameDraft("");
@@ -348,12 +460,20 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     setItems([]);
     resetMatchingState();
     setSelection(DEFAULT_STUDENT_SELECTION);
+    setSchoolSearchLoading(false);
     setTeachersLoading(true);
+    setUnitsLoading(false);
+    setVocabularyLoading(false);
+    setMatchingLoading(false);
     setStatus("");
     setError("");
 
     try {
       const nextTeachers = await listTeachersForSchool(school.id);
+      if (!teacherLookupGate.isCurrent(selectionGeneration)) {
+        return;
+      }
+
       setTeachers(nextTeachers);
 
       if (nextTeachers.length === 1) {
@@ -363,47 +483,75 @@ export function useStudentSetLoader({ formatErrorMessage }) {
           school,
           teacher: onlyTeacher,
           autoTeacherSelected: true,
+          selectionGeneration,
         });
-        setStatus(nextStatus);
+        if (teacherLookupGate.isCurrent(selectionGeneration)) {
+          setStatus(nextStatus);
+        }
         return;
       }
 
-      setStatus(
-        nextTeachers.length > 1
-          ? `${school.name}의 선생님 목록을 불러왔습니다.`
-          : "이 학교에 등록된 선생님 정보가 아직 없습니다.",
-      );
+      if (teacherLookupGate.isCurrent(selectionGeneration)) {
+        setStatus(
+          nextTeachers.length > 1
+            ? `${school.name}의 선생님 목록을 불러왔습니다.`
+            : "이 학교에 등록된 선생님 정보가 아직 없습니다.",
+        );
+      }
     } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "선생님 목록을 불러오지 못했습니다."),
-      );
+      if (teacherLookupGate.isCurrent(selectionGeneration)) {
+        setError(
+          formatErrorMessage(nextError, "선생님 목록을 불러오지 못했습니다."),
+        );
+      }
     } finally {
-      setTeachersLoading(false);
+      if (teacherLookupGate.isCurrent(selectionGeneration)) {
+        setTeachersLoading(false);
+      }
     }
   }
 
   async function chooseTeacher(teacherUserId) {
+    const selectionGeneration = teacherLookupGate.begin();
+    unitLookupGate.begin();
+    vocabularySetGate.begin();
+    matchingSetGate.begin();
     const teacher = teachers.find((entry) => entry.userId === teacherUserId);
+    const school = selectedSchool;
     setSelectedTeacher(teacher ?? null);
     setNameDraft("");
     setItems([]);
     resetMatchingState();
     setUnits([]);
+    setTeachersLoading(false);
+    setUnitsLoading(false);
+    setVocabularyLoading(false);
+    setMatchingLoading(false);
     setSelection(DEFAULT_STUDENT_SELECTION);
     setStatus("");
     setError("");
 
-    if (teacher && selectedSchool) {
+    if (teacher && school) {
       const nextStatus = await restoreSelectionForTeacher({
-        school: selectedSchool,
+        school,
         teacher,
+        selectionGeneration,
       });
-      setStatus(nextStatus);
+      if (teacherLookupGate.isCurrent(selectionGeneration)) {
+        setStatus(nextStatus);
+      }
     }
   }
 
   async function updateSelection(field, value) {
+    let selectionGeneration = null;
+    if (field === "grade" || field === "unit") {
+      selectionGeneration = teacherLookupGate.begin();
+      invalidateUnitDependentLanes();
+    }
+
     setItems([]);
+    setTeachersLoading(false);
     setError("");
     setStatus("");
 
@@ -416,10 +564,24 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       }));
       setUnits([]);
       resetMatchingState();
-      if (selectedTeacher) {
-        await refreshUnits(selectedTeacher, value);
+      setUnitsLoading(false);
+      setVocabularyLoading(false);
+      setMatchingLoading(false);
+      const currentTeacher = selectedTeacher;
+      if (currentTeacher) {
+        await refreshUnits(currentTeacher, value, {
+          parentIsCurrent: () =>
+            teacherLookupGate.isCurrent(selectionGeneration),
+        });
       }
       return;
+    }
+
+    if (field === "unit") {
+      setUnitsLoading(false);
+      setVocabularyLoading(false);
+      setMatchingLoading(false);
+      resetMatchingState();
     }
 
     setSelection((current) => ({
@@ -439,44 +601,61 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       return;
     }
 
-    setLoading(true);
+    const requestSchool = selectedSchool;
+    const requestTeacher = selectedTeacher;
+    const requestSelection = { ...selection };
+    const generation = vocabularySetGate.begin();
+    setVocabularyLoading(true);
     setStatus("");
     setError("");
 
     try {
       const nextItems = await fetchPublishedVocabularySet({
-        teacherUserId: selectedTeacher.userId,
-        grade: selection.grade,
-        unit: selection.unit,
+        teacherUserId: requestTeacher.userId,
+        grade: requestSelection.grade,
+        unit: requestSelection.unit,
       });
+      if (!vocabularySetGate.isCurrent(generation)) {
+        return;
+      }
+
       setItems(nextItems);
-      setMatchingUnits(nextItems.length > 0 ? [selection.unit] : []);
+      setMatchingUnits(
+        nextItems.length > 0 ? [requestSelection.unit] : [],
+      );
       setMatchingItems([]);
       setStatus(
         nextItems.length > 0
-          ? `${selectedTeacher.teacherName} 선생님의 ${formatSetLabel(selection)} 세트를 불러왔습니다.`
+          ? `${requestTeacher.teacherName} 선생님의 ${formatSetLabel(requestSelection)} 세트를 불러왔습니다.`
           : "선택한 조건에 공개된 단어가 없습니다.",
       );
       if (nextItems.length > 0) {
         writeRecentSelectionToStorage({
-          schoolId: selectedSchool.id,
-          teacherUserId: selectedTeacher.userId,
-          grade: selection.grade,
-          unit: selection.unit,
+          schoolId: requestSchool.id,
+          teacherUserId: requestTeacher.userId,
+          grade: requestSelection.grade,
+          unit: requestSelection.unit,
         });
       }
     } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "학생용 단어 세트를 불러오지 못했습니다."),
-      );
+      if (vocabularySetGate.isCurrent(generation)) {
+        setError(
+          formatErrorMessage(nextError, "학생용 단어 세트를 불러오지 못했습니다."),
+        );
+      }
     } finally {
-      setLoading(false);
+      if (vocabularySetGate.isCurrent(generation)) {
+        setVocabularyLoading(false);
+      }
     }
   }
 
   function toggleMatchingUnit(unit) {
+    invalidateSetLanes();
     setMatchingUnits((current) => toggleStudentMatchingUnits(current, unit));
     setMatchingItems([]);
+    setVocabularyLoading(false);
+    setMatchingLoading(false);
     setStatus("");
     setError("");
   }
@@ -492,41 +671,52 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       return false;
     }
 
-    setLoading(true);
+    const requestTeacher = selectedTeacher;
+    const requestSelection = { ...selection };
+    const requestUnits = [...matchingUnits];
+    const generation = matchingSetGate.begin();
+    setMatchingLoading(true);
     setStatus("");
     setError("");
 
     try {
       const unitItems = await Promise.all(
-        matchingUnits.map((unit) =>
+        requestUnits.map((unit) =>
           fetchPublishedVocabularySet({
-            teacherUserId: selectedTeacher.userId,
-            grade: selection.grade,
+            teacherUserId: requestTeacher.userId,
+            grade: requestSelection.grade,
             unit,
           }),
         ),
       );
 
       const combinedItems = buildStudentMatchingItems(unitItems);
+      if (!matchingSetGate.isCurrent(generation)) {
+        return false;
+      }
 
       setMatchingItems(combinedItems);
       setStatus(
         combinedItems.length > 0
-          ? `${selectedTeacher.teacherName} 선생님의 ${selection.grade}학년 ${matchingUnits.length}개 단원에서 ${combinedItems.length}개 단어를 준비했습니다.`
+          ? `${requestTeacher.teacherName} 선생님의 ${requestSelection.grade}학년 ${requestUnits.length}개 단원에서 ${combinedItems.length}개 단어를 준비했습니다.`
           : "선택한 단원들에 공개된 단어가 없습니다.",
       );
 
       return combinedItems.length > 0;
     } catch (nextError) {
-      setError(
-        formatErrorMessage(
-          nextError,
-          "짝 맞추기용 단어 세트를 불러오지 못했습니다.",
-        ),
-      );
+      if (matchingSetGate.isCurrent(generation)) {
+        setError(
+          formatErrorMessage(
+            nextError,
+            "짝 맞추기용 단어 세트를 불러오지 못했습니다.",
+          ),
+        );
+      }
       return false;
     } finally {
-      setLoading(false);
+      if (matchingSetGate.isCurrent(generation)) {
+        setMatchingLoading(false);
+      }
     }
   }
 

@@ -70,6 +70,11 @@ export function ModeSelector({
     units,
   ]);
 
+  function handleSchoolSearchSubmit(event) {
+    event.preventDefault();
+    void onSearchSchools();
+  }
+
   async function handleStartMatching() {
     const loaded = await onLoadMatchingSet();
 
@@ -87,27 +92,29 @@ export function ModeSelector({
           <p className="mode-card-copy">학교를 찾고 선생님·학년·단원을 선택하세요.</p>
         </div>
 
-        <div className="form-grid compact-grid">
-          <label className="field field-wide">
-            <span>학교 이름</span>
-            <input
-              value={schoolQuery}
-              onChange={(event) => onSchoolQueryChange(event.target.value)}
-              placeholder="예: 서울초등학교"
-              disabled={!remoteConfigured}
-            />
-          </label>
-        </div>
+        <form className="school-search-form" onSubmit={handleSchoolSearchSubmit}>
+          <div className="form-grid compact-grid">
+            <label className="field field-wide">
+              <span>학교 이름</span>
+              <input
+                value={schoolQuery}
+                onChange={(event) => onSchoolQueryChange(event.target.value)}
+                placeholder="예: 서울초등학교"
+                disabled={!remoteConfigured}
+              />
+            </label>
+          </div>
 
-        <div className="toolbar-row">
-          <button
-            className="secondary-button"
-            onClick={onSearchSchools}
-            disabled={!remoteConfigured || schoolSearchLoading}
-          >
-            {schoolSearchLoading ? "학교 검색 중..." : "학교 검색"}
-          </button>
-        </div>
+          <div className="toolbar-row">
+            <button
+              type="submit"
+              className="secondary-button"
+              disabled={!remoteConfigured || schoolSearchLoading}
+            >
+              {schoolSearchLoading ? "학교 검색 중..." : "학교 검색"}
+            </button>
+          </div>
+        </form>
 
         {showingSearchResults ? (
           <div className="selection-chip-group" aria-label="학교 검색 결과">
@@ -216,9 +223,14 @@ export function ModeSelector({
           <button
             className="secondary-button"
             onClick={onLoadSet}
-            disabled={!remoteConfigured || !selectedTeacher || !selection.unit}
+            disabled={
+              !remoteConfigured ||
+              !selectedTeacher ||
+              !selection.unit ||
+              matchingLoading
+            }
           >
-            단어 세트 불러오기
+            {matchingLoading ? "세트 불러오는 중..." : "단어 세트 불러오기"}
           </button>
         </div>
 

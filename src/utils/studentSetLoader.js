@@ -1,3 +1,17 @@
+export function createRequestGate() {
+  let currentGeneration = 0;
+
+  return {
+    begin() {
+      currentGeneration += 1;
+      return currentGeneration;
+    },
+    isCurrent(generation) {
+      return generation === currentGeneration;
+    },
+  };
+}
+
 export function toggleStudentMatchingUnits(currentUnits, unit) {
   const cleanUnit = String(unit ?? "").trim();
   if (!cleanUnit) {
