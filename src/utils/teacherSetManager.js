@@ -40,3 +40,24 @@ export function canAutoSaveTeacherSet(snapshot, remoteConfigured = true) {
       !snapshot?.copying,
   );
 }
+
+export function createTeacherAutoSaveRevisionState() {
+  return { latestRevision: 0 };
+}
+
+export function recordTeacherAutoSaveEdit(revisionState) {
+  revisionState.latestRevision += 1;
+  return revisionState.latestRevision;
+}
+
+export function captureTeacherAutoSaveRevision(revisionState) {
+  return revisionState.latestRevision;
+}
+
+export function isCurrentTeacherAutoSaveRevision(revisionState, revision) {
+  return revisionState.latestRevision === revision;
+}
+
+export function ownsTeacherAutoSaveTimer(currentTimer, timer) {
+  return currentTimer === timer;
+}

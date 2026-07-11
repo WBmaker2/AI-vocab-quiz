@@ -21,13 +21,21 @@ import {
   groupPublisherSourcesByTeacherAndSchool,
   summarizePublisherCopyResult,
 } from "../../utils/publisherCopy.js";
-import { canAutoSaveTeacherSet, getNextTeacherSelection } from "../../utils/teacherSetManager.js";
+import {
+  canAutoSaveTeacherSet,
+  captureTeacherAutoSaveRevision,
+  createTeacherAutoSaveRevisionState,
+  getNextTeacherSelection,
+  isCurrentTeacherAutoSaveRevision,
+  ownsTeacherAutoSaveTimer,
+  recordTeacherAutoSaveEdit,
+} from "../../utils/teacherSetManager.js";
 import { mergeVocabularyItems } from "../../utils/vocabularyMerge.js";
 import { parseVocabularyWorkbook } from "../../utils/xlsxImport.js";
 
-function clearTeacherAutoSaveTimer(timerRef) {
-  if (timerRef.current) {
-    window.clearTimeout(timerRef.current);
+function clearTeacherAutoSaveTimer(timerRef, timer = timerRef.current) {
+  if (timer !== null && ownsTeacherAutoSaveTimer(timerRef.current, timer)) {
+    window.clearTimeout(timer);
     timerRef.current = null;
   }
 }
@@ -60,6 +68,8 @@ export function useTeacherSetManager({
   const [autoSaveToken, setAutoSaveToken] = useState(0);
 
   const autoSaveTimerRef = useRef(null);
+  const autoSaveInFlightRevisionRef = useRef(null);
+  const autoSaveRevisionStateRef = useRef(createTeacherAutoSaveRevisionState());
   const autoSaveSnapshotRef = useRef(null);
 
   useEffect(() => {
@@ -103,7 +113,7 @@ export function useTeacherSetManager({
     }
 
     queueAutoSave();
-  }, [autoSaveToken]);
+  }, [autoSaveToken, saving]);
 
   useEffect(
     () => () => {
@@ -118,6 +128,7 @@ export function useTeacherSetManager({
     }
 
     if (!userId || !teacherProfile?.userId) {
+      recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
       clearTeacherAutoSaveTimer(autoSaveTimerRef);
       setAutoSaveToken(0);
       setCatalog([]);
@@ -180,6 +191,7 @@ export function useTeacherSetManager({
   }
 
   function updateSelection(field, value) {
+    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
     setSelection((current) =>
       getNextTeacherSelection({
         currentSelection: current,
@@ -200,6 +212,7 @@ export function useTeacherSetManager({
   }
 
   function updatePublisher(value) {
+    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
     setPublisher(value);
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
@@ -214,11 +227,16 @@ export function useTeacherSetManager({
 
   function setPublishState(nextPublished) {
     setPublished(nextPublished);
-    setDirty(true);
+    markTeacherSetDirty();
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
     setStatus("");
+  }
+
+  function markTeacherSetDirty() {
+    setDirty(true);
+    setAutoSaveToken(recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current));
   }
 
   async function persistGradePublisher(grade, nextPublisher) {
@@ -326,33 +344,64 @@ export function useTeacherSetManager({
       return;
     }
 
+    const scheduledRevision = captureTeacherAutoSaveRevision(
+      autoSaveRevisionStateRef.current,
+    );
     setAutoSaveStatus("자동 저장 예약 중");
-    autoSaveTimerRef.current = window.setTimeout(async () => {
-      const snapshot = autoSaveSnapshotRef.current;
-      if (!canAutoSaveTeacherSet(snapshot, isFirebaseConfigured)) {
-        setAutoSaveStatus("자동 저장 대기 중");
-        clearTeacherAutoSaveTimer(autoSaveTimerRef);
+    const timer = window.setTimeout(async () => {
+      clearTeacherAutoSaveTimer(autoSaveTimerRef, timer);
+
+      if (
+        !isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          scheduledRevision,
+        )
+      ) {
         return;
       }
 
+      const snapshot = autoSaveSnapshotRef.current;
+      if (!canAutoSaveTeacherSet(snapshot, isFirebaseConfigured)) {
+        setAutoSaveStatus("자동 저장 대기 중");
+        return;
+      }
+
+      autoSaveInFlightRevisionRef.current = scheduledRevision;
       setAutoSaveStatus("자동 저장 중...");
 
       try {
         const { cleanPublisher } = await persistSnapshot(snapshot, "autosave");
-        setPublisher(cleanPublisher);
-        setDirty(false);
-        setAutoSaveStatus("자동 저장됨");
-        setError("");
-        await refreshCatalog();
+        if (
+          isCurrentTeacherAutoSaveRevision(
+            autoSaveRevisionStateRef.current,
+            scheduledRevision,
+          )
+        ) {
+          setPublisher(cleanPublisher);
+          setDirty(false);
+          setAutoSaveStatus("자동 저장됨");
+          setError("");
+          await refreshCatalog();
+        }
       } catch (nextError) {
-        setAutoSaveStatus("자동 저장 실패");
-        setError(
-          formatErrorMessage(nextError, "단어 세트를 자동 저장하지 못했습니다."),
-        );
+        if (
+          isCurrentTeacherAutoSaveRevision(
+            autoSaveRevisionStateRef.current,
+            scheduledRevision,
+          )
+        ) {
+          setAutoSaveStatus("자동 저장 실패");
+          setError(
+            formatErrorMessage(nextError, "단어 세트를 자동 저장하지 못했습니다."),
+          );
+        }
       } finally {
-        clearTeacherAutoSaveTimer(autoSaveTimerRef);
+        if (autoSaveInFlightRevisionRef.current === scheduledRevision) {
+          autoSaveInFlightRevisionRef.current = null;
+        }
       }
     }, 700);
+    autoSaveTimerRef.current = timer;
   }
 
   async function loadSet() {
@@ -366,6 +415,7 @@ export function useTeacherSetManager({
       return;
     }
 
+    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
     setLoading(true);
     setStatus("");
     setAutoSaveStatus("");
@@ -409,6 +459,7 @@ export function useTeacherSetManager({
       return;
     }
 
+    const saveRevision = recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -446,19 +497,33 @@ export function useTeacherSetManager({
 
     try {
       await persistSnapshot(snapshot, "manual");
-      setPublisher(cleanPublisher);
-      setDirty(false);
-      setStatus(
-        snapshot.published
-          ? `${formatSetLabel(snapshot.selection)} 세트를 저장하고 학생에게 공개했습니다.`
-          : `${formatSetLabel(snapshot.selection)} 세트를 저장했습니다. 아직 공개 전입니다.`,
-      );
-      setAutoSaveStatus("");
-      await refreshCatalog();
+      if (
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          saveRevision,
+        )
+      ) {
+        setPublisher(cleanPublisher);
+        setDirty(false);
+        setStatus(
+          snapshot.published
+            ? `${formatSetLabel(snapshot.selection)} 세트를 저장하고 학생에게 공개했습니다.`
+            : `${formatSetLabel(snapshot.selection)} 세트를 저장했습니다. 아직 공개 전입니다.`,
+        );
+        setAutoSaveStatus("");
+        await refreshCatalog();
+      }
     } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "단어 세트를 저장하지 못했습니다."),
-      );
+      if (
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          saveRevision,
+        )
+      ) {
+        setError(
+          formatErrorMessage(nextError, "단어 세트를 저장하지 못했습니다."),
+        );
+      }
     } finally {
       setSaving(false);
     }
@@ -475,6 +540,7 @@ export function useTeacherSetManager({
       return;
     }
 
+    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -509,6 +575,7 @@ export function useTeacherSetManager({
       return;
     }
 
+    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -562,6 +629,7 @@ export function useTeacherSetManager({
       return;
     }
 
+    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
     setImporting(true);
     setStatus("");
     setAutoSaveStatus("");
@@ -637,8 +705,7 @@ export function useTeacherSetManager({
 
   function addItem(item) {
     setItems((current) => [...current, createDraftVocabularyItem(item, current.length)]);
-    setDirty(true);
-    setAutoSaveToken((current) => current + 1);
+    markTeacherSetDirty();
   }
 
   function updateItem(id, nextItem) {
@@ -653,8 +720,7 @@ export function useTeacherSetManager({
           : item,
       ),
     );
-    setDirty(true);
-    setAutoSaveToken((current) => current + 1);
+    markTeacherSetDirty();
   }
 
   function removeItem(id) {
@@ -666,14 +732,12 @@ export function useTeacherSetManager({
           order: index + 1,
         })),
     );
-    setDirty(true);
-    setAutoSaveToken((current) => current + 1);
+    markTeacherSetDirty();
   }
 
   function clearItems() {
     setItems([]);
-    setDirty(true);
-    setAutoSaveToken((current) => current + 1);
+    markTeacherSetDirty();
   }
 
   async function searchCopySources() {
