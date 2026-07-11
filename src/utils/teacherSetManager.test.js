@@ -12,6 +12,7 @@ import {
   ownsTeacherAutoSaveTimer,
   recordTeacherAutoSaveEdit,
   refreshTeacherSetCatalog,
+  shouldQueueTeacherAutoSave,
 } from "./teacherSetManager.js";
 
 function createDeferred() {
@@ -452,6 +453,104 @@ test("preserves a pending save before a mutation barrier and runs later saves af
 
   saveC.resolve();
   await pendingSaveC;
+});
+
+test("discarding for edit C preserves save B before the mutation barrier", async () => {
+  const coordinator = createTeacherSetSaveCoordinator();
+  const saveA = createDeferred();
+  const saveB = createDeferred();
+  const mutation = createDeferred();
+  const saveC = createDeferred();
+  const calls = [];
+
+  const pendingSaveA = coordinator.enqueue({
+    revision: 1,
+    snapshot: { items: ["A"] },
+    sourceType: "autosave",
+    persistSnapshot: () => {
+      calls.push("save-a");
+      return saveA.promise;
+    },
+  });
+  await flushCoordinator();
+
+  const pendingSaveB = coordinator.enqueue({
+    revision: 2,
+    snapshot: { items: ["B"] },
+    sourceType: "autosave",
+    persistSnapshot: () => {
+      calls.push("save-b");
+      return saveB.promise;
+    },
+  });
+  const pendingMutation = coordinator.enqueueMutation({
+    revision: 3,
+    runMutation: () => {
+      calls.push("mutation");
+      return mutation.promise;
+    },
+  });
+
+  coordinator.discardPendingBefore(4);
+  const pendingSaveC = coordinator.enqueue({
+    revision: 4,
+    snapshot: { items: ["C"] },
+    sourceType: "autosave",
+    persistSnapshot: () => {
+      calls.push("save-c");
+      return saveC.promise;
+    },
+  });
+
+  saveA.resolve();
+  await pendingSaveA;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "save-b"]);
+
+  saveB.resolve();
+  await pendingSaveB;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "save-b", "mutation"]);
+
+  mutation.resolve();
+  await pendingMutation;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "save-b", "mutation", "save-c"]);
+
+  saveC.resolve();
+  await pendingSaveC;
+});
+
+test("queues the latest import-time edit after importing finishes without another edit", async () => {
+  const coordinator = createTeacherSetSaveCoordinator();
+  const saveAfterImport = createDeferred();
+  const calls = [];
+  const autoSaveState = {
+    autoSaveToken: 2,
+    dirty: true,
+    saving: false,
+    importing: true,
+  };
+
+  assert.equal(shouldQueueTeacherAutoSave(autoSaveState), false);
+
+  autoSaveState.importing = false;
+  if (shouldQueueTeacherAutoSave(autoSaveState)) {
+    coordinator.enqueue({
+      revision: 2,
+      snapshot: { items: ["edited during import"] },
+      sourceType: "autosave",
+      persistSnapshot: () => {
+        calls.push("autosave-after-import");
+        return saveAfterImport.promise;
+      },
+    });
+  }
+  await flushCoordinator();
+
+  assert.deepEqual(calls, ["autosave-after-import"]);
+
+  saveAfterImport.resolve();
 });
 
 test("import completion does not apply stale local state after its refresh finishes", async () => {

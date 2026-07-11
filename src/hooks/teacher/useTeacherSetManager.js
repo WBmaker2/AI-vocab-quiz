@@ -33,6 +33,7 @@ import {
   ownsTeacherAutoSaveTimer,
   recordTeacherAutoSaveEdit,
   refreshTeacherSetCatalog,
+  shouldQueueTeacherAutoSave,
 } from "../../utils/teacherSetManager.js";
 import { mergeVocabularyItems } from "../../utils/vocabularyMerge.js";
 import { parseVocabularyWorkbook } from "../../utils/xlsxImport.js";
@@ -131,8 +132,17 @@ export function useTeacherSetManager({
       return;
     }
 
-    queueAutoSave();
-  }, [autoSaveToken, saving]);
+    if (
+      shouldQueueTeacherAutoSave({
+        autoSaveToken,
+        dirty,
+        saving,
+        importing,
+      })
+    ) {
+      queueAutoSave();
+    }
+  }, [autoSaveToken, saving, importing]);
 
   useEffect(
     () => () => {

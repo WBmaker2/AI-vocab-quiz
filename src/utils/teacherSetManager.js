@@ -41,6 +41,15 @@ export function canAutoSaveTeacherSet(snapshot, remoteConfigured = true) {
   );
 }
 
+export function shouldQueueTeacherAutoSave({
+  autoSaveToken,
+  dirty,
+  saving,
+  importing,
+}) {
+  return Boolean(autoSaveToken && dirty && !saving && !importing);
+}
+
 export function createTeacherAutoSaveRevisionState() {
   return { latestRevision: 0 };
 }
@@ -181,7 +190,15 @@ export function createTeacherSetSaveCoordinator({
   }
 
   function discardPendingBefore(revision) {
-    queue = queue.filter((request) => {
+    const lastMutationIndex = queue.findLastIndex(
+      (request) => request.type === "mutation",
+    );
+
+    queue = queue.filter((request, index) => {
+      if (index <= lastMutationIndex) {
+        return true;
+      }
+
       if (request.type !== "save" || request.revision >= revision) {
         return true;
       }
