@@ -621,6 +621,56 @@ rulesTest(
 );
 
 rulesTest(
+  "studentProfiles rejects arbitrary earned badge additions during a valid session advance",
+  async () => {
+    const profileId = createStudentProfileId();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), "studentProfiles", profileId),
+        createStudentProfileDoc(),
+      );
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      updateDoc(doc(studentDb, "studentProfiles", profileId), {
+        totalSessions: 2,
+        typingSessions: 2,
+        typingLastPlayedAt: createTimestamp(200),
+        earnedBadges: ["first_challenge", "arbitrary_badge"],
+        updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "studentProfiles accepts allowed earned badge additions during a valid session advance",
+  async () => {
+    const profileId = createStudentProfileId();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), "studentProfiles", profileId),
+        createStudentProfileDoc(),
+      );
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(
+      updateDoc(doc(studentDb, "studentProfiles", profileId), {
+        totalSessions: 2,
+        typingSessions: 2,
+        typingLastPlayedAt: createTimestamp(200),
+        earnedBadges: ["first_challenge", "practice_keeper"],
+        updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
   "studentProfiles rejects a slower tied zero matching record after the first matching session",
   async () => {
     const profileId = createStudentProfileId();

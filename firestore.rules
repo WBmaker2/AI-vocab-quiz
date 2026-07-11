@@ -213,6 +213,20 @@ service cloud.firestore {
         );
     }
 
+    function areChangedStudentProfileBadgesValid() {
+      return !studentProfileFieldChanged('earnedBadges')
+        || (
+          request.resource.data.earnedBadges is list
+          && request.resource.data.earnedBadges.hasOnly([
+            'first_challenge',
+            'listening_star',
+            'speaking_bravery',
+            'matching_speed',
+            'practice_keeper'
+          ])
+        );
+    }
+
     function isStudentProfileRead(profileId) {
       return isStudentProfileDocument(resource.data)
         && isStudentProfileId(
@@ -682,6 +696,7 @@ service cloud.firestore {
         && areChangedSpeakingProfileBestFieldsValid()
         && areChangedMatchingProfileBestFieldsValid()
         && areChangedTypingProfileBestFieldsValid()
+        && areChangedStudentProfileBadgesValid()
         && isMatchingProfileBestUpdateAllowed()
         && resource.data.schoolId == request.resource.data.schoolId
         && resource.data.schoolName == request.resource.data.schoolName
