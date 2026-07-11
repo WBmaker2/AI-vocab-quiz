@@ -233,6 +233,35 @@ test("matching ownership blocks vocabulary load and preserves matching items", a
   assert.deepEqual(matchingItems, ["matching-1", "matching-2"]);
 });
 
+test("invalidating an obsolete set load lets a fresh load start immediately", async () => {
+  const guard = studentSetLoader.createExclusiveRequestGuard();
+  const staleResponse = createDeferred();
+  const staleGate = studentSetLoader.createRequestGate();
+  const staleRequest = studentSetLoader.runExclusiveRequest(
+    guard,
+    "vocabulary",
+    staleGate,
+    () => staleResponse.promise,
+  );
+
+  staleGate.begin();
+  guard.invalidate();
+
+  const freshRequest = await studentSetLoader.runExclusiveRequest(
+    guard,
+    "vocabulary",
+    staleGate,
+    () => Promise.resolve(["fresh"]),
+  );
+  assert.equal(freshRequest.ok, true);
+  assert.equal(guard.isBusy(), false);
+
+  staleResponse.resolve(["stale"]);
+  const staleResult = await staleRequest;
+  assert.equal(staleResult.current, false);
+  assert.equal(guard.isBusy(), false);
+});
+
 test("toggleStudentMatchingUnits adds and sorts units numerically", () => {
   const nextUnits = toggleStudentMatchingUnits(["10", "1"], "2");
 

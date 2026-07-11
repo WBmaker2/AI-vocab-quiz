@@ -48,6 +48,39 @@ export function finishTeacherWorkbookImport(importInFlightRef) {
   importInFlightRef.current = false;
 }
 
+export async function runTeacherSetLoad({
+  revision,
+  isCurrentRevision,
+  loadSet,
+  onSuccess,
+  onError,
+  onFinally,
+}) {
+  try {
+    const result = await loadSet();
+    if (isCurrentRevision(revision)) {
+      await onSuccess?.(result);
+    }
+
+    return {
+      ok: true,
+      current: isCurrentRevision(revision),
+      result,
+    };
+  } catch (error) {
+    const current = isCurrentRevision(revision);
+    if (current) {
+      await onError?.(error);
+    }
+
+    return { ok: false, current, error };
+  } finally {
+    if (isCurrentRevision(revision)) {
+      await onFinally?.();
+    }
+  }
+}
+
 export function getNextTeacherSelection({
   currentSelection,
   field,

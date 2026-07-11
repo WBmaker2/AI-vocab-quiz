@@ -168,8 +168,7 @@ export function useStudentSetLoader({ formatErrorMessage }) {
   function invalidateSelectionLanes() {
     teacherLookupGate.begin();
     unitLookupGate.begin();
-    vocabularySetGate.begin();
-    matchingSetGate.begin();
+    invalidateSetLanes();
   }
 
   function invalidateSchoolListLane() {
@@ -180,13 +179,13 @@ export function useStudentSetLoader({ formatErrorMessage }) {
 
   function invalidateUnitDependentLanes() {
     unitLookupGate.begin();
-    vocabularySetGate.begin();
-    matchingSetGate.begin();
+    invalidateSetLanes();
   }
 
   function invalidateSetLanes() {
     vocabularySetGate.begin();
     matchingSetGate.begin();
+    sharedSetLoadGuard.current.invalidate();
   }
 
   function clearStudentLoadingState() {
@@ -469,8 +468,7 @@ export function useStudentSetLoader({ formatErrorMessage }) {
     teacherLookupGate.begin();
     invalidateSchoolListLane();
     unitLookupGate.begin();
-    vocabularySetGate.begin();
-    matchingSetGate.begin();
+    invalidateSetLanes();
     setSelectedSchool(school);
     setSelectedTeacher(null);
     setNameDraft("");
@@ -540,8 +538,7 @@ export function useStudentSetLoader({ formatErrorMessage }) {
   async function chooseTeacher(teacherUserId) {
     const selectionGeneration = teacherLookupGate.begin();
     unitLookupGate.begin();
-    vocabularySetGate.begin();
-    matchingSetGate.begin();
+    invalidateSetLanes();
     const teacher = teachers.find((entry) => entry.userId === teacherUserId);
     const school = selectedSchool;
     setSelectedTeacher(teacher ?? null);

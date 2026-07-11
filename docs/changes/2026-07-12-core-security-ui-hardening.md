@@ -54,6 +54,12 @@ typing results.
   latest request can settle state.
 - Vocabulary and matching set loads are mutually exclusive because they share
   game state.
+- Changing the student selection invalidates the obsolete shared load lease,
+  so a slow previous request cannot silently block the next load.
+- Teacher set loads capture their selection and revision; a late response can
+  no longer replace the items or loading state for a newer selection.
+- Student profile badge arrays must contain unique allowed badge IDs, matching
+  the client-side normalization contract.
 
 Spreadsheet import changes:
 

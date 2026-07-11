@@ -13,27 +13,34 @@ export function createRequestGate() {
 }
 
 export function createExclusiveRequestGuard() {
-  let activeOwner = null;
+  let activeLease = null;
+  let nextLeaseId = 0;
 
   return {
     acquire(owner) {
-      if (activeOwner !== null) {
+      if (activeLease !== null) {
         return false;
       }
 
-      activeOwner = owner;
+      activeLease = {
+        id: (nextLeaseId += 1),
+        owner,
+      };
+      return activeLease;
+    },
+    release(lease) {
+      if (activeLease !== lease) {
+        return false;
+      }
+
+      activeLease = null;
       return true;
     },
-    release(owner) {
-      if (activeOwner !== owner) {
-        return false;
-      }
-
-      activeOwner = null;
-      return true;
+    invalidate() {
+      activeLease = null;
     },
     isBusy() {
-      return activeOwner !== null;
+      return activeLease !== null;
     },
   };
 }
@@ -74,7 +81,8 @@ export async function runExclusiveRequest(
   request,
   { onStart, onSuccess, onError, onFinally } = {},
 ) {
-  if (!guard.acquire(owner)) {
+  const lease = guard.acquire(owner);
+  if (!lease) {
     return { ok: false, current: false, blocked: true };
   }
 
@@ -86,7 +94,7 @@ export async function runExclusiveRequest(
       onFinally,
     });
   } finally {
-    guard.release(owner);
+    guard.release(lease);
   }
 }
 

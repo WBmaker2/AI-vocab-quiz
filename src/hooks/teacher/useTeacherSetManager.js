@@ -36,6 +36,7 @@ import {
   ownsTeacherAutoSaveTimer,
   recordTeacherAutoSaveEdit,
   refreshTeacherSetCatalog,
+  runTeacherSetLoad,
   shouldQueueTeacherAutoSave,
   tryStartTeacherWorkbookImport,
 } from "../../utils/teacherSetManager.js";
@@ -277,6 +278,7 @@ export function useTeacherSetManager({
   }
 
   function recordTeacherSetEdit() {
+    setLoading(false);
     return recordTeacherSetRevision({ discardPendingSaves: true });
   }
 
@@ -497,7 +499,11 @@ export function useTeacherSetManager({
       return;
     }
 
-    recordTeacherSetEdit();
+    const loadRevision = recordTeacherSetEdit();
+    const requestSelection = { ...selection };
+    const requestUserId = userId;
+    const requestProfilePublisher =
+      teacherProfile?.gradePublishers?.[requestSelection.grade] ?? "";
     setLoading(true);
     setStatus("");
     setAutoSaveStatus("");
@@ -505,29 +511,38 @@ export function useTeacherSetManager({
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
 
-    try {
-      const result = await fetchTeacherVocabularySet(userId, selection);
-      const profilePublisher =
-        teacherProfile?.gradePublishers?.[selection.grade] ?? "";
-      const resolvedPublisher =
-        profilePublisher || String(result.publisher ?? "").trim();
+    await runTeacherSetLoad({
+      revision: loadRevision,
+      isCurrentRevision: (revision) =>
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          revision,
+        ),
+      loadSet: () =>
+        fetchTeacherVocabularySet(requestUserId, requestSelection),
+      onSuccess: (result) => {
+        const resolvedPublisher =
+          requestProfilePublisher || String(result.publisher ?? "").trim();
 
-      setItems(result.items);
-      setPublished(result.published);
-      setPublisher(resolvedPublisher);
-      setDirty(false);
-      setStatus(
-        result.items.length > 0
-          ? `${formatSetLabel(selection)} 세트를 불러왔습니다.`
-          : `${formatSetLabel(selection)}에 저장된 단어가 아직 없습니다.`,
-      );
-    } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "단어 세트를 불러오지 못했습니다."),
-      );
-    } finally {
-      setLoading(false);
-    }
+        setItems(result.items);
+        setPublished(result.published);
+        setPublisher(resolvedPublisher);
+        setDirty(false);
+        setStatus(
+          result.items.length > 0
+            ? `${formatSetLabel(requestSelection)} 세트를 불러왔습니다.`
+            : `${formatSetLabel(requestSelection)}에 저장된 단어가 아직 없습니다.`,
+        );
+      },
+      onError: (nextError) => {
+        setError(
+          formatErrorMessage(nextError, "단어 세트를 불러오지 못했습니다."),
+        );
+      },
+      onFinally: () => {
+        setLoading(false);
+      },
+    });
   }
 
   async function saveSet() {

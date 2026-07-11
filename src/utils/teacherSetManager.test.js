@@ -88,6 +88,40 @@ test("workbook import gate starts only one of two immediate calls and releases o
   assert.equal(teacherSetManager.tryStartTeacherWorkbookImport(importInFlightRef), true);
 });
 
+test("a stale teacher set load cannot replace or finish a newer load", async () => {
+  assert.equal(typeof teacherSetManager.runTeacherSetLoad, "function");
+
+  const revisionState = createTeacherAutoSaveRevisionState();
+  const staleResponse = createDeferred();
+  const events = [];
+  const staleRevision = recordTeacherAutoSaveEdit(revisionState);
+  const staleLoad = teacherSetManager.runTeacherSetLoad({
+    revision: staleRevision,
+    isCurrentRevision: (revision) =>
+      isCurrentTeacherAutoSaveRevision(revisionState, revision),
+    loadSet: () => staleResponse.promise,
+    onSuccess: () => events.push("stale-success"),
+    onFinally: () => events.push("stale-finally"),
+  });
+
+  const freshRevision = recordTeacherAutoSaveEdit(revisionState);
+  const freshLoad = await teacherSetManager.runTeacherSetLoad({
+    revision: freshRevision,
+    isCurrentRevision: (revision) =>
+      isCurrentTeacherAutoSaveRevision(revisionState, revision),
+    loadSet: () => Promise.resolve("fresh"),
+    onSuccess: (value) => events.push(value),
+    onFinally: () => events.push("fresh-finally"),
+  });
+
+  staleResponse.resolve("stale");
+  const staleResult = await staleLoad;
+
+  assert.equal(freshLoad.current, true);
+  assert.equal(staleResult.current, false);
+  assert.deepEqual(events, ["fresh", "fresh-finally"]);
+});
+
 test("getNextTeacherSelection keeps other fields for non-grade updates", () => {
   const nextSelection = getNextTeacherSelection({
     currentSelection: { grade: "3", unit: "2" },

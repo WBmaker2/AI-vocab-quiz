@@ -120,6 +120,7 @@ service cloud.firestore {
           'matching_speed',
           'practice_keeper'
         ])
+        && data.earnedBadges.size() == data.earnedBadges.toSet().size()
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
     }
@@ -224,6 +225,8 @@ service cloud.firestore {
             'matching_speed',
             'practice_keeper'
           ])
+          && request.resource.data.earnedBadges.size()
+            == request.resource.data.earnedBadges.toSet().size()
         );
     }
 

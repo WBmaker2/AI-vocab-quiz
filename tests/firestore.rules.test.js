@@ -864,6 +864,23 @@ rulesTest(
 );
 
 rulesTest(
+  "studentProfiles rejects duplicate earned badges",
+  async () => {
+    const profileId = createStudentProfileId();
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+
+    await assertFails(
+      setDoc(
+        doc(studentDb, "studentProfiles", profileId),
+        createStudentProfileDoc({
+          earnedBadges: ["first_challenge", "first_challenge"],
+        }),
+      ),
+    );
+  },
+);
+
+rulesTest(
   "studentProfiles allows capability-shaped creates and gets",
   async () => {
     const profileId = createStudentProfileId();
