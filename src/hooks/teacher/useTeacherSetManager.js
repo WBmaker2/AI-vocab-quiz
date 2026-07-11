@@ -30,6 +30,7 @@ import {
   isCurrentTeacherAutoSaveRevision,
   ownsTeacherAutoSaveTimer,
   recordTeacherAutoSaveEdit,
+  refreshTeacherSetCatalog,
 } from "../../utils/teacherSetManager.js";
 import { mergeVocabularyItems } from "../../utils/vocabularyMerge.js";
 import { parseVocabularyWorkbook } from "../../utils/xlsxImport.js";
@@ -186,23 +187,26 @@ export function useTeacherSetManager({
     setCopyError("");
   }, [selection.grade, teacherProfile?.gradePublishers]);
 
-  async function refreshCatalog(nextUserId = userId) {
+  async function refreshCatalog(nextUserId = userId, revision = null) {
     if (!isFirebaseConfigured || !nextUserId) {
       return;
     }
 
-    setCatalogLoading(true);
-
-    try {
-      const nextCatalog = await listTeacherSetCatalog(nextUserId);
-      setCatalog(nextCatalog);
-    } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "내 단어 세트 목록을 불러오지 못했습니다."),
-      );
-    } finally {
-      setCatalogLoading(false);
-    }
+    return refreshTeacherSetCatalog({
+      loadCatalog: () => listTeacherSetCatalog(nextUserId),
+      revision,
+      isCurrentRevision: (saveRevision) =>
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          saveRevision,
+        ),
+      setLoading: setCatalogLoading,
+      setCatalog,
+      setError: (nextError) =>
+        setError(
+          formatErrorMessage(nextError, "내 단어 세트 목록을 불러오지 못했습니다."),
+        ),
+    });
   }
 
   function updateSelection(field, value) {
@@ -365,6 +369,22 @@ export function useTeacherSetManager({
     });
   }
 
+  async function persistTeacherSetSnapshot(
+    snapshot,
+    sourceType,
+    revision = captureTeacherAutoSaveRevision(autoSaveRevisionStateRef.current),
+  ) {
+    const { result } = await queueTeacherSetSave(snapshot, sourceType, revision);
+    return result;
+  }
+
+  function queueTeacherSetMutation(revision, runMutation) {
+    return teacherSetSaveCoordinatorRef.current.enqueueMutation({
+      revision,
+      runMutation,
+    });
+  }
+
   function queueAutoSave() {
     if (!dirty) {
       setAutoSaveStatus("");
@@ -419,7 +439,7 @@ export function useTeacherSetManager({
           setDirty(false);
           setAutoSaveStatus("자동 저장됨");
           setError("");
-          await refreshCatalog();
+          await refreshCatalog(userId, scheduledRevision);
         }
       } catch (nextError) {
         if (
@@ -545,7 +565,7 @@ export function useTeacherSetManager({
             : `${formatSetLabel(snapshot.selection)} 세트를 저장했습니다. 아직 공개 전입니다.`,
         );
         setAutoSaveStatus("");
-        await refreshCatalog();
+        await refreshCatalog(userId, saveRevision);
       }
     } catch (nextError) {
       if (
@@ -574,7 +594,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    recordTeacherSetEdit();
+    const mutationRevision = recordTeacherSetEdit();
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -583,16 +603,32 @@ export function useTeacherSetManager({
     setError("");
 
     try {
-      await deleteTeacherVocabularySet(userId, selection);
-      setItems([]);
-      setPublished(false);
-      setDirty(false);
-      setStatus(`${formatSetLabel(selection)} 세트를 삭제했습니다.`);
-      await refreshCatalog();
-    } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "단어 세트를 삭제하지 못했습니다."),
+      await queueTeacherSetMutation(mutationRevision, () =>
+        deleteTeacherVocabularySet(userId, selection),
       );
+      if (
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          mutationRevision,
+        )
+      ) {
+        setItems([]);
+        setPublished(false);
+        setDirty(false);
+        setStatus(`${formatSetLabel(selection)} 세트를 삭제했습니다.`);
+        await refreshCatalog(userId, mutationRevision);
+      }
+    } catch (nextError) {
+      if (
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          mutationRevision,
+        )
+      ) {
+        setError(
+          formatErrorMessage(nextError, "단어 세트를 삭제하지 못했습니다."),
+        );
+      }
     } finally {
       setSaving(false);
     }
@@ -609,7 +645,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    recordTeacherSetEdit();
+    const mutationRevision = recordTeacherSetEdit();
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -618,24 +654,38 @@ export function useTeacherSetManager({
     setError("");
 
     try {
-      const deletedCount = await deleteTeacherVocabularySetsForGrade(
-        userId,
-        selection.grade,
+      const { result: deletedCount } = await queueTeacherSetMutation(
+        mutationRevision,
+        () => deleteTeacherVocabularySetsForGrade(userId, selection.grade),
       );
 
-      setItems([]);
-      setPublished(false);
-      setDirty(false);
-      setStatus(
-        deletedCount > 0
-          ? `${selection.grade}학년의 저장 단원 ${deletedCount}개를 초기화했습니다. 새 엑셀 파일을 다시 업로드할 수 있습니다.`
-          : `${selection.grade}학년에 초기화할 저장 단원이 없습니다.`,
-      );
-      await refreshCatalog();
+      if (
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          mutationRevision,
+        )
+      ) {
+        setItems([]);
+        setPublished(false);
+        setDirty(false);
+        setStatus(
+          deletedCount > 0
+            ? `${selection.grade}학년의 저장 단원 ${deletedCount}개를 초기화했습니다. 새 엑셀 파일을 다시 업로드할 수 있습니다.`
+            : `${selection.grade}학년에 초기화할 저장 단원이 없습니다.`,
+        );
+        await refreshCatalog(userId, mutationRevision);
+      }
     } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "학년 단어카드를 초기화하지 못했습니다."),
-      );
+      if (
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          mutationRevision,
+        )
+      ) {
+        setError(
+          formatErrorMessage(nextError, "학년 단어카드를 초기화하지 못했습니다."),
+        );
+      }
     } finally {
       setSaving(false);
     }
@@ -663,7 +713,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    recordTeacherSetEdit();
+    const mutationRevision = recordTeacherSetEdit();
     setImporting(true);
     setStatus("");
     setAutoSaveStatus("");
@@ -672,66 +722,95 @@ export function useTeacherSetManager({
     setAutoSaveToken(0);
 
     try {
-      await persistGradePublisher(grade, cleanPublisher);
-      const groupedSets = await parseVocabularyWorkbook(file);
-      const publishImportedSets =
-        publishOverride === null ? published : publishOverride;
-      let savedUnitCount = 0;
-      let addedVocabularyCount = 0;
-      let duplicateVocabularyCount = 0;
-      const savedItemsByUnit = new Map();
+      const { result: importResult } = await queueTeacherSetMutation(
+        mutationRevision,
+        async () => {
+          await persistGradePublisher(grade, cleanPublisher);
+          const groupedSets = await parseVocabularyWorkbook(file);
+          const publishImportedSets =
+            publishOverride === null ? published : publishOverride;
+          let savedUnitCount = 0;
+          let addedVocabularyCount = 0;
+          let duplicateVocabularyCount = 0;
+          const savedItemsByUnit = new Map();
 
-      for (const groupedSet of groupedSets) {
-        const existingSet = await fetchTeacherVocabularySet(userId, {
-          grade,
-          unit: groupedSet.unit,
-        });
-        const { mergedItems, addedCount, duplicateCount } = mergeVocabularyItems(
-          existingSet.items ?? [],
-          groupedSet.items,
+          for (const groupedSet of groupedSets) {
+            const existingSet = await fetchTeacherVocabularySet(userId, {
+              grade,
+              unit: groupedSet.unit,
+            });
+            const { mergedItems, addedCount, duplicateCount } = mergeVocabularyItems(
+              existingSet.items ?? [],
+              groupedSet.items,
+            );
+            const normalizedItems = normalizeDraftVocabulary(mergedItems);
+
+            await saveTeacherVocabularySet({
+              userId,
+              schoolId: teacherProfile.schoolId,
+              schoolName: teacherProfile.schoolName,
+              teacherName: teacherProfile.teacherName,
+              selection: { grade, unit: groupedSet.unit },
+              items: normalizedItems,
+              published: publishImportedSets,
+              publisher: cleanPublisher,
+              sourceType: "xlsx",
+            });
+
+            savedUnitCount += 1;
+            addedVocabularyCount += addedCount;
+            duplicateVocabularyCount += duplicateCount;
+            savedItemsByUnit.set(groupedSet.unit, normalizedItems);
+          }
+
+          return {
+            groupedSets,
+            publishImportedSets,
+            savedUnitCount,
+            addedVocabularyCount,
+            duplicateVocabularyCount,
+            savedItemsByUnit,
+          };
+        },
+      );
+
+      if (
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          mutationRevision,
+        )
+      ) {
+        await refreshCatalog(userId, mutationRevision);
+
+        const matchedSet = importResult.groupedSets.find(
+          (groupedSet) =>
+            groupedSet.unit === selection.unit && selection.grade === grade,
         );
-        const normalizedItems = normalizeDraftVocabulary(mergedItems);
 
-        await saveTeacherVocabularySet({
-          userId,
-          schoolId: teacherProfile.schoolId,
-          schoolName: teacherProfile.schoolName,
-          teacherName: teacherProfile.teacherName,
-          selection: { grade, unit: groupedSet.unit },
-          items: normalizedItems,
-          published: publishImportedSets,
-          publisher: cleanPublisher,
-          sourceType: "xlsx",
-        });
+        if (matchedSet) {
+          setItems(importResult.savedItemsByUnit.get(matchedSet.unit) ?? []);
+          setPublished(importResult.publishImportedSets);
+          setDirty(false);
+        }
+        setPublisher(cleanPublisher);
 
-        savedUnitCount += 1;
-        addedVocabularyCount += addedCount;
-        duplicateVocabularyCount += duplicateCount;
-        savedItemsByUnit.set(groupedSet.unit, normalizedItems);
+        setStatus(
+          importResult.publishImportedSets
+            ? `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰고 모든 반영 단원을 학생 공개로 설정했습니다.`
+            : `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰었습니다.`,
+        );
       }
-
-      await refreshCatalog();
-
-      const matchedSet = groupedSets.find(
-        (groupedSet) => groupedSet.unit === selection.unit && selection.grade === grade,
-      );
-
-      if (matchedSet) {
-        setItems(savedItemsByUnit.get(matchedSet.unit) ?? []);
-        setPublished(publishImportedSets);
-        setDirty(false);
-      }
-      setPublisher(cleanPublisher);
-
-      setStatus(
-        publishImportedSets
-          ? `${grade}학년 엑셀 업로드를 완료했습니다. ${savedUnitCount}개 단원을 반영했고 새 단어 ${addedVocabularyCount}개를 추가했습니다. 중복 ${duplicateVocabularyCount}개는 건너뛰고 모든 반영 단원을 학생 공개로 설정했습니다.`
-          : `${grade}학년 엑셀 업로드를 완료했습니다. ${savedUnitCount}개 단원을 반영했고 새 단어 ${addedVocabularyCount}개를 추가했습니다. 중복 ${duplicateVocabularyCount}개는 건너뛰었습니다.`,
-      );
     } catch (nextError) {
-      setError(
-        formatErrorMessage(nextError, "엑셀 업로드를 처리하지 못했습니다."),
-      );
+      if (
+        isCurrentTeacherAutoSaveRevision(
+          autoSaveRevisionStateRef.current,
+          mutationRevision,
+        )
+      ) {
+        setError(
+          formatErrorMessage(nextError, "엑셀 업로드를 처리하지 못했습니다."),
+        );
+      }
     } finally {
       setImporting(false);
     }
@@ -1000,6 +1079,7 @@ export function useTeacherSetManager({
     teacherAutoSaveTimerRef: autoSaveTimerRef,
     setTeacherAutoSaveToken: setAutoSaveToken,
     setTeacherAutoSaveStatus: setAutoSaveStatus,
+    persistTeacherSetSnapshot,
     captureTeacherSetSaveRevision: () =>
       captureTeacherAutoSaveRevision(autoSaveRevisionStateRef.current),
     isTeacherSetSaveRevisionCurrent: (revision) =>

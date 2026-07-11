@@ -9,6 +9,7 @@ import {
   isCurrentTeacherAutoSaveRevision,
   ownsTeacherAutoSaveTimer,
   recordTeacherAutoSaveEdit,
+  refreshTeacherSetCatalog,
 } from "./teacherSetManager.js";
 
 function createDeferred() {
@@ -258,4 +259,167 @@ test("manual save captures the current revision and shares the serialized queue"
 
   secondSave.resolve({ cleanPublisher: "publisher-b" });
   await manualSave;
+});
+
+test("coalesces B into C while A is in flight so only A and C write remotely", async () => {
+  const revisionState = createTeacherAutoSaveRevisionState();
+  const coordinator = createTeacherSetSaveCoordinator();
+  const deferredA = createDeferred();
+  const deferredC = createDeferred();
+  const remoteCalls = [];
+
+  const revisionA = recordTeacherAutoSaveEdit(revisionState);
+  const saveA = coordinator.enqueue({
+    revision: revisionA,
+    snapshot: { items: ["A"] },
+    sourceType: "autosave",
+    persistSnapshot: (snapshot) => {
+      remoteCalls.push(snapshot);
+      return deferredA.promise;
+    },
+  });
+  await flushCoordinator();
+
+  const revisionB = recordTeacherAutoSaveEdit(revisionState);
+  const saveB = coordinator.enqueue({
+    revision: revisionB,
+    snapshot: { items: ["B"] },
+    sourceType: "autosave",
+    persistSnapshot: (snapshot) => {
+      remoteCalls.push(snapshot);
+      return Promise.resolve({ snapshot });
+    },
+  });
+  const revisionC = recordTeacherAutoSaveEdit(revisionState);
+  const saveC = coordinator.enqueue({
+    revision: revisionC,
+    snapshot: { items: ["C"] },
+    sourceType: "autosave",
+    persistSnapshot: (snapshot) => {
+      remoteCalls.push(snapshot);
+      return deferredC.promise;
+    },
+  });
+
+  deferredA.resolve({ cleanPublisher: "publisher-a" });
+  await saveA;
+  await flushCoordinator();
+
+  assert.deepEqual(remoteCalls, [{ items: ["A"] }, { items: ["C"] }]);
+
+  deferredC.resolve({ cleanPublisher: "publisher-c" });
+  await Promise.all([saveB, saveC]);
+});
+
+test("orders delete, grade reset, and import mutations between earlier and later saves", async () => {
+  const coordinator = createTeacherSetSaveCoordinator();
+  const saveA = createDeferred();
+  const deleteMutation = createDeferred();
+  const resetMutation = createDeferred();
+  const importMutation = createDeferred();
+  const saveB = createDeferred();
+  const calls = [];
+
+  const pendingSaveA = coordinator.enqueue({
+    revision: 1,
+    snapshot: { items: ["A"] },
+    sourceType: "autosave",
+    persistSnapshot: () => {
+      calls.push("save-a");
+      return saveA.promise;
+    },
+  });
+  await flushCoordinator();
+
+  const pendingDelete = coordinator.enqueueMutation({
+    revision: 2,
+    runMutation: () => {
+      calls.push("delete");
+      return deleteMutation.promise;
+    },
+  });
+  const pendingReset = coordinator.enqueueMutation({
+    revision: 3,
+    runMutation: () => {
+      calls.push("reset");
+      return resetMutation.promise;
+    },
+  });
+  const pendingImport = coordinator.enqueueMutation({
+    revision: 4,
+    runMutation: () => {
+      calls.push("import");
+      return importMutation.promise;
+    },
+  });
+  const pendingSaveB = coordinator.enqueue({
+    revision: 5,
+    snapshot: { items: ["B"] },
+    sourceType: "autosave",
+    persistSnapshot: () => {
+      calls.push("save-b");
+      return saveB.promise;
+    },
+  });
+
+  assert.deepEqual(calls, ["save-a"]);
+
+  saveA.resolve();
+  await pendingSaveA;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "delete"]);
+
+  deleteMutation.resolve();
+  await pendingDelete;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "delete", "reset"]);
+
+  resetMutation.resolve();
+  await pendingReset;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "delete", "reset", "import"]);
+
+  importMutation.resolve();
+  await pendingImport;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "delete", "reset", "import", "save-b"]);
+
+  saveB.resolve();
+  await pendingSaveB;
+});
+
+test("stale catalog refresh does not apply catalog or error state after a newer edit", async () => {
+  const revisionState = createTeacherAutoSaveRevisionState();
+  const pendingCatalog = createDeferred();
+  const pendingError = createDeferred();
+  const appliedCatalogs = [];
+  const appliedErrors = [];
+
+  const refreshRevision = recordTeacherAutoSaveEdit(revisionState);
+  const refreshPromise = refreshTeacherSetCatalog({
+    loadCatalog: () => pendingCatalog.promise,
+    revision: refreshRevision,
+    isCurrentRevision: (revision) =>
+      isCurrentTeacherAutoSaveRevision(revisionState, revision),
+    setLoading: () => {},
+    setCatalog: (catalog) => appliedCatalogs.push(catalog),
+    setError: (error) => appliedErrors.push(error),
+  });
+  const staleErrorPromise = refreshTeacherSetCatalog({
+    loadCatalog: () => pendingError.promise,
+    revision: refreshRevision,
+    isCurrentRevision: (revision) =>
+      isCurrentTeacherAutoSaveRevision(revisionState, revision),
+    setLoading: () => {},
+    setCatalog: (catalog) => appliedCatalogs.push(catalog),
+    setError: (error) => appliedErrors.push(error),
+  });
+
+  recordTeacherAutoSaveEdit(revisionState);
+  pendingCatalog.resolve(["stale catalog"]);
+  pendingError.reject(new Error("stale error"));
+
+  assert.deepEqual(await Promise.all([refreshPromise, staleErrorPromise]), [false, false]);
+  assert.deepEqual(appliedCatalogs, []);
+  assert.deepEqual(appliedErrors, []);
 });

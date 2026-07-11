@@ -67,7 +67,7 @@ export function createTeacherSetSaveCoordinator({
   onSaveSettled = () => {},
 } = {}) {
   let inFlight = null;
-  let pending = null;
+  let queue = [];
 
   function resolveRequest(request, payload) {
     request.waiters.forEach(({ resolve }) => resolve(payload));
@@ -78,31 +78,33 @@ export function createTeacherSetSaveCoordinator({
   }
 
   function runNext() {
-    if (inFlight || !pending) {
+    if (inFlight || queue.length === 0) {
       return;
     }
 
-    inFlight = pending;
-    pending = null;
-    onSaveStart({ revision: inFlight.revision });
+    const request = queue.shift();
+    inFlight = request;
+
+    if (request.type === "save") {
+      onSaveStart({ revision: request.revision });
+    }
 
     Promise.resolve()
-      .then(() =>
-        inFlight.persistSnapshot(inFlight.snapshot, inFlight.sourceType),
-      )
+      .then(() => request.run())
       .then((result) => {
-        resolveRequest(inFlight, {
-          revision: inFlight.revision,
+        resolveRequest(request, {
+          revision: request.revision,
           result,
         });
       })
       .catch((error) => {
-        rejectRequest(inFlight, error);
+        rejectRequest(request, error);
       })
       .finally(() => {
-        const settledRequest = inFlight;
         inFlight = null;
-        onSaveSettled({ revision: settledRequest.revision });
+        if (request.type === "save") {
+          onSaveSettled({ revision: request.revision });
+        }
         runNext();
       });
   }
@@ -111,31 +113,35 @@ export function createTeacherSetSaveCoordinator({
     return new Promise((resolve, reject) => {
       const waiter = { resolve, reject };
 
-      if (inFlight?.revision === revision) {
+      if (inFlight?.type === "save" && inFlight.revision === revision) {
         inFlight.waiters.push(waiter);
         return;
       }
 
-      if (pending) {
-        if (revision < pending.revision) {
-          pending.waiters.push(waiter);
+      const pendingSave = queue.at(-1);
+      if (pendingSave?.type === "save") {
+        if (revision < pendingSave.revision) {
+          pendingSave.waiters.push(waiter);
           return;
         }
 
-        if (revision === pending.revision) {
-          pending.snapshot = snapshot;
-          pending.sourceType = sourceType;
-          pending.persistSnapshot = persistSnapshot;
-          pending.waiters.push(waiter);
+        if (revision === pendingSave.revision) {
+          pendingSave.snapshot = snapshot;
+          pendingSave.sourceType = sourceType;
+          pendingSave.persistSnapshot = persistSnapshot;
+          pendingSave.run = () => persistSnapshot(snapshot, sourceType);
+          pendingSave.waiters.push(waiter);
           return;
         }
 
-        pending = {
+        queue[queue.length - 1] = {
+          type: "save",
           revision,
           snapshot,
           sourceType,
           persistSnapshot,
-          waiters: [...pending.waiters, waiter],
+          run: () => persistSnapshot(snapshot, sourceType),
+          waiters: [...pendingSave.waiters, waiter],
         };
         return;
       }
@@ -145,32 +151,78 @@ export function createTeacherSetSaveCoordinator({
         return;
       }
 
-      pending = {
+      queue.push({
+        type: "save",
         revision,
         snapshot,
         sourceType,
         persistSnapshot,
+        run: () => persistSnapshot(snapshot, sourceType),
         waiters: [waiter],
-      };
+      });
+      runNext();
+    });
+  }
+
+  function enqueueMutation({ revision, runMutation }) {
+    return new Promise((resolve, reject) => {
+      queue.push({
+        type: "mutation",
+        revision,
+        run: runMutation,
+        waiters: [{ resolve, reject }],
+      });
       runNext();
     });
   }
 
   function discardPendingBefore(revision) {
-    if (!pending || pending.revision >= revision) {
-      return;
-    }
+    queue = queue.filter((request) => {
+      if (request.type !== "save" || request.revision >= revision) {
+        return true;
+      }
 
-    const discardedRequest = pending;
-    pending = null;
-    resolveRequest(discardedRequest, {
-      revision: discardedRequest.revision,
-      skipped: true,
+      resolveRequest(request, {
+        revision: request.revision,
+        skipped: true,
+      });
+      return false;
     });
   }
 
   return {
     enqueue,
+    enqueueMutation,
     discardPendingBefore,
   };
+}
+
+export async function refreshTeacherSetCatalog({
+  loadCatalog,
+  revision = null,
+  isCurrentRevision = () => true,
+  setLoading,
+  setCatalog,
+  setError,
+}) {
+  setLoading(true);
+
+  try {
+    const catalog = await loadCatalog();
+    if (revision !== null && !isCurrentRevision(revision)) {
+      return false;
+    }
+
+    setCatalog(catalog);
+    return true;
+  } catch (error) {
+    if (revision !== null && !isCurrentRevision(revision)) {
+      return false;
+    }
+
+    setError(error);
+    return false;
+  } finally {
+    setLoading(false);
+  }
 }
