@@ -4,7 +4,9 @@ import {
   canAutoSaveTeacherSet,
   captureTeacherAutoSaveRevision,
   createTeacherAutoSaveRevisionState,
+  createTeacherSetCatalogRefreshState,
   createTeacherSetSaveCoordinator,
+  completeTeacherSetImport,
   getNextTeacherSelection,
   isCurrentTeacherAutoSaveRevision,
   ownsTeacherAutoSaveTimer,
@@ -388,6 +390,96 @@ test("orders delete, grade reset, and import mutations between earlier and later
   await pendingSaveB;
 });
 
+test("preserves a pending save before a mutation barrier and runs later saves after it", async () => {
+  const coordinator = createTeacherSetSaveCoordinator();
+  const saveA = createDeferred();
+  const saveB = createDeferred();
+  const mutation = createDeferred();
+  const saveC = createDeferred();
+  const calls = [];
+
+  const pendingSaveA = coordinator.enqueue({
+    revision: 1,
+    snapshot: { items: ["A"] },
+    sourceType: "autosave",
+    persistSnapshot: () => {
+      calls.push("save-a");
+      return saveA.promise;
+    },
+  });
+  await flushCoordinator();
+
+  const pendingSaveB = coordinator.enqueue({
+    revision: 2,
+    snapshot: { items: ["B"] },
+    sourceType: "autosave",
+    persistSnapshot: () => {
+      calls.push("save-b");
+      return saveB.promise;
+    },
+  });
+  const pendingMutation = coordinator.enqueueMutation({
+    revision: 3,
+    runMutation: () => {
+      calls.push("mutation");
+      return mutation.promise;
+    },
+  });
+  const pendingSaveC = coordinator.enqueue({
+    revision: 4,
+    snapshot: { items: ["C"] },
+    sourceType: "autosave",
+    persistSnapshot: () => {
+      calls.push("save-c");
+      return saveC.promise;
+    },
+  });
+
+  saveA.resolve();
+  await pendingSaveA;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "save-b"]);
+
+  saveB.resolve();
+  await pendingSaveB;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "save-b", "mutation"]);
+
+  mutation.resolve();
+  await pendingMutation;
+  await flushCoordinator();
+  assert.deepEqual(calls, ["save-a", "save-b", "mutation", "save-c"]);
+
+  saveC.resolve();
+  await pendingSaveC;
+});
+
+test("import completion does not apply stale local state after its refresh finishes", async () => {
+  const revisionState = createTeacherAutoSaveRevisionState();
+  const pendingRefresh = createDeferred();
+  let items = ["newer edit"];
+  let dirty = true;
+
+  const importRevision = recordTeacherAutoSaveEdit(revisionState);
+  const completion = completeTeacherSetImport({
+    refreshCatalog: () => pendingRefresh.promise,
+    revision: importRevision,
+    isCurrentRevision: (revision) =>
+      isCurrentTeacherAutoSaveRevision(revisionState, revision),
+    applyImportResult: () => {
+      items = ["imported item"];
+      dirty = false;
+    },
+  });
+
+  recordTeacherAutoSaveEdit(revisionState);
+  pendingRefresh.resolve();
+
+  assert.equal(await completion, false);
+  assert.deepEqual(items, ["newer edit"]);
+  assert.equal(dirty, true);
+});
+
 test("stale catalog refresh does not apply catalog or error state after a newer edit", async () => {
   const revisionState = createTeacherAutoSaveRevisionState();
   const pendingCatalog = createDeferred();
@@ -422,4 +514,34 @@ test("stale catalog refresh does not apply catalog or error state after a newer 
   assert.deepEqual(await Promise.all([refreshPromise, staleErrorPromise]), [false, false]);
   assert.deepEqual(appliedCatalogs, []);
   assert.deepEqual(appliedErrors, []);
+});
+
+test("an older catalog refresh cannot clear loading while a newer refresh is active", async () => {
+  const refreshState = createTeacherSetCatalogRefreshState();
+  const firstCatalog = createDeferred();
+  const secondCatalog = createDeferred();
+  const loadingStates = [];
+
+  const firstRefresh = refreshTeacherSetCatalog({
+    loadCatalog: () => firstCatalog.promise,
+    refreshState,
+    setLoading: (loading) => loadingStates.push(loading),
+    setCatalog: () => {},
+    setError: () => {},
+  });
+  const secondRefresh = refreshTeacherSetCatalog({
+    loadCatalog: () => secondCatalog.promise,
+    refreshState,
+    setLoading: (loading) => loadingStates.push(loading),
+    setCatalog: () => {},
+    setError: () => {},
+  });
+
+  firstCatalog.resolve([]);
+  await firstRefresh;
+  assert.deepEqual(loadingStates, [true, true]);
+
+  secondCatalog.resolve([]);
+  await secondRefresh;
+  assert.deepEqual(loadingStates, [true, true, false]);
 });

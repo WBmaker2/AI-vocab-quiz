@@ -25,7 +25,9 @@ import {
   canAutoSaveTeacherSet,
   captureTeacherAutoSaveRevision,
   createTeacherAutoSaveRevisionState,
+  createTeacherSetCatalogRefreshState,
   createTeacherSetSaveCoordinator,
+  completeTeacherSetImport,
   getNextTeacherSelection,
   isCurrentTeacherAutoSaveRevision,
   ownsTeacherAutoSaveTimer,
@@ -72,6 +74,7 @@ export function useTeacherSetManager({
   const autoSaveTimerRef = useRef(null);
   const autoSaveInFlightRevisionRef = useRef(null);
   const autoSaveRevisionStateRef = useRef(createTeacherAutoSaveRevisionState());
+  const catalogRefreshStateRef = useRef(createTeacherSetCatalogRefreshState());
   const teacherSetSaveCoordinatorRef = useRef(null);
   const autoSaveSnapshotRef = useRef(null);
 
@@ -200,6 +203,7 @@ export function useTeacherSetManager({
           autoSaveRevisionStateRef.current,
           saveRevision,
         ),
+      refreshState: catalogRefreshStateRef.current,
       setLoading: setCatalogLoading,
       setCatalog,
       setError: (nextError) =>
@@ -259,8 +263,18 @@ export function useTeacherSetManager({
   }
 
   function recordTeacherSetEdit() {
+    return recordTeacherSetRevision({ discardPendingSaves: true });
+  }
+
+  function recordTeacherSetMutation() {
+    return recordTeacherSetRevision({ discardPendingSaves: false });
+  }
+
+  function recordTeacherSetRevision({ discardPendingSaves }) {
     const revision = recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
-    teacherSetSaveCoordinatorRef.current.discardPendingBefore(revision);
+    if (discardPendingSaves) {
+      teacherSetSaveCoordinatorRef.current.discardPendingBefore(revision);
+    }
     return revision;
   }
 
@@ -594,7 +608,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    const mutationRevision = recordTeacherSetEdit();
+    const mutationRevision = recordTeacherSetMutation();
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -645,7 +659,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    const mutationRevision = recordTeacherSetEdit();
+    const mutationRevision = recordTeacherSetMutation();
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -713,7 +727,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    const mutationRevision = recordTeacherSetEdit();
+    const mutationRevision = recordTeacherSetMutation();
     setImporting(true);
     setStatus("");
     setAutoSaveStatus("");
@@ -774,32 +788,34 @@ export function useTeacherSetManager({
         },
       );
 
-      if (
-        isCurrentTeacherAutoSaveRevision(
-          autoSaveRevisionStateRef.current,
-          mutationRevision,
-        )
-      ) {
-        await refreshCatalog(userId, mutationRevision);
+      await completeTeacherSetImport({
+        refreshCatalog: () => refreshCatalog(userId, mutationRevision),
+        revision: mutationRevision,
+        isCurrentRevision: (revision) =>
+          isCurrentTeacherAutoSaveRevision(
+            autoSaveRevisionStateRef.current,
+            revision,
+          ),
+        applyImportResult: () => {
+          const matchedSet = importResult.groupedSets.find(
+            (groupedSet) =>
+              groupedSet.unit === selection.unit && selection.grade === grade,
+          );
 
-        const matchedSet = importResult.groupedSets.find(
-          (groupedSet) =>
-            groupedSet.unit === selection.unit && selection.grade === grade,
-        );
+          if (matchedSet) {
+            setItems(importResult.savedItemsByUnit.get(matchedSet.unit) ?? []);
+            setPublished(importResult.publishImportedSets);
+            setDirty(false);
+          }
+          setPublisher(cleanPublisher);
 
-        if (matchedSet) {
-          setItems(importResult.savedItemsByUnit.get(matchedSet.unit) ?? []);
-          setPublished(importResult.publishImportedSets);
-          setDirty(false);
-        }
-        setPublisher(cleanPublisher);
-
-        setStatus(
-          importResult.publishImportedSets
-            ? `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰고 모든 반영 단원을 학생 공개로 설정했습니다.`
-            : `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰었습니다.`,
-        );
-      }
+          setStatus(
+            importResult.publishImportedSets
+              ? `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰고 모든 반영 단원을 학생 공개로 설정했습니다.`
+              : `${grade}학년 엑셀 업로드를 완료했습니다. ${importResult.savedUnitCount}개 단원을 반영했고 새 단어 ${importResult.addedVocabularyCount}개를 추가했습니다. 중복 ${importResult.duplicateVocabularyCount}개는 건너뛰었습니다.`,
+          );
+        },
+      });
     } catch (nextError) {
       if (
         isCurrentTeacherAutoSaveRevision(

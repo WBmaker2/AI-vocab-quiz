@@ -45,6 +45,10 @@ export function createTeacherAutoSaveRevisionState() {
   return { latestRevision: 0 };
 }
 
+export function createTeacherSetCatalogRefreshState() {
+  return { latestRequest: 0 };
+}
+
 export function recordTeacherAutoSaveEdit(revisionState) {
   revisionState.latestRevision += 1;
   return revisionState.latestRevision;
@@ -201,10 +205,12 @@ export async function refreshTeacherSetCatalog({
   loadCatalog,
   revision = null,
   isCurrentRevision = () => true,
+  refreshState = createTeacherSetCatalogRefreshState(),
   setLoading,
   setCatalog,
   setError,
 }) {
+  const request = ++refreshState.latestRequest;
   setLoading(true);
 
   try {
@@ -223,6 +229,24 @@ export async function refreshTeacherSetCatalog({
     setError(error);
     return false;
   } finally {
-    setLoading(false);
+    if (refreshState.latestRequest === request) {
+      setLoading(false);
+    }
   }
+}
+
+export async function completeTeacherSetImport({
+  refreshCatalog,
+  revision,
+  isCurrentRevision,
+  applyImportResult,
+}) {
+  await refreshCatalog();
+
+  if (!isCurrentRevision(revision)) {
+    return false;
+  }
+
+  applyImportResult();
+  return true;
 }
