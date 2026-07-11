@@ -7,10 +7,15 @@ import {
   toggleStudentMatchingUnits,
 } from "./studentSetLoader.js";
 
-function commitWhenCurrent(gate, generation, commits, value) {
-  if (gate.isCurrent(generation)) {
-    commits.push(value);
-  }
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, resolve, reject };
 }
 
 const asyncLanes = [
@@ -33,33 +38,127 @@ test("request gate advances generations and invalidates older requests", () => {
 });
 
 for (const lane of asyncLanes) {
-  test(`${lane}는 최신 요청의 성공, 오류, 로딩 종료만 반영한다`, () => {
-    assert.equal(typeof studentSetLoader.createRequestGate, "function");
+  test(`${lane}는 production runner에서 최신 요청만 정산한다`, async () => {
+    assert.equal(typeof studentSetLoader.runLatestRequest, "function");
+    if (typeof studentSetLoader.runLatestRequest !== "function") {
+      return;
+    }
 
     const gate = studentSetLoader.createRequestGate();
-    const staleGeneration = gate.begin();
-    const currentGeneration = gate.begin();
-    const commits = [];
-
-    commitWhenCurrent(gate, staleGeneration, commits, "stale-success");
-    commitWhenCurrent(gate, staleGeneration, commits, "stale-error");
-    commitWhenCurrent(gate, staleGeneration, commits, "stale-loading-complete");
-    commitWhenCurrent(gate, currentGeneration, commits, "current-success");
-    commitWhenCurrent(gate, currentGeneration, commits, "current-error");
-    commitWhenCurrent(
+    const events = [];
+    const staleSuccess = createDeferred();
+    const staleError = createDeferred();
+    const currentSuccess = createDeferred();
+    const run = studentSetLoader.runLatestRequest;
+    const staleSuccessRun = run(
       gate,
-      currentGeneration,
-      commits,
-      "current-loading-complete",
+      () => staleSuccess.promise,
+      {
+        onSuccess: () => events.push(`${lane}:stale-success`),
+        onError: () => events.push(`${lane}:stale-error`),
+        onFinally: () => events.push(`${lane}:stale-finally`),
+      },
+    );
+    const staleErrorRun = run(
+      gate,
+      () => staleError.promise,
+      {
+        onSuccess: () => events.push(`${lane}:older-success`),
+        onError: () => events.push(`${lane}:older-error`),
+        onFinally: () => events.push(`${lane}:older-finally`),
+      },
+    );
+    const currentRun = run(
+      gate,
+      () => currentSuccess.promise,
+      {
+        onSuccess: () => events.push(`${lane}:current-success`),
+        onError: () => events.push(`${lane}:current-error`),
+        onFinally: () => events.push(`${lane}:current-finally`),
+      },
     );
 
-    assert.deepEqual(commits, [
-      "current-success",
-      "current-error",
-      "current-loading-complete",
+    staleSuccess.resolve("stale success");
+    staleError.reject(new Error("stale error"));
+    currentSuccess.resolve("current success");
+
+    const results = await Promise.all([
+      staleSuccessRun,
+      staleErrorRun,
+      currentRun,
     ]);
+
+    assert.deepEqual(events, [
+      `${lane}:current-success`,
+      `${lane}:current-finally`,
+    ]);
+    assert.deepEqual(
+      results.map(({ ok, current }) => ({ ok, current })),
+      [
+        { ok: true, current: false },
+        { ok: false, current: false },
+        { ok: true, current: true },
+      ],
+    );
   });
 }
+
+test("production runner commits the current error and finally handlers", async () => {
+  assert.equal(typeof studentSetLoader.runLatestRequest, "function");
+  if (typeof studentSetLoader.runLatestRequest !== "function") {
+    return;
+  }
+
+  const events = [];
+  const result = await studentSetLoader.runLatestRequest(
+    studentSetLoader.createRequestGate(),
+    async () => {
+      throw new Error("current error");
+    },
+    {
+      onError: (error) => events.push(error.message),
+      onFinally: () => events.push("current-finally"),
+    },
+  );
+
+  assert.deepEqual(events, ["current error", "current-finally"]);
+  assert.deepEqual(
+    { ok: result.ok, current: result.current },
+    { ok: false, current: true },
+  );
+});
+
+test("matching seed invalidation does not strand vocabulary loading", async () => {
+  assert.equal(typeof studentSetLoader.runLatestRequest, "function");
+  assert.equal(typeof studentSetLoader.invalidateMatchingLane, "function");
+  if (
+    typeof studentSetLoader.runLatestRequest !== "function" ||
+    typeof studentSetLoader.invalidateMatchingLane !== "function"
+  ) {
+    return;
+  }
+
+  const vocabularyGate = studentSetLoader.createRequestGate();
+  const matchingGate = studentSetLoader.createRequestGate();
+  const vocabularyResponse = createDeferred();
+  let vocabularyLoading = true;
+  const vocabularyRequest = studentSetLoader.runLatestRequest(
+    vocabularyGate,
+    () => vocabularyResponse.promise,
+    {
+      onFinally: () => {
+        vocabularyLoading = false;
+      },
+    },
+  );
+
+  studentSetLoader.invalidateMatchingLane(matchingGate);
+  vocabularyResponse.resolve(["apple"]);
+  const result = await vocabularyRequest;
+
+  assert.equal(result.current, true);
+  assert.equal(vocabularyLoading, false);
+});
 
 test("toggleStudentMatchingUnits adds and sorts units numerically", () => {
   const nextUnits = toggleStudentMatchingUnits(["10", "1"], "2");

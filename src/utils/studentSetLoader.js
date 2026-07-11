@@ -12,6 +12,39 @@ export function createRequestGate() {
   };
 }
 
+export function invalidateMatchingLane(matchingGate) {
+  return matchingGate.begin();
+}
+
+export async function runLatestRequest(
+  gate,
+  request,
+  { onSuccess, onError, onFinally } = {},
+) {
+  const generation = gate.begin();
+  const isCurrent = () => gate.isCurrent(generation);
+  let result;
+
+  try {
+    const value = await request();
+    if (isCurrent()) {
+      await onSuccess?.(value, { generation, isCurrent });
+    }
+    result = { ok: true, current: isCurrent(), value };
+  } catch (error) {
+    if (isCurrent()) {
+      await onError?.(error, { generation, isCurrent });
+    }
+    result = { ok: false, current: isCurrent(), error };
+  } finally {
+    if (isCurrent()) {
+      await onFinally?.({ generation, isCurrent });
+    }
+  }
+
+  return result;
+}
+
 export function toggleStudentMatchingUnits(currentUnits, unit) {
   const cleanUnit = String(unit ?? "").trim();
   if (!cleanUnit) {

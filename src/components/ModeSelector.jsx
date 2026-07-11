@@ -17,6 +17,7 @@ export function ModeSelector({
   selection,
   units,
   matchingUnits,
+  vocabularyLoading,
   matchingLoading,
   initialMatchingPanelOpen,
   unitsLoading,
@@ -227,10 +228,12 @@ export function ModeSelector({
               !remoteConfigured ||
               !selectedTeacher ||
               !selection.unit ||
-              matchingLoading
+              vocabularyLoading
             }
           >
-            {matchingLoading ? "세트 불러오는 중..." : "단어 세트 불러오기"}
+            {vocabularyLoading
+              ? "단어 세트 불러오는 중..."
+              : "단어 세트 불러오기"}
           </button>
         </div>
 
@@ -257,6 +260,7 @@ export function ModeSelector({
                       type="checkbox"
                       checked={checked}
                       onChange={() => onToggleMatchingUnit(unit)}
+                      disabled={matchingLoading}
                     />
                     <span>{unit}단원</span>
                   </label>
@@ -281,6 +285,7 @@ export function ModeSelector({
               <button
                 className="ghost-button"
                 onClick={() => setMatchingPanelOpen(false)}
+                disabled={matchingLoading}
               >
                 닫기
               </button>

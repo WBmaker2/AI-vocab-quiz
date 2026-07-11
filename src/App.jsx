@@ -221,7 +221,8 @@ function App() {
             selection={library.student.selection}
             units={library.student.units}
             matchingUnits={library.student.matchingUnits}
-            matchingLoading={library.student.loading}
+            vocabularyLoading={library.student.vocabularyLoading}
+            matchingLoading={library.student.matchingLoading}
             initialMatchingPanelOpen={homeMatchingPanelOpen}
             unitsLoading={library.student.unitsLoading}
             status={library.student.status}
