@@ -70,6 +70,17 @@ function createTimestamp(seconds) {
   return Timestamp.fromMillis(seconds * 1000);
 }
 
+const STUDENT_PROFILE_TOKEN = "0123456789abcdef0123456789abcdef";
+
+function createStudentProfileId({
+  schoolId = "school-1",
+  grade = "3",
+  studentNameNormalized = "민수",
+  profileToken = STUDENT_PROFILE_TOKEN,
+} = {}) {
+  return `${schoolId}__${grade}__${studentNameNormalized}__${profileToken}`;
+}
+
 function createStudentProfileDoc(overrides = {}) {
   return {
     schoolId: "school-1",
@@ -77,6 +88,7 @@ function createStudentProfileDoc(overrides = {}) {
     grade: "3",
     studentName: "민수",
     studentNameNormalized: "민수",
+    profileToken: STUDENT_PROFILE_TOKEN,
     totalSessions: 1,
     listeningSessions: 0,
     speakingSessions: 0,
@@ -167,11 +179,11 @@ function createFishingLeaderboardDoc(overrides = {}) {
     studentNameNormalized: "민수",
     periodType: "week",
     periodKey: "2026-w15",
-    score: 150,
+    score: 980,
     elapsedSeconds: 48,
-    correctCount: 12,
-    wrongCount: 1,
-    missCount: 2,
+    correctCount: 7,
+    wrongCount: 2,
+    missCount: 1,
     createdAt: createTimestamp(10),
     updatedAt: createTimestamp(100),
     ...overrides,
@@ -537,7 +549,7 @@ rulesTest(
 rulesTest(
   "studentProfiles allows first matching score record when baseline is zero",
   async () => {
-    const profileId = "school-1__3__민수";
+    const profileId = createStudentProfileId();
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
@@ -562,7 +574,7 @@ rulesTest(
 rulesTest(
   "studentProfiles rejects a slower tied zero matching record after the first matching session",
   async () => {
-    const profileId = "school-1__3__민수";
+    const profileId = createStudentProfileId();
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
@@ -595,7 +607,7 @@ rulesTest(
 rulesTest(
   "studentProfiles rejects matching best time changes when typing advances without matching session increase",
   async () => {
-    const profileId = "school-1__3__민수";
+    const profileId = createStudentProfileId();
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
@@ -619,7 +631,7 @@ rulesTest(
 rulesTest(
   "studentProfiles rejects matching best score changes when listening advances without matching session increase",
   async () => {
-    const profileId = "school-1__3__민수";
+    const profileId = createStudentProfileId();
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
@@ -643,7 +655,7 @@ rulesTest(
 rulesTest(
   "studentProfiles allows a typing best-score update even when accuracy drops on the winning run",
   async () => {
-    const profileId = "school-1__3__민수";
+    const profileId = createStudentProfileId();
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
@@ -674,7 +686,7 @@ rulesTest(
 rulesTest(
   "studentProfiles allows the first typing best update for a legacy profile without typing best fields",
   async () => {
-    const profileId = "school-1__3__민수";
+    const profileId = createStudentProfileId();
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
@@ -711,7 +723,7 @@ rulesTest(
 rulesTest(
   "studentProfiles allows a first typing record with zero baseline score and elapsed time",
   async () => {
-    const profileId = "school-1__3__민수";
+    const profileId = createStudentProfileId();
 
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(
@@ -748,6 +760,158 @@ rulesTest(
         typingLastPlayedAt: createTimestamp(200),
         updatedAt: createTimestamp(200),
       }),
+    );
+  },
+);
+
+rulesTest(
+  "studentProfiles allows capability-shaped creates and gets",
+  async () => {
+    const profileId = createStudentProfileId();
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+
+    await assertSucceeds(
+      setDoc(
+        doc(studentDb, "studentProfiles", profileId),
+        createStudentProfileDoc(),
+      ),
+    );
+    await assertSucceeds(getDoc(doc(studentDb, "studentProfiles", profileId)));
+  },
+);
+
+rulesTest(
+  "studentProfiles rejects the legacy predictable profile path",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+
+    await assertFails(
+      setDoc(
+        doc(studentDb, "studentProfiles", "school-1__3__민수"),
+        createStudentProfileDoc(),
+      ),
+    );
+  },
+);
+
+rulesTest(
+  "studentProfiles rejects profile token mutation during a valid session update",
+  async () => {
+    const profileId = createStudentProfileId();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), "studentProfiles", profileId),
+        createStudentProfileDoc(),
+      );
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      updateDoc(doc(studentDb, "studentProfiles", profileId), {
+        totalSessions: 2,
+        typingSessions: 2,
+        typingLastPlayedAt: createTimestamp(200),
+        profileToken: "fedcba9876543210fedcba9876543210",
+        updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "studentProfiles rejects cross-scope field mutation during a valid session update",
+  async () => {
+    const profileId = createStudentProfileId();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), "studentProfiles", profileId),
+        createStudentProfileDoc(),
+      );
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      updateDoc(doc(studentDb, "studentProfiles", profileId), {
+        totalSessions: 2,
+        typingSessions: 2,
+        typingLastPlayedAt: createTimestamp(200),
+        grade: "4",
+        updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "leaderboards accept representative valid bounded result creates",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    const scopeKey = "school-1__3__week__2026-w15";
+
+    await assertSucceeds(
+      setDoc(
+        doc(studentDb, "matchingLeaderboards", scopeKey, "entries", "민수"),
+        createMatchingLeaderboardDoc(),
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(studentDb, "fishingLeaderboards", scopeKey, "entries", "민수"),
+        createFishingLeaderboardDoc(),
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(studentDb, "typingLeaderboards", scopeKey, "entries", "민수"),
+        createTypingLeaderboardDoc(),
+      ),
+    );
+  },
+);
+
+rulesTest(
+  "matchingLeaderboards rejects scores above solved pair capacity",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    const scopeKey = "school-1__3__week__2026-w15";
+
+    await assertFails(
+      setDoc(
+        doc(studentDb, "matchingLeaderboards", scopeKey, "entries", "민수"),
+        createMatchingLeaderboardDoc({ score: 801, solvedPairs: 8 }),
+      ),
+    );
+  },
+);
+
+rulesTest(
+  "fishingLeaderboards rejects scores above correct answer capacity",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    const scopeKey = "school-1__3__week__2026-w15";
+
+    await assertFails(
+      setDoc(
+        doc(studentDb, "fishingLeaderboards", scopeKey, "entries", "민수"),
+        createFishingLeaderboardDoc({ score: 981 }),
+      ),
+    );
+  },
+);
+
+rulesTest(
+  "typingLeaderboards rejects scores above correct answer capacity",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    const scopeKey = "school-1__3__week__2026-w15";
+
+    await assertFails(
+      setDoc(
+        doc(studentDb, "typingLeaderboards", scopeKey, "entries", "민수"),
+        createTypingLeaderboardDoc({ score: 1261 }),
+      ),
     );
   },
 );
@@ -898,11 +1062,11 @@ rulesTest(
     const studentDb = testEnv.unauthenticatedContext().firestore();
     await assertSucceeds(
       updateDoc(doc(studentDb, ...entryRefPath), {
-        score: 150,
+        score: 980,
         elapsedSeconds: 40,
-        correctCount: 12,
-        wrongCount: 1,
-        missCount: 2,
+        correctCount: 7,
+        wrongCount: 2,
+        missCount: 1,
         updatedAt: createTimestamp(200),
       }),
     );
@@ -926,11 +1090,11 @@ rulesTest(
     const studentDb = testEnv.unauthenticatedContext().firestore();
     await assertFails(
       updateDoc(doc(studentDb, ...entryRefPath), {
-        score: 150,
+        score: 980,
         elapsedSeconds: 50,
-        correctCount: 12,
-        wrongCount: 1,
-        missCount: 2,
+        correctCount: 7,
+        wrongCount: 2,
+        missCount: 1,
         updatedAt: createTimestamp(200),
       }),
     );
@@ -954,11 +1118,11 @@ rulesTest(
     const studentDb = testEnv.unauthenticatedContext().firestore();
     await assertFails(
       updateDoc(doc(studentDb, ...entryRefPath), {
-        score: 150,
+        score: 980,
         elapsedSeconds: 48,
-        correctCount: 12,
-        wrongCount: 1,
-        missCount: 2,
+        correctCount: 7,
+        wrongCount: 2,
+        missCount: 1,
         updatedAt: createTimestamp(200),
       }),
     );
@@ -982,9 +1146,9 @@ rulesTest(
     const studentDb = testEnv.unauthenticatedContext().firestore();
     await assertSucceeds(
       updateDoc(doc(studentDb, ...entryRefPath), {
-        score: 170,
+        score: 1120,
         elapsedSeconds: 46,
-        correctCount: 13,
+        correctCount: 8,
         wrongCount: 1,
         missCount: 1,
         updatedAt: createTimestamp(200),
@@ -1010,7 +1174,7 @@ rulesTest(
     const studentDb = testEnv.unauthenticatedContext().firestore();
     await assertFails(
       updateDoc(doc(studentDb, ...entryRefPath), {
-        correctCount: 14,
+        correctCount: 8,
         wrongCount: 0,
         missCount: 1,
         updatedAt: createTimestamp(201),

@@ -22,6 +22,10 @@ service cloud.firestore {
       return (value is int || value is float) && value >= 0;
     }
 
+    function isNonNegativeInteger(value) {
+      return value is int && value >= 0;
+    }
+
     function isStudentBadgeId(badgeId) {
       return badgeId == 'first_challenge'
         || badgeId == 'listening_star'
@@ -30,21 +34,27 @@ service cloud.firestore {
         || badgeId == 'practice_keeper';
     }
 
-    function isStudentProfileId(profileId, schoolId, grade, studentNameNormalized) {
-      return profileId == schoolId + "__" + grade + "__" + studentNameNormalized;
+    function isStudentProfileToken(profileToken) {
+      return profileToken is string
+        && profileToken.matches('^[0-9a-f]{32}$');
+    }
+
+    function isStudentProfileId(profileId, schoolId, grade, studentNameNormalized, profileToken) {
+      return profileId == schoolId + "__" + grade + "__" + studentNameNormalized + "__" + profileToken;
     }
 
     function studentProfileNumber(data, fieldName) {
       return data.keys().hasAny([fieldName]) ? data[fieldName] : 0;
     }
 
-    function isStudentProfileDocument(data) {
+    function hasOnlyStudentProfileFields(data) {
       return data.keys().hasOnly([
           'schoolId',
           'schoolName',
           'grade',
           'studentName',
           'studentNameNormalized',
+          'profileToken',
           'totalSessions',
           'listeningSessions',
           'speakingSessions',
@@ -67,7 +77,11 @@ service cloud.firestore {
           'earnedBadges',
           'createdAt',
           'updatedAt'
-        ])
+        ]);
+    }
+
+    function isStudentProfileDocument(data) {
+      return hasOnlyStudentProfileFields(data)
         && data.schoolId is string
         && data.schoolId.size() > 0
         && data.schoolName is string
@@ -78,6 +92,7 @@ service cloud.firestore {
         && data.studentName.size() > 0
         && data.studentNameNormalized is string
         && data.studentNameNormalized.size() > 0
+        && isStudentProfileToken(data.profileToken)
         && isNonNegativeNumber(data.totalSessions)
         && isNonNegativeNumber(data.listeningSessions)
         && isNonNegativeNumber(data.speakingSessions)
@@ -115,7 +130,31 @@ service cloud.firestore {
           profileId,
           request.resource.data.schoolId,
           request.resource.data.grade,
-          request.resource.data.studentNameNormalized
+          request.resource.data.studentNameNormalized,
+          request.resource.data.profileToken
+        );
+    }
+
+    function isStudentProfileUpdateWrite(profileId) {
+      return hasOnlyStudentProfileFields(request.resource.data)
+        && isStudentProfileToken(request.resource.data.profileToken)
+        && isStudentProfileId(
+          profileId,
+          request.resource.data.schoolId,
+          request.resource.data.grade,
+          request.resource.data.studentNameNormalized,
+          request.resource.data.profileToken
+        );
+    }
+
+    function isStudentProfileRead(profileId) {
+      return isStudentProfileDocument(resource.data)
+        && isStudentProfileId(
+          profileId,
+          resource.data.schoolId,
+          resource.data.grade,
+          resource.data.studentNameNormalized,
+          resource.data.profileToken
         );
     }
 
@@ -288,8 +327,13 @@ service cloud.firestore {
           data.periodKey
         )
         && isNonNegativeNumber(data.score)
-        && isNonNegativeNumber(data.elapsedSeconds)
-        && isNonNegativeNumber(data.solvedPairs);
+        && data.score <= data.solvedPairs * 100
+        && data.elapsedSeconds is int
+        && data.elapsedSeconds >= 0
+        && data.elapsedSeconds <= 7200
+        && data.solvedPairs is int
+        && data.solvedPairs >= 1
+        && data.solvedPairs <= 100;
     }
 
     function isMatchingLeaderboardStudentWrite() {
@@ -356,10 +400,13 @@ service cloud.firestore {
           data.periodKey
         )
         && isNonNegativeNumber(data.score)
+        && data.score <= data.correctCount * 140
         && isNonNegativeNumber(data.elapsedSeconds)
-        && isNonNegativeNumber(data.correctCount)
-        && isNonNegativeNumber(data.wrongCount)
-        && isNonNegativeNumber(data.missCount);
+        && isNonNegativeInteger(data.correctCount)
+        && isNonNegativeInteger(data.wrongCount)
+        && isNonNegativeInteger(data.missCount)
+        && data.correctCount + data.wrongCount + data.missCount >= 1
+        && data.correctCount + data.wrongCount + data.missCount <= 10;
     }
 
     function isFishingLeaderboardStudentWrite() {
@@ -428,12 +475,22 @@ service cloud.firestore {
           data.periodKey
         )
         && isNonNegativeNumber(data.score)
-        && isNonNegativeNumber(data.elapsedSeconds)
-        && isNonNegativeNumber(data.questionCount)
-        && isNonNegativeNumber(data.correctCount)
-        && isNonNegativeNumber(data.accuracy)
-        && isNonNegativeNumber(data.hintUsedCount)
-        && isNonNegativeNumber(data.bestCombo);
+        && data.score <= data.correctCount * 140
+        && data.elapsedSeconds is int
+        && data.elapsedSeconds >= 0
+        && data.elapsedSeconds <= 86400
+        && data.questionCount is int
+        && data.questionCount >= 1
+        && data.questionCount <= 500
+        && isNonNegativeInteger(data.correctCount)
+        && data.correctCount <= data.questionCount
+        && isNonNegativeInteger(data.accuracy)
+        && data.accuracy <= 100
+        && math.abs(data.accuracy * data.questionCount - data.correctCount * 100) <= data.questionCount
+        && isNonNegativeInteger(data.hintUsedCount)
+        && data.hintUsedCount <= data.questionCount
+        && isNonNegativeInteger(data.bestCombo)
+        && data.bestCombo <= data.correctCount;
     }
 
     function isTypingLeaderboardStudentWrite() {
@@ -546,7 +603,7 @@ service cloud.firestore {
     }
 
     match /studentProfiles/{profileId} {
-      allow get: if true;
+      allow get: if isStudentProfileRead(profileId);
       allow list: if false;
 
       allow create: if isStudentProfileWrite(profileId)
@@ -554,10 +611,13 @@ service cloud.firestore {
         && isStudentProfileFirstSessionShape(request.resource.data);
 
       allow update: if isMatchingProfileBestUpdateAllowed()
-        && isStudentProfileWrite(profileId)
+        && isStudentProfileUpdateWrite(profileId)
         && resource.data.schoolId == request.resource.data.schoolId
+        && resource.data.schoolName == request.resource.data.schoolName
         && resource.data.grade == request.resource.data.grade
+        && resource.data.studentName == request.resource.data.studentName
         && resource.data.studentNameNormalized == request.resource.data.studentNameNormalized
+        && resource.data.profileToken == request.resource.data.profileToken
         && resource.data.createdAt == request.resource.data.createdAt
         && request.resource.data.totalSessions == resource.data.totalSessions + 1
         && isStudentProfileSingleSessionAdvance()

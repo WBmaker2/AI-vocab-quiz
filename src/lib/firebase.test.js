@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import {
   createTeacherProfileWriteData,
   shouldReplaceElapsedLeaderboardEntry,
+  validateFishingLeaderboardResult,
+  validateMatchingLeaderboardResult,
+  validateTypingLeaderboardResult,
 } from "./firebase.js";
 
 test("shouldReplaceElapsedLeaderboardEntry updates when the existing score is lower", () => {
@@ -95,4 +98,76 @@ test("createTeacherProfileWriteData updates only self-service profile fields", (
       gradePublishers: { 4: "비상" },
     },
   );
+});
+
+test("leaderboard result validators accept representative bounded scores", () => {
+  assert.deepEqual(
+    validateMatchingLeaderboardResult({ score: 800, elapsedSeconds: 45, solvedPairs: 8 }),
+    { score: 800, elapsedSeconds: 45, solvedPairs: 8 },
+  );
+  assert.deepEqual(
+    validateFishingLeaderboardResult({
+      score: 980,
+      elapsedSeconds: 45,
+      correctCount: 7,
+      wrongCount: 2,
+      missCount: 1,
+    }),
+    { score: 980, elapsedSeconds: 45, correctCount: 7, wrongCount: 2, missCount: 1 },
+  );
+  assert.deepEqual(
+    validateTypingLeaderboardResult({
+      score: 1120,
+      elapsedSeconds: 75,
+      questionCount: 10,
+      correctCount: 8,
+      accuracy: 80,
+      hintUsedCount: 2,
+      bestCombo: 6,
+    }),
+    {
+      score: 1120,
+      elapsedSeconds: 75,
+      questionCount: 10,
+      correctCount: 8,
+      accuracy: 80,
+      hintUsedCount: 2,
+      bestCombo: 6,
+    },
+  );
+});
+
+test("leaderboard result validators reject impossible scores and invalid bounds", () => {
+  assert.throws(
+    () => validateMatchingLeaderboardResult({ score: 801, elapsedSeconds: 45, solvedPairs: 8 }),
+    /score/i,
+  );
+  assert.throws(
+    () => validateFishingLeaderboardResult({
+      score: 981,
+      elapsedSeconds: 45,
+      correctCount: 7,
+      wrongCount: 2,
+      missCount: 1,
+    }), /score/i);
+  assert.throws(
+    () => validateTypingLeaderboardResult({
+      score: 1121,
+      elapsedSeconds: 75,
+      questionCount: 10,
+      correctCount: 8,
+      accuracy: 80,
+      hintUsedCount: 2,
+      bestCombo: 6,
+    }), /score/i);
+  assert.throws(
+    () => validateTypingLeaderboardResult({
+      score: 560,
+      elapsedSeconds: 75,
+      questionCount: 7,
+      correctCount: 4,
+      accuracy: 100,
+      hintUsedCount: 2,
+      bestCombo: 4,
+    }), /accuracy/i);
 });

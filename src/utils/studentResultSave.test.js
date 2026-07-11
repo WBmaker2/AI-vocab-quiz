@@ -147,13 +147,16 @@ test("saveCombinedStudentResult keeps the leaderboard result when progress savin
       failedPeriods: [],
     }),
     saveProgress: async () => {
-      throw new Error("개인 기록 저장 실패");
+      throw new Error("This browser cannot save private growth records because local storage is unavailable.");
     },
   });
 
   assert.deepEqual(result.leaderboard.updatedPeriods, ["week"]);
   assert.equal(result.progress, null);
-  assert.equal(result.progressError, "개인 기록 저장 실패");
+  assert.equal(
+    result.progressError,
+    "This browser cannot save private growth records because local storage is unavailable.",
+  );
 });
 
 test("saveCombinedStudentResult attempts progress save even when leaderboard save fails", async () => {

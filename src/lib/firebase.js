@@ -46,6 +46,11 @@ import {
   normalizeStudentProfileName,
 } from "../utils/studentProgress.js";
 import {
+  findStudentProfileCapability,
+  getOrCreateStudentProfileCapability,
+  isStudentProfileCapabilityToken,
+} from "../utils/studentProfileCapability.js";
+import {
   canMarkBingoCell,
   computeBingoLines,
   createBingoBoard,
@@ -153,6 +158,128 @@ function toNonNegativeNumber(value, fieldName) {
   return Math.max(0, numberValue);
 }
 
+function validateLeaderboardNumber(value, fieldName, { min = 0, max = Infinity } = {}) {
+  const numberValue = Number(value);
+
+  if (!Number.isFinite(numberValue) || numberValue < min || numberValue > max) {
+    throw new Error(`${fieldName} is out of range.`);
+  }
+
+  return numberValue;
+}
+
+function validateLeaderboardInteger(value, fieldName, options = {}) {
+  const numberValue = validateLeaderboardNumber(value, fieldName, options);
+
+  if (!Number.isInteger(numberValue)) {
+    throw new Error(`${fieldName} must be an integer.`);
+  }
+
+  return numberValue;
+}
+
+export function validateMatchingLeaderboardResult({
+  score,
+  elapsedSeconds,
+  solvedPairs,
+}) {
+  const cleanSolvedPairs = validateLeaderboardInteger(solvedPairs, "solvedPairs", {
+    min: 1,
+    max: 100,
+  });
+
+  return {
+    score: validateLeaderboardNumber(score, "score", {
+      min: 0,
+      max: cleanSolvedPairs * 100,
+    }),
+    elapsedSeconds: validateLeaderboardInteger(elapsedSeconds, "elapsedSeconds", {
+      min: 0,
+      max: 7200,
+    }),
+    solvedPairs: cleanSolvedPairs,
+  };
+}
+
+export function validateFishingLeaderboardResult({
+  score,
+  elapsedSeconds,
+  correctCount,
+  wrongCount,
+  missCount,
+}) {
+  const cleanCorrectCount = validateLeaderboardInteger(correctCount, "correctCount");
+  const cleanWrongCount = validateLeaderboardInteger(wrongCount, "wrongCount");
+  const cleanMissCount = validateLeaderboardInteger(missCount, "missCount");
+  const totalRounds = cleanCorrectCount + cleanWrongCount + cleanMissCount;
+
+  if (totalRounds < 1 || totalRounds > 10) {
+    throw new Error("Fishing total rounds is out of range.");
+  }
+
+  return {
+    score: validateLeaderboardNumber(score, "score", {
+      min: 0,
+      max: cleanCorrectCount * 140,
+    }),
+    elapsedSeconds: validateLeaderboardNumber(elapsedSeconds, "elapsedSeconds"),
+    correctCount: cleanCorrectCount,
+    wrongCount: cleanWrongCount,
+    missCount: cleanMissCount,
+  };
+}
+
+export function validateTypingLeaderboardResult({
+  score,
+  elapsedSeconds,
+  questionCount,
+  correctCount,
+  accuracy,
+  hintUsedCount,
+  bestCombo,
+}) {
+  const cleanQuestionCount = validateLeaderboardInteger(questionCount, "questionCount", {
+    min: 1,
+    max: 500,
+  });
+  const cleanCorrectCount = validateLeaderboardInteger(correctCount, "correctCount", {
+    min: 0,
+    max: cleanQuestionCount,
+  });
+  const cleanHintUsedCount = validateLeaderboardInteger(hintUsedCount, "hintUsedCount", {
+    min: 0,
+    max: cleanQuestionCount,
+  });
+  const cleanBestCombo = validateLeaderboardInteger(bestCombo, "bestCombo", {
+    min: 0,
+    max: cleanCorrectCount,
+  });
+  const cleanAccuracy = validateLeaderboardInteger(accuracy, "accuracy", {
+    min: 0,
+    max: 100,
+  });
+
+  if (Math.abs(cleanAccuracy * cleanQuestionCount - cleanCorrectCount * 100) > cleanQuestionCount) {
+    throw new Error("accuracy does not match correctCount.");
+  }
+
+  return {
+    score: validateLeaderboardNumber(score, "score", {
+      min: 0,
+      max: cleanCorrectCount * 140,
+    }),
+    elapsedSeconds: validateLeaderboardInteger(elapsedSeconds, "elapsedSeconds", {
+      min: 0,
+      max: 86400,
+    }),
+    questionCount: cleanQuestionCount,
+    correctCount: cleanCorrectCount,
+    accuracy: cleanAccuracy,
+    hintUsedCount: cleanHintUsedCount,
+    bestCombo: cleanBestCombo,
+  };
+}
+
 const STUDENT_PROGRESS_ACTIVITY_TYPES = new Set([
   "listening",
   "speaking",
@@ -180,7 +307,12 @@ function isStudentProgressActivityType(value) {
   );
 }
 
-function createStudentProgressRef(firestore, { schoolId, grade, studentName }) {
+function createStudentProgressRef(firestore, {
+  schoolId,
+  grade,
+  studentName,
+  profileToken,
+}) {
   return doc(
     firestore,
     "studentProfiles",
@@ -188,6 +320,7 @@ function createStudentProgressRef(firestore, { schoolId, grade, studentName }) {
       schoolId,
       grade,
       studentName,
+      profileToken,
     }),
   );
 }
@@ -207,6 +340,9 @@ function normalizeStudentProfileDocument(snapshotData, fallback) {
     snapshotData?.grade ?? cleanFallback.grade,
   );
   const studentNameNormalized = normalizeStudentNameKey(studentName);
+  const profileToken = String(
+    snapshotData?.profileToken ?? cleanFallback.profileToken ?? "",
+  ).trim();
   const totalSessions = toNonNegativeInteger(snapshotData?.totalSessions ?? 0);
   const earnedBadges = Array.from(
     new Set(
@@ -224,6 +360,7 @@ function normalizeStudentProfileDocument(snapshotData, fallback) {
     grade,
     studentName,
     studentNameNormalized,
+    profileToken: isStudentProfileCapabilityToken(profileToken) ? profileToken : "",
     totalSessions,
     listeningSessions: toNonNegativeInteger(
       snapshotData?.listeningSessions ?? 0,
@@ -276,6 +413,7 @@ function createNextStudentProfile({
   schoolName,
   grade,
   studentName,
+  profileToken,
   activityType,
   comparisonResult,
   newlyEarnedBadges,
@@ -286,6 +424,7 @@ function createNextStudentProfile({
     grade,
     studentName,
     studentNameNormalized: normalizeStudentNameKey(studentName),
+    profileToken,
     totalSessions: currentProfile.totalSessions + 1,
     listeningSessions: currentProfile.listeningSessions,
     speakingSessions: currentProfile.speakingSessions,
@@ -370,6 +509,11 @@ function createMatchingLeaderboardPayload({
   const cleanGrade = normalizeLeaderboardScope(grade);
   const cleanStudentName = normalizeLeaderboardText(studentName);
   const cleanStudentNameNormalized = normalizeStudentNameKey(studentName);
+  const result = validateMatchingLeaderboardResult({
+    score,
+    elapsedSeconds,
+    solvedPairs,
+  });
 
   return {
     scopeKey: createMatchingLeaderboardScopeKey({
@@ -385,9 +529,7 @@ function createMatchingLeaderboardPayload({
     studentNameNormalized: cleanStudentNameNormalized,
     periodType,
     periodKey,
-    score: toNonNegativeInteger(score, "score"),
-    elapsedSeconds: toNonNegativeInteger(elapsedSeconds, "elapsedSeconds"),
-    solvedPairs: toNonNegativeInteger(solvedPairs, "solvedPairs"),
+    ...result,
   };
 }
 
@@ -409,6 +551,13 @@ function createFishingLeaderboardPayload({
   const cleanGrade = normalizeLeaderboardScope(grade);
   const cleanStudentName = normalizeLeaderboardText(studentName);
   const cleanStudentNameNormalized = normalizeStudentNameKey(studentName);
+  const result = validateFishingLeaderboardResult({
+    score,
+    elapsedSeconds,
+    correctCount,
+    wrongCount,
+    missCount,
+  });
 
   return {
     scopeKey: createMatchingLeaderboardScopeKey({
@@ -424,11 +573,7 @@ function createFishingLeaderboardPayload({
     studentNameNormalized: cleanStudentNameNormalized,
     periodType,
     periodKey,
-    score: toNonNegativeInteger(score, "score"),
-    elapsedSeconds: toNonNegativeInteger(elapsedSeconds, "elapsedSeconds"),
-    correctCount: toNonNegativeInteger(correctCount, "correctCount"),
-    wrongCount: toNonNegativeInteger(wrongCount, "wrongCount"),
-    missCount: toNonNegativeInteger(missCount, "missCount"),
+    ...result,
   };
 }
 
@@ -452,6 +597,15 @@ function createTypingLeaderboardPayload({
   const cleanGrade = normalizeLeaderboardScope(grade);
   const cleanStudentName = normalizeLeaderboardText(studentName);
   const cleanStudentNameNormalized = normalizeStudentNameKey(studentName);
+  const result = validateTypingLeaderboardResult({
+    score,
+    elapsedSeconds,
+    questionCount,
+    correctCount,
+    accuracy,
+    hintUsedCount,
+    bestCombo,
+  });
 
   return {
     scopeKey: createMatchingLeaderboardScopeKey({
@@ -467,13 +621,7 @@ function createTypingLeaderboardPayload({
     studentNameNormalized: cleanStudentNameNormalized,
     periodType,
     periodKey,
-    score: toNonNegativeInteger(score, "score"),
-    elapsedSeconds: toNonNegativeInteger(elapsedSeconds, "elapsedSeconds"),
-    questionCount: toNonNegativeInteger(questionCount, "questionCount"),
-    correctCount: toNonNegativeInteger(correctCount, "correctCount"),
-    accuracy: toNonNegativeNumber(accuracy, "accuracy"),
-    hintUsedCount: toNonNegativeInteger(hintUsedCount, "hintUsedCount"),
-    bestCombo: toNonNegativeInteger(bestCombo, "bestCombo"),
+    ...result,
   };
 }
 
@@ -2352,10 +2500,21 @@ export async function fetchStudentProfile({ schoolId, grade, studentName }) {
     return null;
   }
 
+  const profileToken = findStudentProfileCapability({
+    schoolId: cleanSchoolId,
+    grade: cleanGrade,
+    studentName: cleanStudentName,
+  });
+
+  if (!profileToken) {
+    return null;
+  }
+
   const profileRef = createStudentProgressRef(firestore, {
     schoolId: cleanSchoolId,
     grade: cleanGrade,
     studentName: cleanStudentName,
+    profileToken,
   });
   const snapshot = await getDoc(profileRef);
 
@@ -2408,10 +2567,23 @@ export async function saveStudentProgress({
     throw new Error("Activity type must be listening, speaking, matching, or typing.");
   }
 
+  const profileToken = getOrCreateStudentProfileCapability({
+    schoolId: cleanSchoolId,
+    grade: cleanGrade,
+    studentName: cleanStudentName,
+  });
+
+  if (!profileToken) {
+    throw new Error(
+      "This browser cannot save private growth records because local storage is unavailable.",
+    );
+  }
+
   const profileRef = createStudentProgressRef(firestore, {
     schoolId: cleanSchoolId,
     grade: cleanGrade,
     studentName: cleanStudentName,
+    profileToken,
   });
 
   let comparisonResult = null;
@@ -2427,6 +2599,7 @@ export async function saveStudentProgress({
         schoolName: cleanSchoolName,
         grade: cleanGrade,
         studentName: cleanStudentName,
+        profileToken,
       },
     );
 
@@ -2452,6 +2625,7 @@ export async function saveStudentProgress({
       schoolName: cleanSchoolName,
       grade: cleanGrade,
       studentName: cleanStudentName,
+      profileToken,
       activityType: cleanActivityType,
       comparisonResult,
       newlyEarnedBadges,
@@ -2620,6 +2794,12 @@ export async function saveMatchingLeaderboardScore({
     throw new Error("Student name is required.");
   }
 
+  const validatedResult = validateMatchingLeaderboardResult({
+    score,
+    elapsedSeconds,
+    solvedPairs,
+  });
+
   const periodKeys = createLeaderboardPeriodKeys(now);
   const updatedPeriods = [];
   const skippedPeriods = [];
@@ -2637,9 +2817,7 @@ export async function saveMatchingLeaderboardScore({
         studentName: cleanStudentName,
         periodType: type,
         periodKey: periodKeys[type],
-        score,
-        elapsedSeconds,
-        solvedPairs,
+        ...validatedResult,
       });
 
       if (result === "skipped") {
@@ -2698,6 +2876,14 @@ export async function saveFishingLeaderboardScore({
     throw new Error("Student name is required.");
   }
 
+  const validatedResult = validateFishingLeaderboardResult({
+    score,
+    elapsedSeconds,
+    correctCount,
+    wrongCount,
+    missCount,
+  });
+
   const periodKeys = createLeaderboardPeriodKeys(now);
   const updatedPeriods = [];
   const skippedPeriods = [];
@@ -2715,11 +2901,7 @@ export async function saveFishingLeaderboardScore({
         studentName: cleanStudentName,
         periodType: type,
         periodKey: periodKeys[type],
-        score,
-        elapsedSeconds,
-        correctCount,
-        wrongCount,
-        missCount,
+        ...validatedResult,
       });
 
       if (result === "skipped") {
@@ -2780,6 +2962,16 @@ export async function saveTypingLeaderboardScore({
     throw new Error("Student name is required.");
   }
 
+  const validatedResult = validateTypingLeaderboardResult({
+    score,
+    elapsedSeconds,
+    questionCount,
+    correctCount,
+    accuracy,
+    hintUsedCount,
+    bestCombo,
+  });
+
   const periodKeys = createLeaderboardPeriodKeys(now);
   const updatedPeriods = [];
   const skippedPeriods = [];
@@ -2797,13 +2989,7 @@ export async function saveTypingLeaderboardScore({
         studentName: cleanStudentName,
         periodType: type,
         periodKey: periodKeys[type],
-        score,
-        elapsedSeconds,
-        questionCount,
-        correctCount,
-        accuracy,
-        hintUsedCount,
-        bestCombo,
+        ...validatedResult,
       });
 
       if (result === "skipped") {

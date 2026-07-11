@@ -85,6 +85,40 @@ Document fields:
 - `createdAt`
 - `updatedAt`
 
+### `studentProfiles`
+
+Document id:
+
+- `schoolId + grade + normalized student name + device-private capability token`
+
+Document fields include the student scope, immutable `profileToken`, per-activity best
+records, earned badges, and timestamps.
+
+Purpose:
+
+- save a student's personal growth history only on the browser that created the
+  device-private capability token
+- prevent name-only predictable profile reads and writes
+
+The capability token is a random 32-character hexadecimal value stored only in
+that browser's local storage. It is never rendered or logged. A browser without
+the token does not fetch an existing personal profile; saving there creates a
+new device-private profile instead. Consequently, existing personal growth
+history starts fresh once on the updated device-private model. Public leaderboard
+history remains shared and is not reset by this migration.
+
+### Leaderboard score bounds
+
+Student leaderboard writes are checked both in the client and Firestore rules:
+
+- Matching: 1-100 solved pairs, 0-7200 whole elapsed seconds, and score no
+  greater than `solvedPairs * 100`.
+- Fishing: non-negative whole result counts totaling 1-10, and score no greater
+  than `correctCount * 140`.
+- Typing: 1-500 questions, internally consistent whole-number counts and rounded
+  accuracy, 0-86400 whole elapsed seconds, and score no greater than
+  `correctCount * 140`.
+
 ### `items` array shape
 
 Each item inside `vocabularySets.items`:

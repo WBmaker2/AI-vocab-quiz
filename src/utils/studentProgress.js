@@ -3,6 +3,7 @@ import {
   normalizeStudentName,
   normalizeStudentNameKey,
 } from "./leaderboard.js";
+import { isStudentProfileCapabilityToken } from "./studentProfileCapability.js";
 
 export const MATCHING_SPEED_BADGE_THRESHOLD_SECONDS = 45;
 export const PRACTICE_KEEPER_BADGE_MIN_SESSIONS = 3;
@@ -287,11 +288,21 @@ export function normalizeStudentProfileName(value) {
   return normalizeStudentName(value);
 }
 
-export function createStudentProfileId({ schoolId, grade, studentName }) {
+export function createStudentProfileId({
+  schoolId,
+  grade,
+  studentName,
+  profileToken,
+}) {
+  if (!isStudentProfileCapabilityToken(profileToken)) {
+    throw new Error("Student profile capability is required.");
+  }
+
   return [
     normalizeScopeValue(schoolId),
     normalizeScopeValue(grade),
     normalizeStudentNameKey(normalizeStudentProfileName(studentName)),
+    profileToken,
   ].join("__");
 }
 
