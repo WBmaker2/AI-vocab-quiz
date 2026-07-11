@@ -1,4 +1,8 @@
-export function getTeacherProfilePanelMode(profileEditorOpen) {
+export function getTeacherProfilePanelMode(profileEditorOpen, profile) {
+  if (profile && profile.isActive !== true) {
+    return "approval-pending";
+  }
+
   return profileEditorOpen ? "expanded" : "collapsed";
 }
 

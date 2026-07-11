@@ -109,6 +109,30 @@ function normalizeLeaderboardText(value) {
     .replace(/\s+/g, " ");
 }
 
+export function createTeacherProfileWriteData({
+  teacherName,
+  schoolId,
+  schoolName,
+  gradePublishers = {},
+  isNew,
+}) {
+  const selfServiceData = {
+    teacherName: String(teacherName ?? "").trim(),
+    gradePublishers,
+  };
+
+  if (!isNew) {
+    return selfServiceData;
+  }
+
+  return {
+    ...selfServiceData,
+    schoolId,
+    schoolName: String(schoolName ?? "").trim(),
+    isActive: false,
+  };
+}
+
 function toNonNegativeInteger(value, fieldName) {
   const numberValue = Number(value);
 
@@ -2006,6 +2030,7 @@ export async function getTeacherProfile(userId) {
     teacherName: data.teacherName,
     schoolId: data.schoolId,
     schoolName: data.schoolName,
+    isActive: data.isActive === true,
     gradePublishers: data.gradePublishers ?? {},
   };
 }
@@ -2019,27 +2044,34 @@ export async function upsertTeacherProfile({
 }) {
   const { db: firestore } = ensureFirebase();
   const teacherRef = doc(firestore, "teachers", userId);
-
-  const payload = {
-    teacherName: teacherName.trim(),
-    schoolId,
-    schoolName: schoolName.trim(),
-    isActive: true,
-    gradePublishers,
-    updatedAt: serverTimestamp(),
-  };
-
   const teacherSnapshot = await getDoc(teacherRef);
 
   if (teacherSnapshot.exists()) {
-    await updateDoc(teacherRef, payload);
-    return;
+    await updateDoc(teacherRef, {
+      ...createTeacherProfileWriteData({
+        teacherName,
+        schoolId,
+        schoolName,
+        gradePublishers,
+        isNew: false,
+      }),
+      updatedAt: serverTimestamp(),
+    });
+    return { isActive: teacherSnapshot.data().isActive === true };
   }
 
   await setDoc(teacherRef, {
-    ...payload,
+    ...createTeacherProfileWriteData({
+      teacherName,
+      schoolId,
+      schoolName,
+      gradePublishers,
+      isNew: true,
+    }),
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
+  return { isActive: false };
 }
 
 export async function syncTeacherVocabularyMetadata({

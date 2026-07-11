@@ -302,19 +302,22 @@ export function useVocabularyLibrary() {
 
     try {
       const school = await findOrCreateSchool(schoolName);
-      await upsertTeacherProfile({
+      const savedProfile = await upsertTeacherProfile({
         userId,
         teacherName,
         schoolId: school.id,
         schoolName: school.name,
         gradePublishers: teacherProfile?.gradePublishers ?? {},
       });
-      await syncTeacherVocabularyMetadata({
-        userId,
-        teacherName,
-        schoolId: school.id,
-        schoolName: school.name,
-      });
+
+      if (savedProfile.isActive) {
+        await syncTeacherVocabularyMetadata({
+          userId,
+          teacherName,
+          schoolId: school.id,
+          schoolName: school.name,
+        });
+      }
       await student.refreshFeaturedSchools();
 
       const profile = await getTeacherProfile(userId);
@@ -323,7 +326,9 @@ export function useVocabularyLibrary() {
         ...current,
         suggestions: [],
         saving: false,
-        status: "선생님 정보를 저장했습니다.",
+        status: savedProfile.isActive
+          ? "선생님 정보를 저장했습니다."
+          : "승인 요청이 저장되었습니다. 관리자 승인을 기다려 주세요.",
         error: "",
       }));
       return true;
@@ -397,6 +402,9 @@ export function useVocabularyLibrary() {
     !teacherProfileLoading &&
     !teacherProfile &&
     !teacherProfileError;
+  const requiresTeacherApproval = Boolean(
+    teacherProfile && teacherProfile.isActive !== true,
+  );
 
   return {
     remoteConfigured: isFirebaseConfigured,
@@ -413,6 +421,7 @@ export function useVocabularyLibrary() {
       profileError: teacherProfileError,
       profile: teacherProfile,
       requiresOnboarding: requiresTeacherOnboarding,
+      requiresApproval: requiresTeacherApproval,
       onboarding: {
         ...onboarding,
         updateField: updateOnboardingField,

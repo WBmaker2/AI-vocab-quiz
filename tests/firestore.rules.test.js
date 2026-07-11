@@ -9,6 +9,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   Timestamp,
+  deleteDoc,
   doc,
   getDoc,
   setDoc,
@@ -321,9 +322,8 @@ function createBingoPlayerDoc(overrides = {}) {
   };
 }
 
-async function seedTeacher(context) {
-  const adminDb = context.firestore();
-  await setDoc(doc(adminDb, "teachers", "teacher-1"), {
+function createTeacherProfileDoc(overrides = {}) {
+  return {
     teacherName: "김선생",
     schoolId: "school-1",
     schoolName: "테스트초",
@@ -331,8 +331,181 @@ async function seedTeacher(context) {
     gradePublishers: {},
     createdAt: createTimestamp(1),
     updatedAt: createTimestamp(1),
-  });
+    ...overrides,
+  };
 }
+
+function createVocabularySetDoc(overrides = {}) {
+  return {
+    ownerUid: "teacher-1",
+    schoolId: "school-1",
+    schoolName: "테스트초",
+    teacherName: "김선생",
+    grade: "3",
+    unit: "1단원",
+    publisher: "천재",
+    published: false,
+    sourceType: "manual",
+    items: [],
+    createdAt: createTimestamp(1),
+    updatedAt: createTimestamp(1),
+    ...overrides,
+  };
+}
+
+async function seedTeacher(context, teacherId = "teacher-1", overrides = {}) {
+  const adminDb = context.firestore();
+  await setDoc(
+    doc(adminDb, "teachers", teacherId),
+    createTeacherProfileDoc(overrides),
+  );
+}
+
+rulesTest(
+  "teacher profile creation rejects client-selected activation",
+  async () => {
+    const pendingDb = testEnv.authenticatedContext("pending-1").firestore();
+
+    await assertFails(
+      setDoc(
+        doc(pendingDb, "teachers", "pending-1"),
+        createTeacherProfileDoc({ isActive: true }),
+      ),
+    );
+  },
+);
+
+rulesTest(
+  "teacher profile creation requires a school identity and bounded display name",
+  async () => {
+    const pendingDb = testEnv.authenticatedContext("pending-1").firestore();
+
+    await assertFails(
+      setDoc(
+        doc(pendingDb, "teachers", "pending-1"),
+        createTeacherProfileDoc({ isActive: false, schoolId: "" }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(pendingDb, "teachers", "pending-1"),
+        createTeacherProfileDoc({
+          isActive: false,
+          teacherName: "가".repeat(81),
+        }),
+      ),
+    );
+  },
+);
+
+rulesTest(
+  "pending teacher cannot activate their own profile",
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context, "pending-1", { isActive: false });
+    });
+
+    const pendingDb = testEnv.authenticatedContext("pending-1").firestore();
+    await assertFails(
+      updateDoc(doc(pendingDb, "teachers", "pending-1"), { isActive: true }),
+    );
+  },
+);
+
+rulesTest(
+  "teacher cannot change their bound school",
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context);
+    });
+
+    const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
+    await assertFails(
+      updateDoc(doc(teacherDb, "teachers", "teacher-1"), {
+        schoolId: "school-2",
+        schoolName: "다른초",
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "pending teacher cannot write vocabulary sets",
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context, "pending-1", { isActive: false });
+    });
+
+    const pendingDb = testEnv.authenticatedContext("pending-1").firestore();
+    await assertFails(
+      setDoc(
+        doc(pendingDb, "vocabularySets", "pending-1__3__1"),
+        createVocabularySetDoc({ ownerUid: "pending-1" }),
+      ),
+    );
+  },
+);
+
+rulesTest(
+  "pending teacher can update allowed self-service profile fields",
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context, "pending-1", { isActive: false });
+    });
+
+    const pendingDb = testEnv.authenticatedContext("pending-1").firestore();
+    await assertSucceeds(
+      updateDoc(doc(pendingDb, "teachers", "pending-1"), {
+        teacherName: "김새선생",
+        gradePublishers: { 3: "천재" },
+        updatedAt: createTimestamp(2),
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "active teacher can manage vocabulary sets only for their bound school",
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context);
+    });
+
+    const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
+    const boundSetRef = doc(teacherDb, "vocabularySets", "teacher-1__3__1");
+
+    await assertSucceeds(setDoc(boundSetRef, createVocabularySetDoc()));
+    await assertSucceeds(updateDoc(boundSetRef, { published: true }));
+    await assertSucceeds(deleteDoc(boundSetRef));
+    await assertFails(
+      setDoc(
+        doc(teacherDb, "vocabularySets", "teacher-1__3__2"),
+        createVocabularySetDoc({ schoolId: "school-2", schoolName: "다른초" }),
+      ),
+    );
+  },
+);
+
+rulesTest(
+  "active teacher cannot move an existing vocabulary set to another school or owner",
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context);
+      await setDoc(
+        doc(context.firestore(), "vocabularySets", "teacher-1__3__1"),
+        createVocabularySetDoc(),
+      );
+    });
+
+    const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
+    const setRef = doc(teacherDb, "vocabularySets", "teacher-1__3__1");
+
+    await assertFails(
+      updateDoc(setRef, { schoolId: "school-2", schoolName: "다른초" }),
+    );
+    await assertFails(updateDoc(setRef, { ownerUid: "teacher-2" }));
+  },
+);
 
 rulesTest(
   "studentProfiles allows first matching score record when baseline is zero",

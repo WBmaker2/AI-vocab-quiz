@@ -13,6 +13,13 @@ test("getTeacherProfilePanelMode expands when the editor is opened", () => {
   assert.equal(getTeacherProfilePanelMode(true), "expanded");
 });
 
+test("getTeacherProfilePanelMode prioritizes approval waiting over management controls", () => {
+  assert.equal(
+    getTeacherProfilePanelMode(false, { isActive: false }),
+    "approval-pending",
+  );
+});
+
 test("buildTeacherWorkspaceSummaryChips turns the large summary cards into compact chips", () => {
   assert.deepEqual(
     buildTeacherWorkspaceSummaryChips({

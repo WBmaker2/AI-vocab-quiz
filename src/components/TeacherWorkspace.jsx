@@ -297,7 +297,7 @@ export function TeacherWorkspace({
   const activeTeacherTab =
     TEACHER_WORKSPACE_TABS.find((tab) => tab.id === activeTab) ??
     TEACHER_WORKSPACE_TABS[0];
-  const profilePanelMode = getTeacherProfilePanelMode(profileEditorOpen);
+  const profilePanelMode = getTeacherProfilePanelMode(profileEditorOpen, profile);
   const summaryChips = buildTeacherWorkspaceSummaryChips({
     total: stats.total,
     withExamples: stats.withExamples,
@@ -483,6 +483,40 @@ export function TeacherWorkspace({
               {onboarding.saving ? "저장 중..." : "선생님 정보 저장"}
             </button>
           </div>
+        </article>
+      </section>
+    );
+  }
+
+  if (profilePanelMode === "approval-pending") {
+    return (
+      <section className="workspace-panel approval-wait-panel">
+        <div className="section-heading">
+          <div>
+            <p className="mode-label">Teacher Approval</p>
+            <h2>선생님 승인 대기</h2>
+          </div>
+          <div className="toolbar-row">
+            <button className="ghost-button" onClick={onBack}>
+              홈으로
+            </button>
+            <button className="ghost-button" onClick={auth.signOut}>
+              로그아웃
+            </button>
+          </div>
+        </div>
+
+        <article className="approval-wait-card">
+          <p className="mode-label">Approval Requested</p>
+          <h3>관리자 확인 후 단어 세트를 관리할 수 있습니다</h3>
+          <p>
+            {profile.schoolName} · {profile.teacherName} 정보로 승인 요청이
+            접수되었습니다. 학교 관리자가 승인하면 이 화면에서 관리 기능을 바로
+            사용할 수 있습니다.
+          </p>
+          <p className="inline-hint">
+            학교 정보가 잘못되었다면 관리자에게 문의해 주세요.
+          </p>
         </article>
       </section>
     );

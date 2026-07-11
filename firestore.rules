@@ -497,7 +497,7 @@ service cloud.firestore {
 
     match /teachers/{teacherId} {
       allow read: if resource.data.isActive == true || isTeacherOwner(teacherId);
-      allow create, update: if isTeacherOwner(teacherId)
+      allow create: if isTeacherOwner(teacherId)
         && request.resource.data.keys().hasOnly([
           'teacherName',
           'schoolId',
@@ -508,9 +508,36 @@ service cloud.firestore {
           'updatedAt'
         ])
         && request.resource.data.teacherName is string
+        && request.resource.data.teacherName.size() > 0
+        && request.resource.data.teacherName.size() <= 80
+        && request.resource.data.schoolId is string
+        && request.resource.data.schoolId.size() > 0
+        && request.resource.data.schoolName is string
+        && request.resource.data.schoolName.size() > 0
+        && request.resource.data.isActive == false
+        && (
+          !request.resource.data.keys().hasAny(['gradePublishers'])
+          || request.resource.data.gradePublishers is map
+        );
+      allow update: if isTeacherOwner(teacherId)
+        && request.resource.data.keys().hasOnly([
+          'teacherName',
+          'schoolId',
+          'schoolName',
+          'isActive',
+          'gradePublishers',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.teacherName is string
+        && request.resource.data.teacherName.size() > 0
+        && request.resource.data.teacherName.size() <= 80
         && request.resource.data.schoolId is string
         && request.resource.data.schoolName is string
         && request.resource.data.isActive is bool
+        && request.resource.data.isActive == resource.data.isActive
+        && request.resource.data.schoolId == resource.data.schoolId
+        && request.resource.data.schoolName == resource.data.schoolName
         && (
           !request.resource.data.keys().hasAny(['gradePublishers'])
           || request.resource.data.gradePublishers is map
@@ -552,7 +579,7 @@ service cloud.firestore {
         isSignedIn() && resource.data.ownerUid == request.auth.uid
       );
 
-      allow create, update: if isSignedIn()
+      allow create: if isTeacherForSchool(request.resource.data.schoolId)
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.keys().hasOnly([
           'ownerUid',
@@ -580,8 +607,39 @@ service cloud.firestore {
         && request.resource.data.published is bool
         && request.resource.data.sourceType is string
         && request.resource.data.items is list;
+      allow update: if isTeacherForSchool(request.resource.data.schoolId)
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.schoolId == resource.data.schoolId
+        && request.resource.data.keys().hasOnly([
+          'ownerUid',
+          'schoolId',
+          'schoolName',
+          'teacherName',
+          'grade',
+          'unit',
+          'publisher',
+          'published',
+          'sourceType',
+          'items',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.schoolId is string
+        && request.resource.data.schoolName is string
+        && request.resource.data.teacherName is string
+        && request.resource.data.grade is string
+        && request.resource.data.unit is string
+        && (
+          !request.resource.data.keys().hasAny(['publisher'])
+          || request.resource.data.publisher is string
+        )
+        && request.resource.data.published is bool
+        && request.resource.data.sourceType is string
+        && request.resource.data.items is list;
 
-      allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+      allow delete: if isTeacherForSchool(resource.data.schoolId)
+        && resource.data.ownerUid == request.auth.uid;
     }
 
     match /matchingLeaderboards/{scopeKey} {

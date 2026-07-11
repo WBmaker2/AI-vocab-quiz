@@ -33,3 +33,34 @@ VITE_FIREBASE_APP_ID=your_app_id
 - Teachers sign in with Google only.
 - Students do not sign in.
 - Students can read only published sets through Firestore rules.
+
+## Teacher approval
+
+New teacher profiles are created in the `teachers` collection with
+`isActive: false`. Pending teachers can see only the approval-wait screen and
+cannot write vocabulary sets. Existing active profiles remain active.
+
+### Find pending requests
+
+In the Firebase Console, open Firestore Database and query the `teachers`
+collection where `isActive` is equal to `false`. Verify the `teacherName`,
+`schoolId`, and `schoolName` before approving the request.
+
+### Approve a teacher
+
+The project owner must change only the teacher document's `isActive` field to
+`true` using the Firebase Console or a trusted Admin SDK environment. Client
+Firestore rules intentionally prevent teachers from approving themselves or
+changing their school binding.
+
+```js
+import { getFirestore } from "firebase-admin/firestore";
+
+await getFirestore().collection("teachers").doc(teacherUid).update({
+  isActive: true,
+});
+```
+
+Do not use client-side code to activate a teacher. Do not alter `schoolId` or
+`schoolName` when approving; create a new request if the school binding is
+incorrect.
