@@ -5,7 +5,8 @@
 Use Firebase as the shared backend while keeping the product behavior:
 
 - teachers sign in with Google
-- first-time teachers register school name and teacher name
+- first-time teachers register school name and teacher name, then wait for
+  project-admin approval
 - each teacher owns only their own vocabulary sets
 - students enter through `school -> teacher -> grade -> unit`
 - students can read only published sets
@@ -64,6 +65,11 @@ Purpose:
 
 - public teacher selection for students
 - owner profile for teacher dashboard
+- approval source of truth: new profiles use `isActive: false`, and only a
+  trusted Firebase Console/Admin SDK operation may activate them
+
+Teacher self-service updates cannot change `isActive`, `schoolId`, or
+`schoolName`.
 
 ### `vocabularySets`
 
@@ -84,6 +90,10 @@ Document fields:
 - `items`
 - `createdAt`
 - `updatedAt`
+
+Writes require an active owner teacher whose bound `schoolId` and
+`schoolName` match the set. Existing documents cannot move to another owner
+or school.
 
 ### `studentProfiles`
 
@@ -146,6 +156,19 @@ Each item inside `vocabularySets.items`:
 - Teacher list from `teachers` filtered by `schoolId`
 - Unit list from `vocabularySets` filtered by `ownerUid` and then reduced client-side to published units for the selected grade
 - Set detail from deterministic document id, then check `published === true`
+- Independent request generations prevent older school, teacher, unit, or set
+  responses from overwriting a newer student selection.
+
+## Spreadsheet import
+
+- Browser import supports `.xlsx` only.
+- Maximum file size: 5 MiB.
+- Maximum data rows: 5,000.
+- The complete workbook is parsed and validated before any remote write.
+- Publisher metadata and all imported units are committed through one
+  Firestore batch, capped at 500 operations.
+- Teacher saves and destructive mutations share one serialized coordinator, so
+  an older autosave cannot overwrite a later import or revive a deleted set.
 
 ## Tradeoffs
 
@@ -164,8 +187,9 @@ Each item inside `vocabularySets.items`:
 
 ## Acceptance checks
 
-1. A teacher can sign in with Google and create a teacher profile.
-2. A teacher can save and publish only their own sets.
+1. A teacher can sign in with Google and create a pending teacher profile.
+2. Only an approved active teacher can save and publish sets bound to their
+   school identity.
 3. A student can search a school, choose a teacher, grade, and unit.
 4. A student can load only published sets.
 5. The app still works when Firebase config is missing by showing guidance instead of crashing.

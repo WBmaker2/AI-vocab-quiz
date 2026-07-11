@@ -398,6 +398,21 @@ button {
   border-radius: 24px;
 }
 
+.activity-loading-card {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid rgba(23, 50, 77, 0.09);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 16px 34px rgba(23, 50, 77, 0.07);
+}
+
+.activity-loading-card strong {
+  font-size: 1rem;
+}
+
 .mode-card,
 .workspace-panel {
   padding: 1.25rem;

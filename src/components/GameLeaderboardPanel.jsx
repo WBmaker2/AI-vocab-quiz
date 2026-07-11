@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import * as firebaseApi from "../lib/firebase.js";
+import { useEffect, useState } from "react";
+import {
+  fetchFishingLeaderboards,
+  fetchMatchingLeaderboards,
+  fetchTypingLeaderboards,
+  saveFishingLeaderboardScore,
+  saveMatchingLeaderboardScore,
+  saveTypingLeaderboardScore,
+} from "../lib/firebase.js";
 import { getActivityLeaderboardDefinition } from "../utils/activityLeaderboard.js";
 import { formatElapsedSeconds } from "../utils/quiz.js";
 
@@ -9,27 +16,23 @@ const TYPING_LEADERBOARD_DEFINITION = {
   collectionName: "typingLeaderboards",
 };
 
-function getFirebaseApiHandler(name) {
-  return firebaseApi[name];
-}
+const LEADERBOARD_HANDLERS = {
+  matching: {
+    fetchLeaderboards: fetchMatchingLeaderboards,
+    saveScore: saveMatchingLeaderboardScore,
+  },
+  fishing: {
+    fetchLeaderboards: fetchFishingLeaderboards,
+    saveScore: saveFishingLeaderboardScore,
+  },
+  typing: {
+    fetchLeaderboards: fetchTypingLeaderboards,
+    saveScore: saveTypingLeaderboardScore,
+  },
+};
 
 function getLeaderboardHandlers(activityType) {
-  if (activityType === "typing") {
-    return {
-      fetchLeaderboards: getFirebaseApiHandler("fetchTypingLeaderboards"),
-      saveScore: getFirebaseApiHandler("saveTypingLeaderboardScore"),
-    };
-  }
-
-  return activityType === "fishing"
-    ? {
-        fetchLeaderboards: firebaseApi.fetchFishingLeaderboards,
-        saveScore: firebaseApi.saveFishingLeaderboardScore,
-      }
-    : {
-        fetchLeaderboards: firebaseApi.fetchMatchingLeaderboards,
-        saveScore: firebaseApi.saveMatchingLeaderboardScore,
-      };
+  return LEADERBOARD_HANDLERS[activityType] ?? LEADERBOARD_HANDLERS.matching;
 }
 
 function getActivityDefinition(activityType) {
@@ -98,10 +101,7 @@ export function GameLeaderboardPanel({
   const grade = String(leaderboardContext?.grade ?? "").trim();
   const canUseLeaderboard = remoteConfigured && schoolId && schoolName && grade;
   const definition = getActivityDefinition(activityType);
-  const handlers = useMemo(
-    () => getLeaderboardHandlers(definition.type),
-    [definition.type],
-  );
+  const handlers = getLeaderboardHandlers(definition.type);
   const availablePeriods = Object.values(leaderboards);
   const activePeriod = leaderboards[activePeriodType] ?? availablePeriods[0] ?? null;
   const contextLabel = schoolName && grade ? `${schoolName} · ${grade}학년` : "";

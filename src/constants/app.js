@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.11.0",
+    date: "2026-07-12",
+    summary: [
+      "신규 교사는 관리자 승인 후 학교 자료를 관리하도록 바꾸고, 학생 개인 성장 기록은 이름만 입력해도 현재 기기에서만 이어지는 무작위 비공개 키 방식으로 보호했습니다.",
+      "교사 자동 저장과 삭제·초기화·가져오기를 하나의 순서 보장 큐로 통합하고, 엑셀 가져오기는 안전한 .xlsx 전용 파서와 원자적 Firestore 배치 저장으로 교체했습니다.",
+      "활동 화면 헤더를 작게 줄이고 준비 완료 안내·키보드 초점·색상 대비·동작 감소 설정을 개선했으며, 활동별 지연 로딩으로 초기 앱 청크를 크게 분리했습니다.",
+    ],
+  },
+  {
     version: "v1.10.13",
     date: "2026-04-23",
     summary: [

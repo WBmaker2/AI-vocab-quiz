@@ -1,16 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { BrowserSupportNotice } from "./components/BrowserSupportNotice.jsx";
-import { ListeningQuiz } from "./components/ListeningQuiz.jsx";
 import { ModeSelector } from "./components/ModeSelector.jsx";
-import { StudentBingoBoard } from "./components/StudentBingoBoard.jsx";
-import { StudentBingoJoin } from "./components/StudentBingoJoin.jsx";
-import { TeacherBingoHost } from "./components/TeacherBingoHost.jsx";
 import { UpdateHistoryModal } from "./components/UpdateHistoryModal.jsx";
-import { SpeakingQuiz } from "./components/SpeakingQuiz.jsx";
-import { TeacherWorkspace } from "./components/TeacherWorkspace.jsx";
-import { WordFishingGame } from "./components/WordFishingGame.jsx";
-import { WordTypingGame } from "./components/WordTypingGame.jsx";
-import { WordMatchingGame } from "./components/WordMatchingGame.jsx";
 import { APP_UPDATES, APP_VERSION } from "./constants/app.js";
 import { GRADE_OPTIONS, PUBLISHER_OPTIONS } from "./constants/vocabulary.js";
 import { useBingoSession } from "./hooks/useBingoSession.js";
@@ -19,6 +10,51 @@ import { isSpeechRecognitionSupported } from "./hooks/useSpeechRecognition.js";
 import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis.js";
 import { useVocabularyLibrary } from "./hooks/useVocabularyLibrary.js";
 import { getAppChromeLayout } from "./utils/appChrome.js";
+
+function lazyNamed(importer, exportName) {
+  return lazy(() =>
+    importer().then((module) => ({
+      default: module[exportName],
+    })),
+  );
+}
+
+const ListeningQuiz = lazyNamed(
+  () => import("./components/ListeningQuiz.jsx"),
+  "ListeningQuiz",
+);
+const SpeakingQuiz = lazyNamed(
+  () => import("./components/SpeakingQuiz.jsx"),
+  "SpeakingQuiz",
+);
+const TeacherWorkspace = lazyNamed(
+  () => import("./components/TeacherWorkspace.jsx"),
+  "TeacherWorkspace",
+);
+const WordMatchingGame = lazyNamed(
+  () => import("./components/WordMatchingGame.jsx"),
+  "WordMatchingGame",
+);
+const WordFishingGame = lazyNamed(
+  () => import("./components/WordFishingGame.jsx"),
+  "WordFishingGame",
+);
+const WordTypingGame = lazyNamed(
+  () => import("./components/WordTypingGame.jsx"),
+  "WordTypingGame",
+);
+const TeacherBingoHost = lazyNamed(
+  () => import("./components/TeacherBingoHost.jsx"),
+  "TeacherBingoHost",
+);
+const StudentBingoJoin = lazyNamed(
+  () => import("./components/StudentBingoJoin.jsx"),
+  "StudentBingoJoin",
+);
+const StudentBingoBoard = lazyNamed(
+  () => import("./components/StudentBingoBoard.jsx"),
+  "StudentBingoBoard",
+);
 
 const APP_VIEWS = {
   HOME: "home",
@@ -236,6 +272,14 @@ function App() {
           role="region"
           aria-label={chromeLayout.focusLabel}
           data-view={view}
+        >
+        <Suspense
+          fallback={
+            <section className="activity-loading-card" role="status" aria-live="polite">
+              <p className="mode-label">Loading Activity</p>
+              <strong>활동 화면을 준비하는 중입니다...</strong>
+            </section>
+          }
         >
         {view === APP_VIEWS.HOME ? (
           <ModeSelector
@@ -584,6 +628,7 @@ function App() {
             onBack={() => navigateTo(APP_VIEWS.HOME)}
           />
         ) : null}
+        </Suspense>
         </div>
       </main>
 

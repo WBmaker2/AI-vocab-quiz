@@ -40,7 +40,6 @@ import {
   tryStartTeacherWorkbookImport,
 } from "../../utils/teacherSetManager.js";
 import { mergeVocabularyItems } from "../../utils/vocabularyMerge.js";
-import { parseVocabularyWorkbook } from "../../utils/xlsxImport.js";
 
 function clearTeacherAutoSaveTimer(timerRef, timer = timerRef.current) {
   if (timer !== null && ownsTeacherAutoSaveTimer(timerRef.current, timer)) {
@@ -763,6 +762,9 @@ export function useTeacherSetManager({
         const { result: importResult } = await queueTeacherSetMutation(
           mutationRevision,
           async () => {
+            const { parseVocabularyWorkbook } = await import(
+              "../../utils/xlsxImport.js"
+            );
             const importPlan = await parseVocabularyWorkbook(file);
             let savedUnitCount = 0;
             let addedVocabularyCount = 0;
