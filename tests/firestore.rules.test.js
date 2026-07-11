@@ -572,6 +572,55 @@ rulesTest(
 );
 
 rulesTest(
+  "studentProfiles rejects fractional listening and speaking session counters",
+  async () => {
+    const profileId = createStudentProfileId();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), "studentProfiles", profileId),
+        createStudentProfileDoc(),
+      );
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      updateDoc(doc(studentDb, "studentProfiles", profileId), {
+        totalSessions: 2,
+        listeningSessions: 0.5,
+        speakingSessions: 0.5,
+        updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "studentProfiles rejects fractional listening best fields during a valid session advance",
+  async () => {
+    const profileId = createStudentProfileId();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), "studentProfiles", profileId),
+        createStudentProfileDoc(),
+      );
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      updateDoc(doc(studentDb, "studentProfiles", profileId), {
+        totalSessions: 2,
+        listeningSessions: 1,
+        listeningBestScore: 1.5,
+        listeningBestCorrectCount: 1.5,
+        updatedAt: createTimestamp(200),
+      }),
+    );
+  },
+);
+
+rulesTest(
   "studentProfiles rejects a slower tied zero matching record after the first matching session",
   async () => {
     const profileId = createStudentProfileId();

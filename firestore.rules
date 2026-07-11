@@ -147,6 +147,72 @@ service cloud.firestore {
         );
     }
 
+    function studentProfileFieldChanged(fieldName) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([fieldName]);
+    }
+
+    function areChangedStudentProfileSessionsValid() {
+      return (!studentProfileFieldChanged('totalSessions') || isNonNegativeInteger(request.resource.data.totalSessions))
+        && (!studentProfileFieldChanged('listeningSessions') || isNonNegativeInteger(request.resource.data.listeningSessions))
+        && (!studentProfileFieldChanged('speakingSessions') || isNonNegativeInteger(request.resource.data.speakingSessions))
+        && (!studentProfileFieldChanged('matchingSessions') || isNonNegativeInteger(request.resource.data.matchingSessions))
+        && (!studentProfileFieldChanged('typingSessions') || isNonNegativeInteger(request.resource.data.typingSessions));
+    }
+
+    function areChangedListeningProfileBestFieldsValid() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'listeningBestScore',
+          'listeningBestCorrectCount'
+        ])
+        || (
+          isNonNegativeInteger(request.resource.data.listeningBestScore)
+          && isNonNegativeInteger(request.resource.data.listeningBestCorrectCount)
+        );
+    }
+
+    function areChangedSpeakingProfileBestFieldsValid() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'speakingBestScore',
+          'speakingBestCorrectCount'
+        ])
+        || (
+          isNonNegativeInteger(request.resource.data.speakingBestScore)
+          && isNonNegativeInteger(request.resource.data.speakingBestCorrectCount)
+        );
+    }
+
+    function areChangedMatchingProfileBestFieldsValid() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'matchingBestScore',
+          'matchingBestTime'
+        ])
+        || (
+          isNonNegativeInteger(request.resource.data.matchingBestScore)
+          && isNonNegativeInteger(request.resource.data.matchingBestTime)
+        );
+    }
+
+    function areChangedTypingProfileBestFieldsValid() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'typingBestScore',
+          'typingBestCorrectCount',
+          'typingBestAccuracy',
+          'typingBestQuestionCount',
+          'typingBestHintUsedCount',
+          'typingBestCombo',
+          'typingBestElapsedSeconds'
+        ])
+        || (
+          isNonNegativeInteger(request.resource.data.typingBestScore)
+          && isNonNegativeInteger(request.resource.data.typingBestCorrectCount)
+          && isNonNegativeInteger(request.resource.data.typingBestAccuracy)
+          && isNonNegativeInteger(request.resource.data.typingBestQuestionCount)
+          && isNonNegativeInteger(request.resource.data.typingBestHintUsedCount)
+          && isNonNegativeInteger(request.resource.data.typingBestCombo)
+          && isNonNegativeInteger(request.resource.data.typingBestElapsedSeconds)
+        );
+    }
+
     function isStudentProfileRead(profileId) {
       return isStudentProfileDocument(resource.data)
         && isStudentProfileId(
@@ -610,8 +676,13 @@ service cloud.firestore {
         && request.resource.data.totalSessions == 1
         && isStudentProfileFirstSessionShape(request.resource.data);
 
-      allow update: if isMatchingProfileBestUpdateAllowed()
-        && isStudentProfileUpdateWrite(profileId)
+      allow update: if isStudentProfileUpdateWrite(profileId)
+        && areChangedStudentProfileSessionsValid()
+        && areChangedListeningProfileBestFieldsValid()
+        && areChangedSpeakingProfileBestFieldsValid()
+        && areChangedMatchingProfileBestFieldsValid()
+        && areChangedTypingProfileBestFieldsValid()
+        && isMatchingProfileBestUpdateAllowed()
         && resource.data.schoolId == request.resource.data.schoolId
         && resource.data.schoolName == request.resource.data.schoolName
         && resource.data.grade == request.resource.data.grade
@@ -619,6 +690,7 @@ service cloud.firestore {
         && resource.data.studentNameNormalized == request.resource.data.studentNameNormalized
         && resource.data.profileToken == request.resource.data.profileToken
         && resource.data.createdAt == request.resource.data.createdAt
+        && request.resource.data.updatedAt is timestamp
         && request.resource.data.totalSessions == resource.data.totalSessions + 1
         && isStudentProfileSingleSessionAdvance()
         && request.resource.data.listeningBestScore >= resource.data.listeningBestScore
