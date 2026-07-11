@@ -13,6 +13,7 @@ import {
   fetchTeacherVocabularySet,
   isFirebaseConfigured,
   listTeacherSetCatalog,
+  saveTeacherVocabularyImportBatch,
   saveTeacherVocabularySet,
   searchPublishedPublisherSources,
   upsertTeacherProfile,
@@ -749,46 +750,61 @@ export function useTeacherSetManager({
       const { result: importResult } = await queueTeacherSetMutation(
         mutationRevision,
         async () => {
-          await persistGradePublisher(grade, cleanPublisher);
-          const groupedSets = await parseVocabularyWorkbook(file);
+          const importPlan = await parseVocabularyWorkbook(file);
           const publishImportedSets =
             publishOverride === null ? published : publishOverride;
           let savedUnitCount = 0;
           let addedVocabularyCount = 0;
           let duplicateVocabularyCount = 0;
           const savedItemsByUnit = new Map();
+          const vocabularySets = [];
 
-          for (const groupedSet of groupedSets) {
-            const existingSet = await fetchTeacherVocabularySet(userId, {
-              grade,
-              unit: groupedSet.unit,
-            });
+          // All workbook validation completes before these reads prepare the one batch write.
+          const existingSets = await Promise.all(
+            importPlan.units.map(async (groupedSet) => ({
+              groupedSet,
+              existingSet: await fetchTeacherVocabularySet(userId, {
+                grade,
+                unit: groupedSet.unit,
+              }),
+            })),
+          );
+
+          for (const { groupedSet, existingSet } of existingSets) {
             const { mergedItems, addedCount, duplicateCount } = mergeVocabularyItems(
               existingSet.items ?? [],
               groupedSet.items,
             );
             const normalizedItems = normalizeDraftVocabulary(mergedItems);
 
-            await saveTeacherVocabularySet({
-              userId,
-              schoolId: teacherProfile.schoolId,
-              schoolName: teacherProfile.schoolName,
-              teacherName: teacherProfile.teacherName,
-              selection: { grade, unit: groupedSet.unit },
+            vocabularySets.push({
+              unit: groupedSet.unit,
               items: normalizedItems,
-              published: publishImportedSets,
-              publisher: cleanPublisher,
-              sourceType: "xlsx",
             });
-
             savedUnitCount += 1;
             addedVocabularyCount += addedCount;
             duplicateVocabularyCount += duplicateCount;
             savedItemsByUnit.set(groupedSet.unit, normalizedItems);
           }
 
+          const nextGradePublishers = {
+            ...(teacherProfile.gradePublishers ?? {}),
+            [grade]: cleanPublisher,
+          };
+
+          await saveTeacherVocabularyImportBatch({
+            userId,
+            teacherProfile,
+            grade,
+            publisher: cleanPublisher,
+            gradePublishers: nextGradePublishers,
+            published: publishImportedSets,
+            vocabularySets,
+          });
+
           return {
-            groupedSets,
+            groupedSets: importPlan.units,
+            nextGradePublishers,
             publishImportedSets,
             savedUnitCount,
             addedVocabularyCount,
@@ -818,6 +834,14 @@ export function useTeacherSetManager({
             setDirty(false);
           }
           setPublisher(cleanPublisher);
+          setTeacherProfile((current) =>
+            current
+              ? {
+                  ...current,
+                  gradePublishers: importResult.nextGradePublishers,
+                }
+              : current,
+          );
 
           setStatus(
             importResult.publishImportedSets

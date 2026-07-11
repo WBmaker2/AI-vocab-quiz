@@ -49,17 +49,19 @@ export function TeacherBulkTab({
               type="button"
               className="secondary-button"
               onClick={onImportWorkbook}
-              disabled={!importFile || importing}
+              disabled={!importFile || importing || saving}
             >
-              {importing ? "업로드 중..." : "엑셀 가져오기"}
+              {importing ? "파일 검증 및 저장 중..." : "엑셀 가져오기"}
             </button>
           </div>
         </div>
         <p className="inline-hint">
-          `Lesson / English / Korean` 열을 가진 파일을 업로드하면, 현재 선생님의
-          선택 학년의 모든 Lesson 단원이 한꺼번에 저장됩니다. 기존 단원이
-          있으면 새 단어만 안전하게 추가하고, 중복 단어는 건너뜁니다. 위의
-          `학생 공개` 체크 상태도 모든 반영 단원에 함께 적용됩니다.
+          최신 `.xlsx` 파일만 업로드할 수 있습니다. `Lesson / English / Korean`
+          열을 가진 파일을 업로드하면, 현재 선생님의 선택 학년의 모든 Lesson
+          단원이 한꺼번에 저장됩니다. 다른 형식의 파일은 Excel에서 다시 열어
+          `.xlsx` 형식으로 저장한 뒤 업로드하세요. 기존 단원이 있으면 새 단어만
+          안전하게 추가하고, 중복 단어는 건너뜁니다. 위의 `학생 공개` 체크 상태도
+          모든 반영 단원에 함께 적용됩니다.
         </p>
         <div className="form-grid compact-grid">
           <label className="field field-wide">
@@ -81,7 +83,8 @@ export function TeacherBulkTab({
             <input
               ref={importInputRef}
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx"
+              disabled={importing || saving}
               onChange={(event) => onImportFileChange(event.target.files?.[0] ?? null)}
             />
           </label>

@@ -7,6 +7,7 @@ import {
   validateMatchingLeaderboardResult,
   validateTypingLeaderboardResult,
 } from "./firebase.js";
+import * as firebase from "./firebase.js";
 
 test("shouldReplaceElapsedLeaderboardEntry updates when the existing score is lower", () => {
   assert.equal(
@@ -170,4 +171,30 @@ test("leaderboard result validators reject impossible scores and invalid bounds"
       hintUsedCount: 2,
       bestCombo: 4,
     }), /accuracy/i);
+});
+
+test("saveTeacherVocabularyImportBatch rejects more than 500 operations before Firebase writes", async () => {
+  const vocabularySets = Array.from({ length: 500 }, (_, index) => ({
+    unit: String(index + 1),
+    items: [],
+  }));
+  const result = await Promise.resolve()
+    .then(() =>
+      firebase.saveTeacherVocabularyImportBatch({
+        userId: "teacher-1",
+        teacherProfile: {
+          teacherName: "김선생",
+          schoolId: "school-1",
+          schoolName: "테스트초",
+        },
+        grade: "3",
+        publisher: "천재교육",
+        gradePublishers: { 3: "천재교육" },
+        published: false,
+        vocabularySets,
+      }),
+    )
+    .catch((error) => error);
+
+  assert.match(result?.message ?? "", /500/);
 });

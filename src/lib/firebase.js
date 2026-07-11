@@ -22,6 +22,7 @@ import {
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
   deleteDoc,
 } from "firebase/firestore";
 import {
@@ -2355,6 +2356,118 @@ export async function saveTeacherVocabularySet({
   };
 
   await setDoc(setRef, payload, { merge: true });
+}
+
+const MAX_FIRESTORE_BATCH_OPERATIONS = 500;
+
+function prepareTeacherVocabularyImportBatch({
+  userId,
+  teacherProfile,
+  grade,
+  publisher,
+  gradePublishers,
+  published,
+  vocabularySets,
+}) {
+  const cleanUserId = String(userId ?? "").trim();
+  const cleanGrade = String(grade ?? "").trim();
+  const cleanPublisher = String(publisher ?? "").trim();
+  const cleanTeacherName = String(teacherProfile?.teacherName ?? "").trim();
+  const cleanSchoolId = String(teacherProfile?.schoolId ?? "").trim();
+  const cleanSchoolName = String(teacherProfile?.schoolName ?? "").trim();
+
+  if (!cleanUserId || !cleanGrade || !cleanPublisher) {
+    throw new Error("엑셀 가져오기에 필요한 선생님, 학년, 출판사 정보가 없습니다.");
+  }
+
+  if (!cleanTeacherName || !cleanSchoolId || !cleanSchoolName) {
+    throw new Error("선생님 학교 정보가 완전하지 않아 엑셀을 가져올 수 없습니다.");
+  }
+
+  if (!Array.isArray(vocabularySets) || vocabularySets.length === 0) {
+    throw new Error("엑셀 가져오기 계획에 저장할 단원이 없습니다.");
+  }
+
+  if (vocabularySets.length + 1 > MAX_FIRESTORE_BATCH_OPERATIONS) {
+    throw new Error("엑셀 가져오기는 한 번에 Firestore 배치 500개 작업을 넘길 수 없습니다.");
+  }
+
+  const units = new Set();
+  const preparedSets = vocabularySets.map((set) => {
+    const unit = String(set?.unit ?? "").trim();
+    if (!unit || units.has(unit)) {
+      throw new Error("엑셀 가져오기 계획에 중복되었거나 비어 있는 단원이 있습니다.");
+    }
+    units.add(unit);
+
+    return {
+      unit,
+      items: Array.isArray(set.items) ? set.items : [],
+    };
+  });
+
+  return {
+    userId: cleanUserId,
+    teacherProfile: {
+      teacherName: cleanTeacherName,
+      schoolId: cleanSchoolId,
+      schoolName: cleanSchoolName,
+    },
+    grade: cleanGrade,
+    publisher: cleanPublisher,
+    gradePublishers: gradePublishers ?? {},
+    published: Boolean(published),
+    vocabularySets: preparedSets,
+  };
+}
+
+export async function saveTeacherVocabularyImportBatch(input) {
+  const plan = prepareTeacherVocabularyImportBatch(input);
+  const { db: firestore } = ensureFirebase();
+  const batch = writeBatch(firestore);
+  const teacherRef = doc(firestore, "teachers", plan.userId);
+
+  batch.set(
+    teacherRef,
+    {
+      ...createTeacherProfileWriteData({
+        teacherName: plan.teacherProfile.teacherName,
+        schoolId: plan.teacherProfile.schoolId,
+        schoolName: plan.teacherProfile.schoolName,
+        gradePublishers: plan.gradePublishers,
+        isNew: false,
+      }),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  plan.vocabularySets.forEach((set) => {
+    const setRef = doc(
+      firestore,
+      "vocabularySets",
+      createVocabularySetId(plan.userId, plan.grade, set.unit),
+    );
+    batch.set(
+      setRef,
+      {
+        ownerUid: plan.userId,
+        schoolId: plan.teacherProfile.schoolId,
+        schoolName: plan.teacherProfile.schoolName,
+        teacherName: plan.teacherProfile.teacherName,
+        grade: plan.grade,
+        unit: set.unit,
+        publisher: plan.publisher,
+        published: plan.published,
+        sourceType: "xlsx",
+        items: set.items,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+
+  await batch.commit();
 }
 
 export async function deleteTeacherVocabularySet(userId, selection) {
