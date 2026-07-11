@@ -73,7 +73,9 @@ export function useVocabularyLibrary() {
     teacherAutoSaveTimerRef: teacherSet.teacherAutoSaveTimerRef,
     setTeacherAutoSaveToken: teacherSet.setTeacherAutoSaveToken,
     setTeacherAutoSaveStatus: teacherSet.setTeacherAutoSaveStatus,
-    persistTeacherSetSnapshot: teacherSet.persistTeacherSetSnapshot,
+    captureTeacherSetSaveRevision: teacherSet.captureTeacherSetSaveRevision,
+    isTeacherSetSaveRevisionCurrent: teacherSet.isTeacherSetSaveRevisionCurrent,
+    queueTeacherSetSave: teacherSet.queueTeacherSetSave,
     setTeacherDirty: teacherSet.setTeacherDirty,
   });
 

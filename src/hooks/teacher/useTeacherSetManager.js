@@ -25,6 +25,7 @@ import {
   canAutoSaveTeacherSet,
   captureTeacherAutoSaveRevision,
   createTeacherAutoSaveRevisionState,
+  createTeacherSetSaveCoordinator,
   getNextTeacherSelection,
   isCurrentTeacherAutoSaveRevision,
   ownsTeacherAutoSaveTimer,
@@ -70,7 +71,21 @@ export function useTeacherSetManager({
   const autoSaveTimerRef = useRef(null);
   const autoSaveInFlightRevisionRef = useRef(null);
   const autoSaveRevisionStateRef = useRef(createTeacherAutoSaveRevisionState());
+  const teacherSetSaveCoordinatorRef = useRef(null);
   const autoSaveSnapshotRef = useRef(null);
+
+  if (!teacherSetSaveCoordinatorRef.current) {
+    teacherSetSaveCoordinatorRef.current = createTeacherSetSaveCoordinator({
+      onSaveStart: ({ revision }) => {
+        autoSaveInFlightRevisionRef.current = revision;
+      },
+      onSaveSettled: ({ revision }) => {
+        if (autoSaveInFlightRevisionRef.current === revision) {
+          autoSaveInFlightRevisionRef.current = null;
+        }
+      },
+    });
+  }
 
   useEffect(() => {
     autoSaveSnapshotRef.current = {
@@ -128,7 +143,7 @@ export function useTeacherSetManager({
     }
 
     if (!userId || !teacherProfile?.userId) {
-      recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
+      recordTeacherSetEdit();
       clearTeacherAutoSaveTimer(autoSaveTimerRef);
       setAutoSaveToken(0);
       setCatalog([]);
@@ -191,7 +206,7 @@ export function useTeacherSetManager({
   }
 
   function updateSelection(field, value) {
-    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
+    recordTeacherSetEdit();
     setSelection((current) =>
       getNextTeacherSelection({
         currentSelection: current,
@@ -212,7 +227,7 @@ export function useTeacherSetManager({
   }
 
   function updatePublisher(value) {
-    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
+    recordTeacherSetEdit();
     setPublisher(value);
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
@@ -236,7 +251,13 @@ export function useTeacherSetManager({
 
   function markTeacherSetDirty() {
     setDirty(true);
-    setAutoSaveToken(recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current));
+    setAutoSaveToken(recordTeacherSetEdit());
+  }
+
+  function recordTeacherSetEdit() {
+    const revision = recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
+    teacherSetSaveCoordinatorRef.current.discardPendingBefore(revision);
+    return revision;
   }
 
   async function persistGradePublisher(grade, nextPublisher) {
@@ -331,6 +352,19 @@ export function useTeacherSetManager({
     };
   }
 
+  function queueTeacherSetSave(
+    snapshot,
+    sourceType,
+    revision = captureTeacherAutoSaveRevision(autoSaveRevisionStateRef.current),
+  ) {
+    return teacherSetSaveCoordinatorRef.current.enqueue({
+      snapshot,
+      sourceType,
+      revision,
+      persistSnapshot,
+    });
+  }
+
   function queueAutoSave() {
     if (!dirty) {
       setAutoSaveStatus("");
@@ -366,17 +400,21 @@ export function useTeacherSetManager({
         return;
       }
 
-      autoSaveInFlightRevisionRef.current = scheduledRevision;
       setAutoSaveStatus("자동 저장 중...");
 
       try {
-        const { cleanPublisher } = await persistSnapshot(snapshot, "autosave");
+        const { result } = await queueTeacherSetSave(
+          snapshot,
+          "autosave",
+          scheduledRevision,
+        );
         if (
           isCurrentTeacherAutoSaveRevision(
             autoSaveRevisionStateRef.current,
             scheduledRevision,
           )
         ) {
+          const { cleanPublisher } = result;
           setPublisher(cleanPublisher);
           setDirty(false);
           setAutoSaveStatus("자동 저장됨");
@@ -395,10 +433,6 @@ export function useTeacherSetManager({
             formatErrorMessage(nextError, "단어 세트를 자동 저장하지 못했습니다."),
           );
         }
-      } finally {
-        if (autoSaveInFlightRevisionRef.current === scheduledRevision) {
-          autoSaveInFlightRevisionRef.current = null;
-        }
       }
     }, 700);
     autoSaveTimerRef.current = timer;
@@ -415,7 +449,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
+    recordTeacherSetEdit();
     setLoading(true);
     setStatus("");
     setAutoSaveStatus("");
@@ -459,7 +493,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    const saveRevision = recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
+    const saveRevision = captureTeacherAutoSaveRevision(autoSaveRevisionStateRef.current);
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -496,7 +530,7 @@ export function useTeacherSetManager({
     setError("");
 
     try {
-      await persistSnapshot(snapshot, "manual");
+      await queueTeacherSetSave(snapshot, "manual", saveRevision);
       if (
         isCurrentTeacherAutoSaveRevision(
           autoSaveRevisionStateRef.current,
@@ -540,7 +574,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
+    recordTeacherSetEdit();
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -575,7 +609,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
+    recordTeacherSetEdit();
     clearTeacherAutoSaveTimer(autoSaveTimerRef);
     setAutoSaveToken(0);
     setAutoSaveStatus("");
@@ -629,7 +663,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    recordTeacherAutoSaveEdit(autoSaveRevisionStateRef.current);
+    recordTeacherSetEdit();
     setImporting(true);
     setStatus("");
     setAutoSaveStatus("");
@@ -966,7 +1000,11 @@ export function useTeacherSetManager({
     teacherAutoSaveTimerRef: autoSaveTimerRef,
     setTeacherAutoSaveToken: setAutoSaveToken,
     setTeacherAutoSaveStatus: setAutoSaveStatus,
-    persistTeacherSetSnapshot: persistSnapshot,
+    captureTeacherSetSaveRevision: () =>
+      captureTeacherAutoSaveRevision(autoSaveRevisionStateRef.current),
+    isTeacherSetSaveRevisionCurrent: (revision) =>
+      isCurrentTeacherAutoSaveRevision(autoSaveRevisionStateRef.current, revision),
+    queueTeacherSetSave,
     setTeacherDirty: setDirty,
   };
 }

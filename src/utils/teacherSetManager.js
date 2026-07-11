@@ -61,3 +61,116 @@ export function isCurrentTeacherAutoSaveRevision(revisionState, revision) {
 export function ownsTeacherAutoSaveTimer(currentTimer, timer) {
   return currentTimer === timer;
 }
+
+export function createTeacherSetSaveCoordinator({
+  onSaveStart = () => {},
+  onSaveSettled = () => {},
+} = {}) {
+  let inFlight = null;
+  let pending = null;
+
+  function resolveRequest(request, payload) {
+    request.waiters.forEach(({ resolve }) => resolve(payload));
+  }
+
+  function rejectRequest(request, error) {
+    request.waiters.forEach(({ reject }) => reject(error));
+  }
+
+  function runNext() {
+    if (inFlight || !pending) {
+      return;
+    }
+
+    inFlight = pending;
+    pending = null;
+    onSaveStart({ revision: inFlight.revision });
+
+    Promise.resolve()
+      .then(() =>
+        inFlight.persistSnapshot(inFlight.snapshot, inFlight.sourceType),
+      )
+      .then((result) => {
+        resolveRequest(inFlight, {
+          revision: inFlight.revision,
+          result,
+        });
+      })
+      .catch((error) => {
+        rejectRequest(inFlight, error);
+      })
+      .finally(() => {
+        const settledRequest = inFlight;
+        inFlight = null;
+        onSaveSettled({ revision: settledRequest.revision });
+        runNext();
+      });
+  }
+
+  function enqueue({ revision, snapshot, sourceType, persistSnapshot }) {
+    return new Promise((resolve, reject) => {
+      const waiter = { resolve, reject };
+
+      if (inFlight?.revision === revision) {
+        inFlight.waiters.push(waiter);
+        return;
+      }
+
+      if (pending) {
+        if (revision < pending.revision) {
+          pending.waiters.push(waiter);
+          return;
+        }
+
+        if (revision === pending.revision) {
+          pending.snapshot = snapshot;
+          pending.sourceType = sourceType;
+          pending.persistSnapshot = persistSnapshot;
+          pending.waiters.push(waiter);
+          return;
+        }
+
+        pending = {
+          revision,
+          snapshot,
+          sourceType,
+          persistSnapshot,
+          waiters: [...pending.waiters, waiter],
+        };
+        return;
+      }
+
+      if (inFlight && revision < inFlight.revision) {
+        resolve({ revision, skipped: true });
+        return;
+      }
+
+      pending = {
+        revision,
+        snapshot,
+        sourceType,
+        persistSnapshot,
+        waiters: [waiter],
+      };
+      runNext();
+    });
+  }
+
+  function discardPendingBefore(revision) {
+    if (!pending || pending.revision >= revision) {
+      return;
+    }
+
+    const discardedRequest = pending;
+    pending = null;
+    resolveRequest(discardedRequest, {
+      revision: discardedRequest.revision,
+      skipped: true,
+    });
+  }
+
+  return {
+    enqueue,
+    discardPendingBefore,
+  };
+}

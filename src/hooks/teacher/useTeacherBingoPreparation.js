@@ -7,6 +7,7 @@ import {
   buildTeacherBingoSelectedUnitLabels,
   createTeacherBingoSessionDraft,
   deriveTeacherBingoUnits,
+  saveTeacherBingoPreStartSet,
   sortTeacherBingoUnits,
 } from "../../utils/teacherBingoPreparation.js";
 
@@ -22,7 +23,9 @@ export function useTeacherBingoPreparation({
   teacherAutoSaveTimerRef,
   setTeacherAutoSaveToken,
   setTeacherAutoSaveStatus,
-  persistTeacherSetSnapshot,
+  captureTeacherSetSaveRevision,
+  isTeacherSetSaveRevisionCurrent,
+  queueTeacherSetSave,
   setTeacherDirty,
 }) {
   const [selectedUnits, setSelectedUnits] = useState([]);
@@ -98,12 +101,17 @@ export function useTeacherBingoPreparation({
     );
 
     if (snapshot?.dirty && currentUnitIncluded) {
+      const saveRevision = captureTeacherSetSaveRevision();
       clearTeacherAutoSaveTimer(teacherAutoSaveTimerRef);
       setTeacherAutoSaveToken(0);
-      setTeacherAutoSaveStatus("빙고 시작 전 자동 저장 중...");
-      await persistTeacherSetSnapshot(snapshot, "manual");
-      setTeacherDirty(false);
-      setTeacherAutoSaveStatus("자동 저장됨");
+      await saveTeacherBingoPreStartSet({
+        snapshot,
+        revision: saveRevision,
+        queueTeacherSetSave,
+        isCurrentRevision: isTeacherSetSaveRevisionCurrent,
+        setDirty: setTeacherDirty,
+        setAutoSaveStatus: setTeacherAutoSaveStatus,
+      });
     }
 
     const latestCatalog = await listTeacherSetCatalog(userId);

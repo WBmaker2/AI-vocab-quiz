@@ -4,7 +4,31 @@ import {
   buildTeacherBingoItemsFromCatalog,
   createTeacherBingoSessionDraft,
   deriveTeacherBingoUnits,
+  saveTeacherBingoPreStartSet,
 } from "./teacherBingoPreparation.js";
+import {
+  captureTeacherAutoSaveRevision,
+  createTeacherAutoSaveRevisionState,
+  createTeacherSetSaveCoordinator,
+  isCurrentTeacherAutoSaveRevision,
+  recordTeacherAutoSaveEdit,
+} from "./teacherSetManager.js";
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, resolve, reject };
+}
+
+async function flushCoordinator() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 test("deriveTeacherBingoUnits keeps only available units and sorts them", () => {
   const nextUnits = deriveTeacherBingoUnits({
@@ -86,4 +110,45 @@ test("createTeacherBingoSessionDraft includes labels and board size", () => {
   assert.deepEqual(draft.selectedUnitLabels, ["1단원", "2단원"]);
   assert.equal(draft.boardSize, 3);
   assert.equal(draft.items.length, 10);
+});
+
+test("bingo pre-start save cannot mark a newer edit clean", async () => {
+  const revisionState = createTeacherAutoSaveRevisionState();
+  const coordinator = createTeacherSetSaveCoordinator();
+  const pendingSave = createDeferred();
+  let dirty = true;
+  let autoSaveStatus = "";
+
+  const revision = recordTeacherAutoSaveEdit(revisionState);
+  const savePromise = saveTeacherBingoPreStartSet({
+    snapshot: { items: ["A"] },
+    revision,
+    queueTeacherSetSave: (snapshot, sourceType, saveRevision) =>
+      coordinator.enqueue({
+        snapshot,
+        sourceType,
+        revision: saveRevision,
+        persistSnapshot: () => pendingSave.promise,
+      }),
+    isCurrentRevision: (saveRevision) =>
+      isCurrentTeacherAutoSaveRevision(revisionState, saveRevision),
+    setDirty: (nextDirty) => {
+      dirty = nextDirty;
+    },
+    setAutoSaveStatus: (nextStatus) => {
+      autoSaveStatus = nextStatus;
+    },
+  });
+  await flushCoordinator();
+
+  recordTeacherAutoSaveEdit(revisionState);
+  autoSaveStatus = "자동 저장 예약 중";
+  pendingSave.resolve({ cleanPublisher: "publisher-a" });
+
+  const saved = await savePromise;
+
+  assert.equal(saved, false);
+  assert.equal(dirty, true);
+  assert.equal(autoSaveStatus, "자동 저장 예약 중");
+  assert.equal(captureTeacherAutoSaveRevision(revisionState), 2);
 });

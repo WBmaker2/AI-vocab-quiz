@@ -104,3 +104,23 @@ export function createTeacherBingoSessionDraft({
     boardSize: determineBingoBoardSize(items.length),
   };
 }
+
+export async function saveTeacherBingoPreStartSet({
+  snapshot,
+  revision,
+  queueTeacherSetSave,
+  isCurrentRevision,
+  setDirty,
+  setAutoSaveStatus,
+}) {
+  setAutoSaveStatus("빙고 시작 전 자동 저장 중...");
+  await queueTeacherSetSave(snapshot, "manual", revision);
+
+  if (!isCurrentRevision(revision)) {
+    return false;
+  }
+
+  setDirty(false);
+  setAutoSaveStatus("자동 저장됨");
+  return true;
+}
