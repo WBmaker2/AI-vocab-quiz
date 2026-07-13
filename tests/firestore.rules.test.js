@@ -2807,7 +2807,7 @@ rulesTest(
 );
 
 rulesTest(
-  "bingo player can finalize setup and mark exactly one called word in a live session",
+  "bingo player first called word rejects legacy rank zero and allows null rank",
   async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await seedTeacher(context);
@@ -2859,23 +2859,41 @@ rulesTest(
       });
     });
 
-    await assertSucceeds(
+    const playerRef = doc(
+      playerDb,
+      "bingoSessions",
+      "ABC123",
+      "players",
+      "민수",
+    );
+    const firstMarkPayload = {
+      markedWordIds: ["word-1"],
+      bingoLines: 0,
+      completedLineKeys: [],
+      hasBingo: false,
+      updatedAt: createTimestamp(32),
+    };
+
+    await assertFails(
       updateDoc(
-        doc(playerDb, "bingoSessions", "ABC123", "players", "민수"),
+        playerRef,
         {
-          markedWordIds: ["word-1"],
-          bingoLines: 0,
-          completedLineKeys: [],
-          hasBingo: false,
-          updatedAt: createTimestamp(32),
+          ...firstMarkPayload,
+          bingoRank: 0,
         },
       ),
     );
 
-    const playerSnapshot = await getDoc(
-      doc(playerDb, "bingoSessions", "ABC123", "players", "민수"),
+    await assertSucceeds(
+      updateDoc(playerRef, {
+        ...firstMarkPayload,
+        bingoRank: null,
+      }),
     );
+
+    const playerSnapshot = await getDoc(playerRef);
     assert.deepEqual(playerSnapshot.data()?.markedWordIds, ["word-1"]);
+    assert.equal(playerSnapshot.data()?.bingoRank, null);
   },
 );
 

@@ -65,6 +65,7 @@ import {
   normalizeBingoText,
   selectNextBingoWord,
 } from "../utils/bingo.js";
+import { normalizeBingoRank } from "../utils/bingoPlayer.js";
 import {
   assertTeacherVocabularyImportBatchCapacity,
 } from "../utils/teacherSetManager.js";
@@ -3306,6 +3307,9 @@ function normalizeBingoPlayerDocument(snapshotData, fallback = {}) {
     ?? snapshotData?.joinedAt
     ?? cleanFallback.joinedAt
     ?? null;
+  const bingoRankValue = snapshotData?.bingoRank === undefined
+    ? cleanFallback.bingoRank
+    : snapshotData.bingoRank;
   const bingoLinesResult = computeBingoLines(markedWordIds, boardCells, boardSize);
 
   return {
@@ -3323,11 +3327,7 @@ function normalizeBingoPlayerDocument(snapshotData, fallback = {}) {
     bingoLines: bingoLinesResult.bingoLines,
     completedLineKeys: bingoLinesResult.completedLineKeys,
     hasBingo: Boolean(snapshotData?.hasBingo ?? cleanFallback.hasBingo ?? bingoLinesResult.bingoLines > 0),
-    bingoRank: Number.isFinite(Number(snapshotData?.bingoRank))
-      ? Number(snapshotData.bingoRank)
-      : Number.isFinite(Number(cleanFallback.bingoRank))
-        ? Number(cleanFallback.bingoRank)
-        : null,
+    bingoRank: normalizeBingoRank(bingoRankValue),
     setupStartedAt,
     setupCompletedAt,
     joinedAt: snapshotData?.joinedAt ?? cleanFallback.joinedAt ?? null,
