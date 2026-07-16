@@ -1894,6 +1894,73 @@ rulesTest(
 );
 
 rulesTest(
+  "bingo player appends a lower-numbered completed line after the existing line",
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context);
+
+      const adminDb = context.firestore();
+      await setDoc(
+        doc(adminDb, "bingoSessions", "ABC136"),
+        createBingoSessionDoc({
+          sessionCode: "ABC136",
+          activeWordId: "word-3",
+          activeWordText: "word 3",
+          activeWordMeaning: "뜻 3",
+          calledWordIds: ["word-1", "word-2", "word-3", "word-5", "word-9"],
+          updatedAt: createTimestamp(31),
+        }),
+      );
+
+      await setDoc(
+        doc(adminDb, "bingoSessions", "ABC136", "players", "민수"),
+        createBingoPlayerDoc({
+          setupStatus: "ready",
+          boardWordIds: createBingoVocabularyItems().map((item) => item.id),
+          markedWordIds: ["word-1", "word-2", "word-5", "word-9"],
+          bingoLines: 1,
+          completedLineKeys: ["line-6"],
+          hasBingo: false,
+          bingoRank: null,
+          setupCompletedAt: createTimestamp(30),
+          updatedAt: createTimestamp(30),
+        }),
+      );
+    });
+
+    const playerDb = testEnv.unauthenticatedContext().firestore();
+    const playerRef = doc(
+      playerDb,
+      "bingoSessions",
+      "ABC136",
+      "players",
+      "민수",
+    );
+    const nextMarkPayload = {
+      markedWordIds: ["word-1", "word-2", "word-5", "word-9", "word-3"],
+      bingoLines: 2,
+      hasBingo: false,
+      bingoRank: null,
+      updatedAt: createTimestamp(32),
+    };
+
+    await assertFails(
+      updateDoc(playerRef, {
+        ...nextMarkPayload,
+        completedLineKeys: ["line-0", "line-6"],
+      }),
+    );
+
+    await assertSucceeds(
+      updateDoc(playerRef, {
+        ...nextMarkPayload,
+        completedLineKeys: ["line-6", "line-0"],
+      }),
+    );
+  },
+);
+
+rulesTest(
   "bingo player cannot submit the wrong completed line key for a completed top row",
   async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {

@@ -65,7 +65,10 @@ import {
   normalizeBingoText,
   selectNextBingoWord,
 } from "../utils/bingo.js";
-import { normalizeBingoRank } from "../utils/bingoPlayer.js";
+import {
+  mergeBingoCompletedLineKeys,
+  normalizeBingoRank,
+} from "../utils/bingoPlayer.js";
 import {
   assertTeacherVocabularyImportBatchCapacity,
 } from "../utils/teacherSetManager.js";
@@ -4076,13 +4079,17 @@ export async function markBingoCell({
       playerData.boardCells,
       playerData.boardSize,
     );
+    const nextCompletedLineKeys = mergeBingoCompletedLineKeys(
+      playerSnapshot.data()?.completedLineKeys,
+      bingoLinesResult.completedLineKeys,
+    );
     const nextBingoLines = bingoLinesResult.bingoLines;
     const nextHasBingo = nextBingoLines >= 3;
 
     transaction.update(playerRef, {
       markedWordIds: nextMarkedWordIds,
       bingoLines: nextBingoLines,
-      completedLineKeys: bingoLinesResult.completedLineKeys,
+      completedLineKeys: nextCompletedLineKeys,
       hasBingo: nextHasBingo,
       bingoRank: playerData.bingoRank ?? (nextHasBingo ? 1 : null),
       updatedAt: serverTimestamp(),
@@ -4093,7 +4100,7 @@ export async function markBingoCell({
       playerId: cleanPlayerId,
       markedWordId: cleanWordId,
       bingoLines: nextBingoLines,
-      completedLineKeys: bingoLinesResult.completedLineKeys,
+      completedLineKeys: nextCompletedLineKeys,
       hasBingo: nextHasBingo,
       isBingo: nextHasBingo && !playerData.hasBingo,
       session: {
@@ -4105,7 +4112,7 @@ export async function markBingoCell({
         ...playerData,
         markedWordIds: nextMarkedWordIds,
         bingoLines: nextBingoLines,
-        completedLineKeys: bingoLinesResult.completedLineKeys,
+        completedLineKeys: nextCompletedLineKeys,
         hasBingo: nextHasBingo,
         bingoRank: playerData.bingoRank ?? (nextHasBingo ? 1 : null),
       },

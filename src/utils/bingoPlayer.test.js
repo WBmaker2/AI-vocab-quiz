@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { canMarkBingoCell } from "./bingo.js";
-import { normalizeBingoRank } from "./bingoPlayer.js";
+import {
+  mergeBingoCompletedLineKeys,
+  normalizeBingoRank,
+} from "./bingoPlayer.js";
 
 test("normalizeBingoRank preserves only positive integer ranks", () => {
   assert.equal(normalizeBingoRank(1), 1);
@@ -16,6 +19,26 @@ test("normalizeBingoRank keeps missing and invalid ranks null", () => {
   for (const value of [null, undefined, "", "   ", Infinity, true, {}]) {
     assert.equal(normalizeBingoRank(value), null);
   }
+});
+
+test("mergeBingoCompletedLineKeys preserves completed lines and appends newly completed lines", () => {
+  assert.deepEqual(
+    mergeBingoCompletedLineKeys(
+      ["line-6"],
+      ["line-0", "line-6"],
+    ),
+    ["line-6", "line-0"],
+  );
+});
+
+test("mergeBingoCompletedLineKeys removes invalid and duplicate line keys", () => {
+  assert.deepEqual(
+    mergeBingoCompletedLineKeys(
+      ["line-6", "line-6", ""],
+      ["line-0", "line-6", "line-0", null],
+    ),
+    ["line-6", "line-0"],
+  );
 });
 
 test("canMarkBingoCell allows only the current unmarked word", () => {

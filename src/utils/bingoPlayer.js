@@ -11,3 +11,23 @@ export function normalizeBingoRank(value) {
 
   return Number.isSafeInteger(rank) && rank > 0 ? rank : null;
 }
+
+function normalizeCompletedLineKeys(values) {
+  return Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+export function mergeBingoCompletedLineKeys(previousKeys, completedKeys) {
+  const preservedKeys = normalizeCompletedLineKeys(previousKeys);
+  const preservedKeySet = new Set(preservedKeys);
+  const newlyCompletedKeys = normalizeCompletedLineKeys(completedKeys).filter(
+    (key) => !preservedKeySet.has(key),
+  );
+
+  return [...preservedKeys, ...newlyCompletedKeys];
+}

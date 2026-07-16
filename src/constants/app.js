@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.11.2",
+    date: "2026-07-16",
+    summary: [
+      "학급 빙고에서 이미 완성한 줄보다 번호가 앞선 새 빙고 줄을 완성할 때 특정 단어의 체크 저장이 권한 오류로 막히던 문제를 수정했습니다.",
+      "기존 완료 줄 순서를 유지하면서 새로 완성된 줄만 뒤에 추가해, 호출된 단어가 새 빙고 줄을 만드는 위치여도 체크 완료 상태가 정상 반영됩니다.",
+    ],
+  },
+  {
     version: "v1.11.1",
     date: "2026-07-13",
     summary: [
