@@ -667,8 +667,10 @@ service cloud.firestore {
         && resource.data.periodKey == request.resource.data.periodKey;
     }
 
-    function isSpellingLeaderboardTeacherDelete() {
-      return isTeacherForSchool(resource.data.schoolId);
+    function isSpellingLeaderboardTeacherDelete(scopeKey, studentKey) {
+      return isTeacherForSchool(resource.data.schoolId)
+        && scopeKey == resource.data.scopeKey
+        && studentKey == resource.data.studentNameNormalized;
     }
 
     function isSpellingLeaderboardStudentImprovement() {
@@ -992,7 +994,7 @@ service cloud.firestore {
         allow update: if isSpellingLeaderboardTeacherUpdate(studentKey)
           && scopeKey == request.resource.data.scopeKey
           && studentKey == request.resource.data.studentNameNormalized;
-        allow delete: if isSpellingLeaderboardTeacherDelete();
+        allow delete: if isSpellingLeaderboardTeacherDelete(scopeKey, studentKey);
       }
     }
 

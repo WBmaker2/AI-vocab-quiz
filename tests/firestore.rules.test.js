@@ -1116,6 +1116,79 @@ rulesTest(
 );
 
 rulesTest(
+  "spellingLeaderboards deny a same-school teacher delete with a mismatched student key",
+  async () => {
+    const mismatchedPath = [
+      "spellingLeaderboards",
+      "school-1__3__week__2026-w15",
+      "entries",
+      "지수",
+    ];
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context);
+      await setDoc(doc(context.firestore(), ...mismatchedPath), createSpellingLeaderboardDoc());
+    });
+
+    const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
+    await assertFails(
+      deleteDoc(doc(
+        teacherDb,
+        "spellingLeaderboards",
+        "school-1__3__week__2026-w15",
+        "entries",
+        "지수",
+      )),
+    );
+  },
+);
+
+rulesTest(
+  "spellingLeaderboards deny a same-school teacher delete with a mismatched scope key",
+  async () => {
+    const mismatchedPath = [
+      "spellingLeaderboards",
+      "school-1__3__month__2026-04",
+      "entries",
+      "민수",
+    ];
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context);
+      await setDoc(doc(context.firestore(), ...mismatchedPath), createSpellingLeaderboardDoc());
+    });
+
+    const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
+    await assertFails(
+      deleteDoc(doc(
+        teacherDb,
+        "spellingLeaderboards",
+        "school-1__3__month__2026-04",
+        "entries",
+        "민수",
+      )),
+    );
+  },
+);
+
+rulesTest(
+  "spellingLeaderboards allow a same-school teacher delete with matching path keys",
+  async () => {
+    const entryPath = [
+      "spellingLeaderboards",
+      "school-1__3__week__2026-w15",
+      "entries",
+      "민수",
+    ];
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context);
+      await setDoc(doc(context.firestore(), ...entryPath), createSpellingLeaderboardDoc());
+    });
+
+    const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
+    await assertSucceeds(deleteDoc(doc(teacherDb, ...entryPath)));
+  },
+);
+
+rulesTest(
   "matchingLeaderboards allows a student update when the score improves",
   async () => {
     const entryRefPath = [
