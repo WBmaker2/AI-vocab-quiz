@@ -59,3 +59,56 @@ Additional check: `git diff --check` passed.
 
 - `952aefa` `feat: register spelling leaderboard activity`
 - The report hash update is committed separately so the implementation commit is not amended.
+
+## Fix Round 1
+
+### Finding Addressed
+
+Expanded `src/utils/activityLeaderboard.test.js` so spelling tie ranking is
+verified independently at every requested comparison level:
+
+- score descending
+- correct count descending
+- total attempts ascending
+- elapsed time ascending
+- updated time descending
+
+Added a regression assertion for the existing matching score/time comparison
+and typing score/accuracy comparison. The spelling field-based
+`hasSpellingMetrics` behavior was not changed.
+
+### Scope Boundary
+
+`src/lib/firebase.js` was not modified. Firebase spelling dispatch remains a
+Task 3 concern as specified by the review resolution.
+
+### Changed Files
+
+- `src/utils/activityLeaderboard.test.js`
+- `.superpowers/sdd/2026-08-09-word-spelling-game/task-2-report.md`
+
+### Verification
+
+Focused command:
+
+```text
+node --test src/utils/activityLeaderboard.test.js src/utils/teacherLeaderboards.test.js src/components/teacher/teacherLeaderboardView.test.js
+```
+
+Output: 11 passed, 0 failed, 0 skipped.
+
+Full command:
+
+```text
+npm test
+```
+
+Output: 150 passed, 0 failed, 72 skipped. The skipped tests require
+`FIRESTORE_EMULATOR_HOST`; no test failures occurred.
+
+Additional check: `git diff --check` passed before the fix commit.
+
+### Fix Commit
+
+- `628628d` `test: cover spelling leaderboard tie order`
+- The report append is committed separately so the test commit is not amended.
