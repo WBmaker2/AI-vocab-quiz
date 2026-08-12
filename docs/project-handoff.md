@@ -255,6 +255,27 @@
    - 게임 시작, 입력 확인, 다음 문제, 점수 저장 버튼에 `gi-pulse`를 적용하고 reduced-motion에서는 애니메이션을 끔
    - `npm test`, `npm run build`, `npm run test:rules`, `npm run test:smoke`를 실행해 결과를 릴리스 커밋 보고서에 기록
 
+### 8.0.1 2026-08-12 프로덕션 배포 및 라이브 검증
+
+1. **철자 완성 게임 릴리스 반영**
+   - 브랜치 `codex/typing-leaderboards`의 커밋 `4212fa3`까지 GitHub 원격에 푸시
+   - Firebase 프로젝트 `talking-vocab-quiz`에 `firestore.rules`를 배포
+   - Vercel production 배포 `dpl_CvPepcrKMFkpq4Y2g7bMiS4YQFXK` 완료
+   - 공개 주소: <https://talking-vacab-quiz.vercel.app>
+
+2. **검증 결과**
+   - `npm test`: 158개 통과
+   - `npm run test:rules`: Firestore Emulator 79개 통과
+   - `npm run build`: 통과
+   - `npm run test:smoke`: 통과
+   - 공개 URL HTTP 200 및 v1.12.0 화면 확인
+   - 실제 공개 단어 세트 3학년 1단원 11개를 불러와 철자 게임 진입, 한 글자 단어 `_` 단서, `I` 정답 100점, 다음 문제 활성화 확인
+   - 결과 화면의 철자 리더보드 읽기, 임시 QA 저장·재조회, 주·월·년·전체 4개 임시 문서 삭제와 삭제 후 화면 재조회까지 확인
+
+3. **운영 참고**
+   - Firebase 규칙 배포 시 기존 미사용 함수 2건 경고가 있었지만 컴파일과 배포는 성공
+   - 실제 학생 이름이나 수업 기록은 라이브 검증에 사용하지 않음
+
 ### 8.1 2026-07-12 작업 기록
 
 1. **권한과 개인 기록 보호**
