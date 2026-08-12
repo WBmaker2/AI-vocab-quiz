@@ -30,3 +30,28 @@ Modified only the requested implementation and test files:
 ## Review Notes
 
 No unresolved concerns were found. Existing matching, fishing, and typing behavior remained unchanged in the focused review and regression suite.
+
+## Fix Round 1
+
+### Finding
+
+The spelling leaderboard teacher delete rule previously checked only the resource school ownership. A same-school teacher could therefore address a spelling entry through a mismatched `scopeKey` or `studentKey` path.
+
+### Fix
+
+- Changed `isSpellingLeaderboardTeacherDelete` to require the request path `scopeKey` to equal `resource.data.scopeKey`.
+- Changed the same helper to require the request path `studentKey` to equal `resource.data.studentNameNormalized`.
+- Preserved the existing matching, fishing, and typing delete rules.
+- Added emulator coverage for existing documents at mismatched student-key and scope-key paths, plus a valid same-school teacher delete.
+- No Firebase unit test was added because this is a Firestore rules path-integrity contract covered directly by emulator tests.
+
+### Verification
+
+- `npm run test:rules`: PASS — Firestore emulator started successfully; 79 passed, 0 failed, 0 skipped.
+- `node --test src/lib/firebase.test.js`: PASS — 12 passed, 0 failed.
+- `npm test`: PASS — 152 passed, 0 failed, 79 skipped because the direct test script does not start the Firestore emulator.
+- `git diff --check`: PASS.
+
+### Commit
+
+- Fix commit: `c7a425daefe4ba92ec44ca8f3be322c7032eb5bb`
