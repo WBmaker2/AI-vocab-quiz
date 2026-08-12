@@ -57,4 +57,5 @@ Additional check: `git diff --check` passed.
 
 ## Commit
 
-The commit hash is recorded here after the implementation is committed.
+- `952aefa` `feat: register spelling leaderboard activity`
+- The report hash update is committed separately so the implementation commit is not amended.
