@@ -39,6 +39,10 @@ const WordFishingGame = lazyNamed(
   () => import("./components/WordFishingGame.jsx"),
   "WordFishingGame",
 );
+const WordSpellingGame = lazyNamed(
+  () => import("./components/WordSpellingGame.jsx"),
+  "WordSpellingGame",
+);
 const WordTypingGame = lazyNamed(
   () => import("./components/WordTypingGame.jsx"),
   "WordTypingGame",
@@ -63,6 +67,7 @@ const APP_VIEWS = {
   SPEAKING: "speaking",
   MATCHING: "matching",
   FISHING: "fishing",
+  SPELLING: "spelling",
   TYPING: "typing",
   BINGO_HOST: "bingo-host",
   BINGO_JOIN: "bingo-join",
@@ -321,6 +326,7 @@ function App() {
             onOpenSpeaking={() => navigateTo(APP_VIEWS.SPEAKING)}
             onOpenMatching={() => navigateTo(APP_VIEWS.MATCHING)}
             onOpenFishing={() => navigateTo(APP_VIEWS.FISHING)}
+            onOpenSpelling={() => navigateTo(APP_VIEWS.SPELLING)}
             onOpenTyping={() => navigateTo(APP_VIEWS.TYPING)}
             onOpenBingo={() => navigateTo(APP_VIEWS.BINGO_JOIN)}
           />
@@ -426,6 +432,18 @@ function App() {
           <WordFishingGame
             items={library.student.items}
             speech={speechSynthesis}
+            celebration={celebrationAudio}
+            leaderboardContext={library.student.leaderboardContext}
+            remoteConfigured={library.remoteConfigured}
+            studentNameDraft={library.student.nameDraft}
+            onStudentNameDraftChange={library.student.updateNameDraft}
+            onBack={() => navigateTo(APP_VIEWS.HOME)}
+          />
+        ) : null}
+
+        {view === APP_VIEWS.SPELLING ? (
+          <WordSpellingGame
+            items={library.student.items}
             celebration={celebrationAudio}
             leaderboardContext={library.student.leaderboardContext}
             remoteConfigured={library.remoteConfigured}

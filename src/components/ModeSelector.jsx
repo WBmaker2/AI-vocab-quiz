@@ -39,6 +39,7 @@ export function ModeSelector({
   onOpenSpeaking,
   onOpenMatching,
   onOpenFishing,
+  onOpenSpelling,
   onOpenTyping,
   onOpenBingo,
 }) {
@@ -401,6 +402,14 @@ export function ModeSelector({
                 disabled={!hasVocabulary}
               >
                 단어 낚시
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={onOpenSpelling}
+                disabled={!hasVocabulary}
+              >
+                철자 완성 게임
               </button>
               <button
                 type="button"

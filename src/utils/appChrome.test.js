@@ -51,6 +51,13 @@ const compactLayouts = [
     "단어 낚시 화면",
   ],
   [
+    "spelling",
+    "Spelling Completion",
+    "철자 완성 게임",
+    "가려진 철자를 보고 영어 단어를 완성해보세요.",
+    "철자 완성 게임 화면",
+  ],
+  [
     "typing",
     "Word Typing",
     "영어 단어 타자",

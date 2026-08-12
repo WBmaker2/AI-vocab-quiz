@@ -39,6 +39,12 @@ const COMPACT_LAYOUTS = {
     subtitle: "소리를 듣고 알맞은 뜻 카드를 낚아보세요.",
     focusLabel: "단어 낚시 화면",
   },
+  spelling: {
+    eyebrow: "Spelling Completion",
+    title: "철자 완성 게임",
+    subtitle: "가려진 철자를 보고 영어 단어를 완성해보세요.",
+    focusLabel: "철자 완성 게임 화면",
+  },
   typing: {
     eyebrow: "Word Typing",
     title: "영어 단어 타자",
