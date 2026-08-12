@@ -34,3 +34,19 @@ No game logic, Firebase implementation, Firestore rules, or routing files were c
 
 - Manual gameplay and production/live browser verification were not performed in this environment.
 - The existing untracked planning documents in `docs/superpowers/plans/` were left untouched and are not part of this Task 7 change.
+
+## Fix Round 1
+
+Finding addressed: synchronized the top-level `package-lock.json` version and `packages[""]` version from `1.11.2` to `1.12.0`. No dependency entries or dependency versions were changed.
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `npm test` | PASS: 153 passed, 0 failed, 79 skipped because the direct command had no Firestore emulator host. |
+| `npm run build` | PASS: Vite production build completed; `WordSpellingGame` lazy chunk emitted. |
+| `npm run test:rules` | PASS: Firestore emulator ran all 79 rules tests successfully, 0 failed. |
+| `npm run test:smoke` | PASS: `playwright smoke: ok`. |
+| `git diff --check` | PASS: `git diff --check: ok`. |
+
+No production or manual gameplay verification was performed.
