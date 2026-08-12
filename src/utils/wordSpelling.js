@@ -42,6 +42,15 @@ export function isSpellingAnswerCorrect(input, expectedWord) {
   return normalizeSpellingAnswer(input) === normalizeSpellingAnswer(expectedWord);
 }
 
+export function isSpellingNextQuestionShortcut(event) {
+  return Boolean(
+    event &&
+      event.key === "Enter" &&
+      !event.isComposing &&
+      !event.repeat,
+  );
+}
+
 export function createSpellingQuestions(items, options = {}) {
   const usedMasksByWord = options.usedMasksByWord ?? new Map();
   const lastSignatureByWord = options.lastSignatureByWord ?? new Map();

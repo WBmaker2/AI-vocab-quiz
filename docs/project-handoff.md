@@ -244,7 +244,7 @@
 
 ## 8. 현재 버전 기준 핵심 상태
 
-- 현재 코드 버전: **v1.12.1**
+- 현재 코드 버전: **v1.12.2**
 - 현재 라이브 배포: **Vercel production**
 - 현재 라이브 주소: <https://talking-vacab-quiz.vercel.app>
 - Firebase Hosting 라이브 주소: <https://talking-vocab-quiz.web.app>
@@ -271,7 +271,15 @@
    - 공개 URL 교사 로그인 팝업이 same-origin `/__/auth/handler`로 열리는 것을 확인
    - Google 계정 선택 이후의 실제 교사 프로필 조회와 5·6학년 7~12단원 세트 불러오기는
      교사 계정 확인이 필요한 후속 브라우저 검증으로 남김
-   - Vercel 주소는 예비 주소로 유지
+- Vercel 주소는 예비 주소로 유지
+
+### 8.0.3 2026-08-12 철자 완성 게임 키보드 진행
+
+- 첫 Enter는 답안을 채점하고, 채점 결과가 표시된 뒤 두 번째 Enter는 다음
+  문제 또는 마지막 문제의 결과 화면으로 이동하도록 추가
+- Enter 반복 입력과 IME 조합 입력을 무시해 한 번의 키 입력이 중복 진행되지
+  않도록 처리
+- 상세 기록: `docs/changes/2026-08-12-spelling-enter-navigation.md`
 
 ### 8.0 2026-08-09 작업 기록
 

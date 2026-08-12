@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.12.2",
+    date: "2026-08-12",
+    summary: [
+      "철자 완성 게임에서 정답을 입력한 뒤 Enter를 한 번 더 누르면 다음 문제로 이동하도록 키보드 진행을 추가했습니다.",
+      "채점용 Enter와 다음 문제용 Enter가 중복 처리되지 않도록 입력 반복과 조합 입력을 안전하게 구분했습니다.",
+    ],
+  },
+  {
     version: "v1.12.1",
     date: "2026-08-12",
     summary: [

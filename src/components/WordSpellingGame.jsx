@@ -5,6 +5,7 @@ import {
   calculateSpellingAccuracy,
   calculateSpellingAttemptScore,
   createSpellingQuestions,
+  isSpellingNextQuestionShortcut,
   isSpellingAnswerCorrect,
   normalizeSpellingItems,
   SPELLING_ATTEMPT_LIMIT,
@@ -101,6 +102,24 @@ export function WordSpellingGame({
 
     inputRef.current?.focus();
   }, [activeQuestion, phase, questionCompleted]);
+
+  useEffect(() => {
+    if (phase !== "playing" || !questionCompleted) {
+      return undefined;
+    }
+
+    function handleNextQuestionShortcut(event) {
+      if (!isSpellingNextQuestionShortcut(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      moveToNextQuestion();
+    }
+
+    document.addEventListener("keydown", handleNextQuestionShortcut);
+    return () => document.removeEventListener("keydown", handleNextQuestionShortcut);
+  }, [phase, questionCompleted, questionIndex, questionCount]);
 
   useEffect(() => {
     if (phase !== "complete" || completionCelebratedRef.current) {
@@ -335,7 +354,7 @@ export function WordSpellingGame({
             </div>
             <div className="feedback-meta">
               <span>정답은 한 문제당 세 번까지 입력할 수 있어요.</span>
-              <span>정답을 공개한 문제도 다음 문제로 진행합니다.</span>
+              <span>결과가 나오면 Enter를 한 번 더 눌러 다음 문제로 이동할 수 있어요.</span>
             </div>
           </article>
 
@@ -363,6 +382,7 @@ export function WordSpellingGame({
           type="button"
           onClick={moveToNextQuestion}
           disabled={!questionCompleted}
+          aria-keyshortcuts="Enter"
         >
           {questionIndex >= questionCount - 1 ? "결과 보기" : "다음 문제"}
         </button>

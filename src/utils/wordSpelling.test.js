@@ -5,6 +5,7 @@ import {
   calculateSpellingAttemptScore,
   createSpellingMask,
   createSpellingQuestions,
+  isSpellingNextQuestionShortcut,
   isSpellingAnswerCorrect,
   normalizeSpellingItems,
 } from "./wordSpelling.js";
@@ -30,6 +31,13 @@ test("calculates the fixed spelling attempt scores", () => {
 test("calculates accuracy from completed questions", () => {
   assert.equal(calculateSpellingAccuracy(2, 3), 67);
   assert.equal(calculateSpellingAccuracy(0, 0), 0);
+});
+
+test("recognizes only a fresh non-composing Enter as the next-question shortcut", () => {
+  assert.equal(isSpellingNextQuestionShortcut({ key: "Enter" }), true);
+  assert.equal(isSpellingNextQuestionShortcut({ key: "Enter", isComposing: true }), false);
+  assert.equal(isSpellingNextQuestionShortcut({ key: "Enter", repeat: true }), false);
+  assert.equal(isSpellingNextQuestionShortcut({ key: "Space" }), false);
 });
 
 test("shows an internal clue for long words", () => {
