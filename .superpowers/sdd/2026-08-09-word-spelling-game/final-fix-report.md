@@ -36,3 +36,27 @@ fishing, or typing behavior was changed.
 
 No live or production verification was performed or claimed. Existing
 untracked plan documents were left untouched.
+
+## Fix Round: Final Review Follow-up
+
+- P1: `createSpellingMask` now accepts the actual previous signature, while
+  `createSpellingQuestions` records the last selected signature separately
+  from the used-signature set. `WordSpellingGame` retains both maps across
+  retries/restarts for the same normalized item sequence and clears them on
+  item changes and unmount. The deterministic exhaustion regression confirms
+  that consecutive masks do not repeat while another candidate exists.
+- P2: `compareSpellingLeaderboardEntries` is exported as a numeric comparator,
+  returns `0` for complete ties, and is used directly by `fetchPeriod` sorting.
+  The picker remains in place for upsert and teacher rename behavior.
+
+## Fix Round Verification
+
+- `node --test src/utils/wordSpelling.test.js src/utils/activityLeaderboard.test.js src/lib/firebase.test.js`: 28 passed.
+- `npm test`: 158 passed, 79 Firestore-emulator tests skipped by the direct test command.
+- `npm run test:rules`: 79 passed with the Firestore emulator.
+- `npm run build`: passed.
+- `npm run test:smoke`: passed.
+- `git diff --check`: passed.
+- Fix commit: `850a9468491de56ce4ce0bbb43053b002b1f01de`.
+
+No push, deployment, or live verification was performed.
