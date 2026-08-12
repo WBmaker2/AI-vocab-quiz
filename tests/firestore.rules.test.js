@@ -150,6 +150,29 @@ function createTypingLeaderboardDoc(overrides = {}) {
   };
 }
 
+function createSpellingLeaderboardDoc(overrides = {}) {
+  return {
+    scopeKey: "school-1__3__week__2026-w15",
+    schoolId: "school-1",
+    schoolName: "테스트초",
+    grade: "3",
+    studentName: "민수",
+    studentNameNormalized: "민수",
+    periodType: "week",
+    periodKey: "2026-w15",
+    score: 180,
+    elapsedSeconds: 60,
+    questionCount: 3,
+    correctCount: 2,
+    accuracy: 67,
+    revealedCount: 1,
+    totalAttempts: 5,
+    createdAt: createTimestamp(10),
+    updatedAt: createTimestamp(100),
+    ...overrides,
+  };
+}
+
 function createMatchingLeaderboardDoc(overrides = {}) {
   return {
     scopeKey: "school-1__3__week__2026-w15",
@@ -1029,6 +1052,66 @@ rulesTest(
         createTypingLeaderboardDoc({ score: 1261 }),
       ),
     );
+  },
+);
+
+rulesTest(
+  "spellingLeaderboards accept a student's own normalized entry",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(
+      setDoc(
+        doc(studentDb, "spellingLeaderboards", "school-1__3__week__2026-w15", "entries", "민수"),
+        createSpellingLeaderboardDoc(),
+      ),
+    );
+  },
+);
+
+rulesTest(
+  "spellingLeaderboards reject mismatched student keys, schools, and scopes",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    const basePath = ["spellingLeaderboards", "school-1__3__week__2026-w15", "entries"];
+    await assertFails(setDoc(doc(studentDb, ...basePath, "지수"), createSpellingLeaderboardDoc()));
+    await assertFails(setDoc(
+      doc(studentDb, ...basePath, "민수"),
+      createSpellingLeaderboardDoc({ schoolId: "school-2", scopeKey: "school-1__3__week__2026-w15" }),
+    ));
+    await assertFails(setDoc(
+      doc(studentDb, ...basePath, "민수"),
+      createSpellingLeaderboardDoc({ scopeKey: "school-2__3__week__2026-w15" }),
+    ));
+  },
+);
+
+rulesTest(
+  "spellingLeaderboards reject impossible completion metrics",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    const entry = doc(studentDb, "spellingLeaderboards", "school-1__3__week__2026-w15", "entries", "민수");
+    await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ revealedCount: 0 })));
+    await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ totalAttempts: 2 })));
+    await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ totalAttempts: 10 })));
+  },
+);
+
+rulesTest(
+  "spellingLeaderboards reject a lower student score and allow same-school teacher maintenance",
+  async () => {
+    const entryRefPath = ["spellingLeaderboards", "school-1__3__week__2026-w15", "entries", "민수"];
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), ...entryRefPath), createSpellingLeaderboardDoc());
+      await seedTeacher(context);
+      await setDoc(doc(context.firestore(), "spellingLeaderboards", "school-2__3__week__2026-w15", "entries", "민수"),
+        createSpellingLeaderboardDoc({ schoolId: "school-2", scopeKey: "school-2__3__week__2026-w15" }));
+    });
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(updateDoc(doc(studentDb, ...entryRefPath), { score: 170, updatedAt: createTimestamp(200) }));
+    const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
+    await assertSucceeds(updateDoc(doc(teacherDb, ...entryRefPath), { score: 170, updatedAt: createTimestamp(201) }));
+    await assertSucceeds(deleteDoc(doc(teacherDb, ...entryRefPath)));
+    await assertFails(deleteDoc(doc(teacherDb, "spellingLeaderboards", "school-2__3__week__2026-w15", "entries", "민수")));
   },
 );
 

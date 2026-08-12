@@ -5,6 +5,7 @@ import {
   shouldReplaceElapsedLeaderboardEntry,
   validateFishingLeaderboardResult,
   validateMatchingLeaderboardResult,
+  validateSpellingLeaderboardResult,
   validateTypingLeaderboardResult,
 } from "./firebase.js";
 import * as firebase from "./firebase.js";
@@ -171,6 +172,53 @@ test("leaderboard result validators reject impossible scores and invalid bounds"
       hintUsedCount: 2,
       bestCombo: 4,
     }), /accuracy/i);
+});
+
+test("validates spelling leaderboard metrics", () => {
+  assert.deepEqual(
+    validateSpellingLeaderboardResult({
+      score: 180,
+      elapsedSeconds: 60,
+      questionCount: 3,
+      correctCount: 2,
+      accuracy: 67,
+      revealedCount: 1,
+      totalAttempts: 5,
+    }),
+    {
+      score: 180,
+      elapsedSeconds: 60,
+      questionCount: 3,
+      correctCount: 2,
+      accuracy: 67,
+      revealedCount: 1,
+      totalAttempts: 5,
+    },
+  );
+});
+
+test("rejects impossible spelling leaderboard metrics", () => {
+  assert.throws(
+    () => validateSpellingLeaderboardResult({
+      score: 301, elapsedSeconds: 60, questionCount: 3, correctCount: 2,
+      accuracy: 67, revealedCount: 1, totalAttempts: 5,
+    }),
+    /score/i,
+  );
+  assert.throws(
+    () => validateSpellingLeaderboardResult({
+      score: 180, elapsedSeconds: 60, questionCount: 3, correctCount: 2,
+      accuracy: 67, revealedCount: 1, totalAttempts: 2,
+    }),
+    /totalAttempts/i,
+  );
+  assert.throws(
+    () => validateSpellingLeaderboardResult({
+      score: 180, elapsedSeconds: 60, questionCount: 3, correctCount: 1,
+      accuracy: 33, revealedCount: 1, totalAttempts: 3,
+    }),
+    /cover|revealed/i,
+  );
 });
 
 test("saveTeacherVocabularyImportBatch rejects more than 500 operations before Firebase writes", async () => {

@@ -618,6 +618,72 @@ service cloud.firestore {
         );
     }
 
+    function isSpellingLeaderboardDocument(data) {
+      return data.keys().hasOnly([
+          'scopeKey', 'schoolId', 'schoolName', 'grade', 'studentName',
+          'studentNameNormalized', 'periodType', 'periodKey', 'score',
+          'elapsedSeconds', 'questionCount', 'correctCount', 'accuracy',
+          'revealedCount', 'totalAttempts', 'createdAt', 'updatedAt'
+        ])
+        && data.scopeKey is string && data.scopeKey.size() > 0
+        && data.schoolId is string && data.schoolId.size() > 0
+        && data.schoolName is string && data.schoolName.size() > 0
+        && data.grade is string && data.grade.size() > 0
+        && data.studentName is string && data.studentName.size() > 0
+        && data.studentNameNormalized is string && data.studentNameNormalized.size() > 0
+        && isMatchingLeaderboardPeriodType(data.periodType)
+        && data.periodKey is string && data.periodKey.size() > 0
+        && isMatchingLeaderboardScopeKey(data.scopeKey, data.schoolId, data.grade, data.periodType, data.periodKey)
+        && isNonNegativeNumber(data.score)
+        && data.score <= data.questionCount * 100
+        && data.elapsedSeconds is int && data.elapsedSeconds >= 0 && data.elapsedSeconds <= 86400
+        && data.questionCount is int && data.questionCount >= 1 && data.questionCount <= 500
+        && isNonNegativeInteger(data.correctCount) && data.correctCount <= data.questionCount
+        && isNonNegativeInteger(data.revealedCount) && data.revealedCount <= data.questionCount
+        && data.correctCount + data.revealedCount == data.questionCount
+        && isNonNegativeInteger(data.accuracy) && data.accuracy <= 100
+        && math.abs(data.accuracy * data.questionCount - data.correctCount * 100) <= data.questionCount
+        && data.totalAttempts is int
+        && data.totalAttempts >= data.questionCount
+        && data.totalAttempts <= data.questionCount * 3;
+    }
+
+    function isSpellingLeaderboardStudentWrite() {
+      return isSpellingLeaderboardDocument(request.resource.data)
+        && request.resource.data.scopeKey == request.resource.data.schoolId + "__" + request.resource.data.grade + "__" + request.resource.data.periodType + "__" + request.resource.data.periodKey;
+    }
+
+    function isSpellingLeaderboardTeacherCreate(studentKey) {
+      return isSpellingLeaderboardDocument(request.resource.data)
+        && isTeacherForSchool(request.resource.data.schoolId)
+        && studentKey == request.resource.data.studentNameNormalized;
+    }
+
+    function isSpellingLeaderboardTeacherUpdate(studentKey) {
+      return isSpellingLeaderboardTeacherCreate(studentKey)
+        && resource.data.schoolId == request.resource.data.schoolId
+        && resource.data.grade == request.resource.data.grade
+        && resource.data.periodType == request.resource.data.periodType
+        && resource.data.periodKey == request.resource.data.periodKey;
+    }
+
+    function isSpellingLeaderboardTeacherDelete() {
+      return isTeacherForSchool(resource.data.schoolId);
+    }
+
+    function isSpellingLeaderboardStudentImprovement() {
+      return request.resource.data.score > resource.data.score
+        || (request.resource.data.score == resource.data.score
+          && request.resource.data.correctCount > resource.data.correctCount)
+        || (request.resource.data.score == resource.data.score
+          && request.resource.data.correctCount == resource.data.correctCount
+          && request.resource.data.totalAttempts < resource.data.totalAttempts)
+        || (request.resource.data.score == resource.data.score
+          && request.resource.data.correctCount == resource.data.correctCount
+          && request.resource.data.totalAttempts == resource.data.totalAttempts
+          && request.resource.data.elapsedSeconds < resource.data.elapsedSeconds);
+    }
+
     function isLeaderboardTiedScoreFasterElapsed() {
       return request.resource.data.score > resource.data.score
         || (
@@ -896,6 +962,37 @@ service cloud.firestore {
           && studentKey == request.resource.data.studentNameNormalized;
 
         allow delete: if isTypingLeaderboardTeacherDelete();
+      }
+    }
+
+    match /spellingLeaderboards/{scopeKey} {
+      allow read, write: if false;
+
+      match /entries/{studentKey} {
+        allow read: if true;
+        allow create: if (
+          isSpellingLeaderboardStudentWrite()
+          && scopeKey == request.resource.data.scopeKey
+          && studentKey == request.resource.data.studentNameNormalized
+        ) || (
+          isSpellingLeaderboardTeacherCreate(studentKey)
+          && scopeKey == request.resource.data.scopeKey
+        );
+        allow update: if isSpellingLeaderboardStudentWrite()
+          && scopeKey == request.resource.data.scopeKey
+          && studentKey == request.resource.data.studentNameNormalized
+          && resource.data.scopeKey == request.resource.data.scopeKey
+          && resource.data.schoolId == request.resource.data.schoolId
+          && resource.data.schoolName == request.resource.data.schoolName
+          && resource.data.grade == request.resource.data.grade
+          && resource.data.studentNameNormalized == request.resource.data.studentNameNormalized
+          && resource.data.periodType == request.resource.data.periodType
+          && resource.data.periodKey == request.resource.data.periodKey
+          && isSpellingLeaderboardStudentImprovement();
+        allow update: if isSpellingLeaderboardTeacherUpdate(studentKey)
+          && scopeKey == request.resource.data.scopeKey
+          && studentKey == request.resource.data.studentNameNormalized;
+        allow delete: if isSpellingLeaderboardTeacherDelete();
       }
     }
 
