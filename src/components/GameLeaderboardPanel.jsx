@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import {
   fetchFishingLeaderboards,
   fetchMatchingLeaderboards,
+  fetchSpellingLeaderboards,
   fetchTypingLeaderboards,
   saveFishingLeaderboardScore,
   saveMatchingLeaderboardScore,
+  saveSpellingLeaderboardScore,
   saveTypingLeaderboardScore,
 } from "../lib/firebase.js";
 import { getActivityLeaderboardDefinition } from "../utils/activityLeaderboard.js";
@@ -24,6 +26,10 @@ const LEADERBOARD_HANDLERS = {
   fishing: {
     fetchLeaderboards: fetchFishingLeaderboards,
     saveScore: saveFishingLeaderboardScore,
+  },
+  spelling: {
+    fetchLeaderboards: fetchSpellingLeaderboards,
+    saveScore: saveSpellingLeaderboardScore,
   },
   typing: {
     fetchLeaderboards: fetchTypingLeaderboards,
@@ -64,6 +70,10 @@ function formatLeaderboardEntryDetail(entry, periodType, activityType) {
 
   if (activityType === "fishing") {
     detailParts.push(`정답 ${entry.correctCount ?? 0}`);
+  } else if (activityType === "spelling") {
+    detailParts.push(`정답 ${entry.correctCount ?? 0}/${entry.questionCount ?? 0}`);
+    detailParts.push(`공개 ${entry.revealedCount ?? 0}회`);
+    detailParts.push(`시도 ${entry.totalAttempts ?? 0}회`);
   } else if (activityType === "typing") {
     detailParts.push(`정답 ${entry.correctCount ?? 0}/${entry.questionCount ?? 0}`);
     detailParts.push(`정확도 ${formatLeaderboardAccuracy(entry.accuracy)}`);
