@@ -160,7 +160,7 @@ function createSpellingLeaderboardDoc(overrides = {}) {
     studentNameNormalized: "민수",
     periodType: "week",
     periodKey: "2026-w15",
-    score: 180,
+    score: 210,
     elapsedSeconds: 60,
     questionCount: 3,
     correctCount: 2,
@@ -1093,6 +1093,7 @@ rulesTest(
     await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ revealedCount: 0 })));
     await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ totalAttempts: 2 })));
     await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ totalAttempts: 10 })));
+    await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ score: 200 })));
   },
 );
 
@@ -1107,9 +1108,17 @@ rulesTest(
         createSpellingLeaderboardDoc({ schoolId: "school-2", scopeKey: "school-2__3__week__2026-w15" }));
     });
     const studentDb = testEnv.unauthenticatedContext().firestore();
-    await assertFails(updateDoc(doc(studentDb, ...entryRefPath), { score: 170, updatedAt: createTimestamp(200) }));
+    await assertFails(updateDoc(doc(studentDb, ...entryRefPath), {
+      score: 180,
+      totalAttempts: 6,
+      updatedAt: createTimestamp(200),
+    }));
     const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
-    await assertSucceeds(updateDoc(doc(teacherDb, ...entryRefPath), { score: 170, updatedAt: createTimestamp(201) }));
+    await assertSucceeds(updateDoc(doc(teacherDb, ...entryRefPath), {
+      score: 180,
+      totalAttempts: 6,
+      updatedAt: createTimestamp(201),
+    }));
     await assertSucceeds(deleteDoc(doc(teacherDb, ...entryRefPath)));
     await assertFails(deleteDoc(doc(teacherDb, "spellingLeaderboards", "school-2__3__week__2026-w15", "entries", "민수")));
   },

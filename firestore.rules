@@ -634,8 +634,10 @@ service cloud.firestore {
         && isMatchingLeaderboardPeriodType(data.periodType)
         && data.periodKey is string && data.periodKey.size() > 0
         && isMatchingLeaderboardScopeKey(data.scopeKey, data.schoolId, data.grade, data.periodType, data.periodKey)
-        && isNonNegativeNumber(data.score)
-        && data.score <= data.questionCount * 100
+        && data.score is int
+        && data.score == data.questionCount * 100
+          + data.correctCount * 30
+          - data.totalAttempts * 30
         && data.elapsedSeconds is int && data.elapsedSeconds >= 0 && data.elapsedSeconds <= 86400
         && data.questionCount is int && data.questionCount >= 1 && data.questionCount <= 500
         && isNonNegativeInteger(data.correctCount) && data.correctCount <= data.questionCount
@@ -644,7 +646,7 @@ service cloud.firestore {
         && isNonNegativeInteger(data.accuracy) && data.accuracy <= 100
         && math.abs(data.accuracy * data.questionCount - data.correctCount * 100) <= data.questionCount
         && data.totalAttempts is int
-        && data.totalAttempts >= data.questionCount
+        && data.totalAttempts >= data.correctCount + data.revealedCount * 3
         && data.totalAttempts <= data.questionCount * 3;
     }
 

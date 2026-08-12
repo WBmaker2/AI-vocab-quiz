@@ -42,6 +42,20 @@ export function isSpellingAnswerCorrect(input, expectedWord) {
   return normalizeSpellingAnswer(input) === normalizeSpellingAnswer(expectedWord);
 }
 
+export function createSpellingQuestions(items, options = {}) {
+  const usedMasksByWord = options.usedMasksByWord ?? new Map();
+  const random = options.random ?? Math.random;
+
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const usedSignatures = usedMasksByWord.get(item.normalizedWord) ?? new Set();
+    const mask = createSpellingMask(item.word, { usedSignatures, random });
+    usedSignatures.add(mask.signature);
+    usedMasksByWord.set(item.normalizedWord, usedSignatures);
+
+    return { ...item, mask };
+  });
+}
+
 function isSpellingLetter(character) {
   return /[a-z]/i.test(character);
 }
@@ -115,8 +129,15 @@ export function createSpellingMask(word, options = {}) {
     .filter((index) => index >= 0);
   const usedSignatures = options.usedSignatures ?? new Set();
   const random = options.random ?? Math.random;
-  const clueCount =
-    letterIndexes.length <= 4 ? 1 : letterIndexes.length <= 7 ? 2 : letterIndexes.length <= 10 ? 3 : 4;
+  const clueCount = letterIndexes.length === 1
+    ? 0
+    : letterIndexes.length <= 4
+      ? 1
+      : letterIndexes.length <= 7
+        ? 2
+        : letterIndexes.length <= 10
+          ? 3
+          : 4;
   const candidates = createMaskCandidates(letterIndexes, clueCount);
   if (candidates.length === 0) {
     const separatorCharacters = characters.map((character) => ({

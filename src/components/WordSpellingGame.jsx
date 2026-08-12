@@ -4,7 +4,7 @@ import { WordSpellingStartCard } from "./WordSpellingStartCard.jsx";
 import {
   calculateSpellingAccuracy,
   calculateSpellingAttemptScore,
-  createSpellingMask,
+  createSpellingQuestions,
   isSpellingAnswerCorrect,
   normalizeSpellingItems,
   SPELLING_ATTEMPT_LIMIT,
@@ -24,6 +24,7 @@ export function WordSpellingGame({
   const transitionTimerRef = useRef(null);
   const startedAtRef = useRef(0);
   const completionCelebratedRef = useRef(false);
+  const usedMasksByWordRef = useRef(new Map());
   const [phase, setPhase] = useState("ready");
   const [questions, setQuestions] = useState([]);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -37,6 +38,11 @@ export function WordSpellingGame({
   const [feedbackTone, setFeedbackTone] = useState("idle");
   const [feedbackMessage, setFeedbackMessage] = useState("가려진 철자를 보고 영어 단어를 입력해 보세요.");
   const [elapsedMs, setElapsedMs] = useState(0);
+  const itemSetSignature = JSON.stringify(spellingItems.map((item) => [
+    item.id,
+    item.word,
+    item.meaning,
+  ]));
 
   const resetGameState = () => {
     window.clearTimeout(transitionTimerRef.current);
@@ -58,8 +64,9 @@ export function WordSpellingGame({
   };
 
   useEffect(() => {
+    usedMasksByWordRef.current.clear();
     resetGameState();
-  }, [items]);
+  }, [itemSetSignature]);
 
   useEffect(() => {
     if (phase !== "playing") {
@@ -73,7 +80,10 @@ export function WordSpellingGame({
     return () => window.clearInterval(timer);
   }, [phase]);
 
-  useEffect(() => () => window.clearTimeout(transitionTimerRef.current), []);
+  useEffect(() => () => {
+    window.clearTimeout(transitionTimerRef.current);
+    usedMasksByWordRef.current.clear();
+  }, []);
 
   const canStart = spellingItems.length > 0;
   const activeQuestion = questions[questionIndex] ?? null;
@@ -103,14 +113,8 @@ export function WordSpellingGame({
       return;
     }
 
-    const usedMasksByWord = new Map();
-    const nextQuestions = spellingItems.map((item) => {
-      const usedSignatures = usedMasksByWord.get(item.normalizedWord) ?? new Set();
-      const mask = createSpellingMask(item.word, { usedSignatures });
-      usedSignatures.add(mask.signature);
-      usedMasksByWord.set(item.normalizedWord, usedSignatures);
-
-      return { ...item, mask };
+    const nextQuestions = createSpellingQuestions(spellingItems, {
+      usedMasksByWord: usedMasksByWordRef.current,
     });
 
     window.clearTimeout(transitionTimerRef.current);

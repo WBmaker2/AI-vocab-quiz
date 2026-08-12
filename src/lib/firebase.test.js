@@ -177,7 +177,7 @@ test("leaderboard result validators reject impossible scores and invalid bounds"
 test("validates spelling leaderboard metrics", () => {
   assert.deepEqual(
     validateSpellingLeaderboardResult({
-      score: 180,
+      score: 210,
       elapsedSeconds: 60,
       questionCount: 3,
       correctCount: 2,
@@ -186,7 +186,7 @@ test("validates spelling leaderboard metrics", () => {
       totalAttempts: 5,
     }),
     {
-      score: 180,
+      score: 210,
       elapsedSeconds: 60,
       questionCount: 3,
       correctCount: 2,
@@ -197,10 +197,40 @@ test("validates spelling leaderboard metrics", () => {
   );
 });
 
+test("validates the exact spelling score for every completed-question outcome", () => {
+  const base = {
+    elapsedSeconds: 60,
+    questionCount: 1,
+    accuracy: 100,
+    correctCount: 1,
+    revealedCount: 0,
+  };
+
+  for (const [totalAttempts, score] of [[1, 100], [2, 70], [3, 40]]) {
+    assert.equal(
+      validateSpellingLeaderboardResult({ ...base, totalAttempts, score }).score,
+      score,
+    );
+  }
+
+  assert.equal(
+    validateSpellingLeaderboardResult({
+      elapsedSeconds: 60,
+      questionCount: 1,
+      correctCount: 0,
+      accuracy: 0,
+      revealedCount: 1,
+      totalAttempts: 3,
+      score: 10,
+    }).score,
+    10,
+  );
+});
+
 test("rejects impossible spelling leaderboard metrics", () => {
   assert.throws(
     () => validateSpellingLeaderboardResult({
-      score: 301, elapsedSeconds: 60, questionCount: 3, correctCount: 2,
+      score: 200, elapsedSeconds: 60, questionCount: 3, correctCount: 2,
       accuracy: 67, revealedCount: 1, totalAttempts: 5,
     }),
     /score/i,

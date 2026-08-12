@@ -72,6 +72,10 @@ import {
 import {
   assertTeacherVocabularyImportBatchCapacity,
 } from "../utils/teacherSetManager.js";
+import {
+  createSpellingLeaderboardApi,
+  validateSpellingLeaderboardResult,
+} from "./spellingLeaderboard.js";
 
 function getEnvValue(name) {
   return String(import.meta.env?.[name] ?? "").trim();
@@ -111,6 +115,12 @@ function ensureFirebase() {
 
   return { auth, db };
 }
+
+const spellingLeaderboardApi = createSpellingLeaderboardApi({
+  ensureFirestore: () => ensureFirebase().db,
+});
+
+export { validateSpellingLeaderboardResult };
 
 function normalizeLeaderboardScope(value) {
   return String(value ?? "").trim();
@@ -285,60 +295,6 @@ export function validateTypingLeaderboardResult({
     accuracy: cleanAccuracy,
     hintUsedCount: cleanHintUsedCount,
     bestCombo: cleanBestCombo,
-  };
-}
-
-export function validateSpellingLeaderboardResult({
-  score,
-  elapsedSeconds,
-  questionCount,
-  correctCount,
-  accuracy,
-  revealedCount,
-  totalAttempts,
-}) {
-  const cleanQuestionCount = validateLeaderboardInteger(questionCount, "questionCount", {
-    min: 1,
-    max: 500,
-  });
-  const cleanCorrectCount = validateLeaderboardInteger(correctCount, "correctCount", {
-    min: 0,
-    max: cleanQuestionCount,
-  });
-  const cleanRevealedCount = validateLeaderboardInteger(revealedCount, "revealedCount", {
-    min: 0,
-    max: cleanQuestionCount,
-  });
-  if (cleanCorrectCount + cleanRevealedCount !== cleanQuestionCount) {
-    throw new Error("correctCount and revealedCount must cover questionCount.");
-  }
-
-  const cleanTotalAttempts = validateLeaderboardInteger(totalAttempts, "totalAttempts", {
-    min: cleanQuestionCount,
-    max: cleanQuestionCount * 3,
-  });
-  const cleanAccuracy = validateLeaderboardInteger(accuracy, "accuracy", {
-    min: 0,
-    max: 100,
-  });
-  if (Math.abs(cleanAccuracy * cleanQuestionCount - cleanCorrectCount * 100) > cleanQuestionCount) {
-    throw new Error("accuracy does not match correctCount.");
-  }
-
-  return {
-    score: validateLeaderboardNumber(score, "score", {
-      min: 0,
-      max: cleanQuestionCount * 100,
-    }),
-    elapsedSeconds: validateLeaderboardInteger(elapsedSeconds, "elapsedSeconds", {
-      min: 0,
-      max: 86400,
-    }),
-    questionCount: cleanQuestionCount,
-    correctCount: cleanCorrectCount,
-    accuracy: cleanAccuracy,
-    revealedCount: cleanRevealedCount,
-    totalAttempts: cleanTotalAttempts,
   };
 }
 
@@ -687,53 +643,6 @@ function createTypingLeaderboardPayload({
   };
 }
 
-function createSpellingLeaderboardPayload({
-  schoolId,
-  schoolName,
-  grade,
-  studentName,
-  periodType,
-  periodKey,
-  score,
-  elapsedSeconds,
-  questionCount,
-  correctCount,
-  accuracy,
-  revealedCount,
-  totalAttempts,
-}) {
-  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
-  const cleanSchoolName = normalizeLeaderboardText(schoolName);
-  const cleanGrade = normalizeLeaderboardScope(grade);
-  const cleanStudentName = normalizeLeaderboardText(studentName);
-  const result = validateSpellingLeaderboardResult({
-    score,
-    elapsedSeconds,
-    questionCount,
-    correctCount,
-    accuracy,
-    revealedCount,
-    totalAttempts,
-  });
-
-  return {
-    scopeKey: createMatchingLeaderboardScopeKey({
-      schoolId: cleanSchoolId,
-      grade: cleanGrade,
-      periodType,
-      periodKey,
-    }),
-    schoolId: cleanSchoolId,
-    schoolName: cleanSchoolName,
-    grade: cleanGrade,
-    studentName: cleanStudentName,
-    studentNameNormalized: normalizeStudentNameKey(cleanStudentName),
-    periodType,
-    periodKey,
-    ...result,
-  };
-}
-
 function createMatchingLeaderboardEntryRef(
   firestore,
   { schoolId, grade, periodType, periodKey, studentName },
@@ -806,25 +715,6 @@ function createTypingLeaderboardEntryRef(
       "entries",
       studentKey,
     ),
-  };
-}
-
-function createSpellingLeaderboardEntryRef(
-  firestore,
-  { schoolId, grade, periodType, periodKey, studentName },
-) {
-  const scopeKey = createMatchingLeaderboardScopeKey({
-    schoolId,
-    grade,
-    periodType,
-    periodKey,
-  });
-  const studentKey = normalizeStudentNameKey(studentName);
-
-  return {
-    scopeKey,
-    studentKey,
-    ref: doc(firestore, "spellingLeaderboards", scopeKey, "entries", studentKey),
   };
 }
 
@@ -939,40 +829,6 @@ function createTypingLeaderboardWritePayload({
   };
 }
 
-function createSpellingLeaderboardWritePayload({
-  source,
-  schoolId,
-  schoolName,
-  grade,
-  studentName,
-  periodType,
-  periodKey,
-}) {
-  const cleanStudentName = normalizeLeaderboardText(studentName);
-  const cleanSchoolName = normalizeLeaderboardText(source.schoolName ?? schoolName);
-  const payload = createSpellingLeaderboardPayload({
-    schoolId,
-    schoolName: cleanSchoolName,
-    grade,
-    studentName: cleanStudentName,
-    periodType,
-    periodKey,
-    score: source.score,
-    elapsedSeconds: source.elapsedSeconds,
-    questionCount: source.questionCount,
-    correctCount: source.correctCount,
-    accuracy: source.accuracy,
-    revealedCount: source.revealedCount,
-    totalAttempts: source.totalAttempts,
-  });
-
-  return {
-    ...payload,
-    createdAt: source.createdAt ?? serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-}
-
 function pickBetterTypingLeaderboardEntry(left, right) {
   if (!left) {
     return right ?? null;
@@ -1018,29 +874,6 @@ function pickBetterTypingLeaderboardEntry(left, right) {
   }
 
   return left;
-}
-
-function pickBetterSpellingLeaderboardEntry(left, right) {
-  if (!left) return right ?? null;
-  if (!right) return left;
-  const fields = [
-    ["score", "desc"],
-    ["correctCount", "desc"],
-    ["totalAttempts", "asc"],
-    ["elapsedSeconds", "asc"],
-  ];
-  for (const [field, direction] of fields) {
-    const leftValue = Number(left[field] ?? (direction === "asc" ? Number.POSITIVE_INFINITY : 0));
-    const rightValue = Number(right[field] ?? (direction === "asc" ? Number.POSITIVE_INFINITY : 0));
-    if (leftValue !== rightValue) {
-      return direction === "desc"
-        ? (rightValue > leftValue ? right : left)
-        : (rightValue < leftValue ? right : left);
-    }
-  }
-  const leftUpdatedAt = left.updatedAt?.toMillis?.() ?? left.createdAt?.toMillis?.() ?? 0;
-  const rightUpdatedAt = right.updatedAt?.toMillis?.() ?? right.createdAt?.toMillis?.() ?? 0;
-  return rightUpdatedAt > leftUpdatedAt ? right : left;
 }
 
 export function shouldReplaceElapsedLeaderboardEntry({
@@ -1304,74 +1137,6 @@ async function upsertTypingLeaderboardPeriod({
   });
 }
 
-async function upsertSpellingLeaderboardPeriod({
-  firestore,
-  schoolId,
-  schoolName,
-  grade,
-  studentName,
-  periodType,
-  periodKey,
-  score,
-  elapsedSeconds,
-  questionCount,
-  correctCount,
-  accuracy,
-  revealedCount,
-  totalAttempts,
-}) {
-  const payload = createSpellingLeaderboardPayload({
-    schoolId,
-    schoolName,
-    grade,
-    studentName,
-    periodType,
-    periodKey,
-    score,
-    elapsedSeconds,
-    questionCount,
-    correctCount,
-    accuracy,
-    revealedCount,
-    totalAttempts,
-  });
-  const leaderboardRef = doc(
-    firestore,
-    "spellingLeaderboards",
-    payload.scopeKey,
-    "entries",
-    payload.studentNameNormalized,
-  );
-
-  return runTransaction(firestore, async (transaction) => {
-    const snapshot = await transaction.get(leaderboardRef);
-    if (!snapshot.exists()) {
-      transaction.set(leaderboardRef, {
-        ...payload,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      return "created";
-    }
-
-    const nextData = { ...snapshot.data(), ...payload };
-    if (pickBetterSpellingLeaderboardEntry(snapshot.data(), nextData) === nextData) {
-      transaction.update(leaderboardRef, {
-        score: payload.score,
-        elapsedSeconds: payload.elapsedSeconds,
-        questionCount: payload.questionCount,
-        correctCount: payload.correctCount,
-        accuracy: payload.accuracy,
-        revealedCount: payload.revealedCount,
-        totalAttempts: payload.totalAttempts,
-        updatedAt: serverTimestamp(),
-      });
-      return "updated";
-    }
-    return "skipped";
-  });
-}
-
 async function fetchMatchingLeaderboardPeriod({
   firestore,
   schoolId,
@@ -1569,47 +1334,6 @@ async function fetchTypingLeaderboardPeriod({
     periodKey,
     entries,
   };
-}
-
-async function fetchSpellingLeaderboardPeriod({
-  firestore,
-  schoolId,
-  grade,
-  periodType,
-  periodKey,
-  limitCount,
-}) {
-  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
-  const cleanGrade = normalizeLeaderboardScope(grade);
-  const scopeKey = createMatchingLeaderboardScopeKey({
-    schoolId: cleanSchoolId,
-    grade: cleanGrade,
-    periodType,
-    periodKey,
-  });
-  if (!cleanSchoolId || !cleanGrade || !periodKey || !scopeKey) {
-    return { periodType, periodKey, entries: [] };
-  }
-
-  const snapshot = await getDocs(query(
-    collection(firestore, "spellingLeaderboards", scopeKey, "entries"),
-  ));
-  const entries = snapshot.docs
-    .map((item) => ({ id: item.id, ...item.data() }))
-    .sort((left, right) => {
-      const comparisons = [
-        Number(right.score ?? 0) - Number(left.score ?? 0),
-        Number(right.correctCount ?? 0) - Number(left.correctCount ?? 0),
-        Number(left.totalAttempts ?? 0) - Number(right.totalAttempts ?? 0),
-        Number(left.elapsedSeconds ?? 0) - Number(right.elapsedSeconds ?? 0),
-      ];
-      const firstDifference = comparisons.find((value) => value !== 0);
-      if (firstDifference !== undefined) return firstDifference;
-      return (right.updatedAt?.toMillis?.() ?? 0) - (left.updatedAt?.toMillis?.() ?? 0);
-    })
-    .slice(0, limitCount)
-    .map((entry, index) => ({ ...entry, rank: index + 1 }));
-  return { periodType, periodKey, entries };
 }
 
 export async function fetchTeacherActivityLeaderboards({
@@ -2110,70 +1834,13 @@ export async function renameTeacherSpellingLeaderboardStudent({
   newStudentName,
   now = new Date(),
 }) {
-  const { db: firestore } = ensureFirebase();
-  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
-  const cleanGrade = normalizeLeaderboardScope(grade);
-  const cleanOldStudentName = normalizeStudentName(oldStudentName);
-  const cleanNewStudentName = normalizeStudentName(newStudentName);
-  const oldStudentKey = normalizeStudentNameKey(cleanOldStudentName);
-  const newStudentKey = normalizeStudentNameKey(cleanNewStudentName);
-  if (!cleanSchoolId || !cleanGrade || !cleanOldStudentName || !cleanNewStudentName) {
-    throw new Error("School, grade, and student names are required.");
-  }
-  if (oldStudentKey === newStudentKey) {
-    throw new Error("The new student name must be different from the current name.");
-  }
-
-  const updatedPeriods = [];
-  const keptPeriods = [];
-  const skippedPeriods = [];
-  const periodKeys = createLeaderboardPeriodKeys(now);
-  await runTransaction(firestore, async (transaction) => {
-    const periodSnapshots = [];
-    for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
-      const periodKey = periodKeys[type];
-      const scopeGrade = createMatchingLeaderboardGradeScope(type, cleanGrade);
-      const oldEntry = createSpellingLeaderboardEntryRef(firestore, {
-        schoolId: cleanSchoolId, grade: scopeGrade, periodType: type, periodKey,
-        studentName: cleanOldStudentName,
-      });
-      const newEntry = createSpellingLeaderboardEntryRef(firestore, {
-        schoolId: cleanSchoolId, grade: scopeGrade, periodType: type, periodKey,
-        studentName: cleanNewStudentName,
-      });
-      periodSnapshots.push({
-        type, periodKey, scopeGrade, oldEntry, newEntry,
-        oldSnapshot: await transaction.get(oldEntry.ref),
-        newSnapshot: await transaction.get(newEntry.ref),
-      });
-    }
-    for (const { type, periodKey, scopeGrade, oldEntry, newEntry, oldSnapshot, newSnapshot } of periodSnapshots) {
-      if (!oldSnapshot.exists()) {
-        skippedPeriods.push(type);
-        continue;
-      }
-      const oldData = oldSnapshot.data();
-      const newData = newSnapshot.exists() ? newSnapshot.data() : null;
-      const winner = pickBetterSpellingLeaderboardEntry(newData, oldData);
-      if (newData && winner === newData) {
-        transaction.delete(oldEntry.ref);
-        keptPeriods.push(type);
-        continue;
-      }
-      transaction.set(newEntry.ref, createSpellingLeaderboardWritePayload({
-        source: winner ?? oldData,
-        schoolId: cleanSchoolId,
-        schoolName: oldData.schoolName ?? newData?.schoolName ?? "",
-        grade: scopeGrade,
-        studentName: cleanNewStudentName,
-        periodType: type,
-        periodKey,
-      }));
-      transaction.delete(oldEntry.ref);
-      updatedPeriods.push(type);
-    }
+  return spellingLeaderboardApi.renameTeacherSpellingLeaderboardStudent({
+    schoolId,
+    grade,
+    oldStudentName,
+    newStudentName,
+    now,
   });
-  return { updatedPeriods, keptPeriods, skippedPeriods };
 }
 
 export async function deleteTeacherMatchingLeaderboardStudent({
@@ -2383,38 +2050,12 @@ export async function deleteTeacherSpellingLeaderboardStudent({
   studentName,
   now = new Date(),
 }) {
-  const { db: firestore } = ensureFirebase();
-  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
-  const cleanGrade = normalizeLeaderboardScope(grade);
-  const cleanStudentName = normalizeStudentName(studentName);
-  if (!cleanSchoolId || !cleanGrade || !cleanStudentName) {
-    throw new Error("School, grade, and student name are required.");
-  }
-  const deletedPeriods = [];
-  const skippedPeriods = [];
-  const periodKeys = createLeaderboardPeriodKeys(now);
-  await runTransaction(firestore, async (transaction) => {
-    const periodSnapshots = [];
-    for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
-      const entry = createSpellingLeaderboardEntryRef(firestore, {
-        schoolId: cleanSchoolId,
-        grade: createMatchingLeaderboardGradeScope(type, cleanGrade),
-        periodType: type,
-        periodKey: periodKeys[type],
-        studentName: cleanStudentName,
-      });
-      periodSnapshots.push({ type, entry, snapshot: await transaction.get(entry.ref) });
-    }
-    for (const { type, entry, snapshot } of periodSnapshots) {
-      if (!snapshot.exists()) {
-        skippedPeriods.push(type);
-      } else {
-        transaction.delete(entry.ref);
-        deletedPeriods.push(type);
-      }
-    }
+  return spellingLeaderboardApi.deleteTeacherSpellingLeaderboardStudent({
+    schoolId,
+    grade,
+    studentName,
+    now,
   });
-  return { deletedPeriods, skippedPeriods };
 }
 
 export async function deleteTeacherActivityLeaderboardStudent({
@@ -3330,27 +2971,12 @@ export async function fetchSpellingLeaderboards({
   now = new Date(),
   limitCount = 10,
 }) {
-  const { db: firestore } = ensureFirebase();
-  const periodKeys = createLeaderboardPeriodKeys(now);
-  const leaderboardEntries = await Promise.all(
-    LEADERBOARD_PERIOD_DEFINITIONS.map(async ({ type, label }) => {
-      const periodResult = await fetchSpellingLeaderboardPeriod({
-        firestore,
-        schoolId,
-        grade: createMatchingLeaderboardGradeScope(type, grade),
-        periodType: type,
-        periodKey: periodKeys[type],
-        limitCount,
-      });
-      return [type, {
-        periodType: type,
-        periodKey: periodResult.periodKey,
-        label,
-        entries: periodResult.entries,
-      }];
-    }),
-  );
-  return Object.fromEntries(leaderboardEntries);
+  return spellingLeaderboardApi.fetchSpellingLeaderboards({
+    schoolId,
+    grade,
+    now,
+    limitCount,
+  });
 }
 
 export async function saveMatchingLeaderboardScore({
@@ -3619,46 +3245,20 @@ export async function saveSpellingLeaderboardScore({
   totalAttempts,
   now = new Date(),
 }) {
-  const { db: firestore } = ensureFirebase();
-  const cleanSchoolId = normalizeLeaderboardScope(schoolId);
-  const cleanSchoolName = normalizeLeaderboardText(schoolName);
-  const cleanGrade = normalizeLeaderboardScope(grade);
-  const cleanStudentName = normalizeStudentName(studentName);
-  if (!cleanSchoolId) throw new Error("School id is required.");
-  if (!cleanSchoolName) throw new Error("School name is required.");
-  if (!cleanGrade) throw new Error("Grade is required.");
-  if (!cleanStudentName) throw new Error("Student name is required.");
-
-  const validatedResult = validateSpellingLeaderboardResult({
-    score, elapsedSeconds, questionCount, correctCount, accuracy, revealedCount, totalAttempts,
+  return spellingLeaderboardApi.saveSpellingLeaderboardScore({
+    schoolId,
+    schoolName,
+    grade,
+    studentName,
+    score,
+    elapsedSeconds,
+    questionCount,
+    correctCount,
+    accuracy,
+    revealedCount,
+    totalAttempts,
+    now,
   });
-  const periodKeys = createLeaderboardPeriodKeys(now);
-  const updatedPeriods = [];
-  const skippedPeriods = [];
-  const failedPeriods = [];
-  let lastError = null;
-  for (const { type } of LEADERBOARD_PERIOD_DEFINITIONS) {
-    try {
-      const result = await upsertSpellingLeaderboardPeriod({
-        firestore,
-        schoolId: cleanSchoolId,
-        schoolName: cleanSchoolName,
-        grade: createMatchingLeaderboardGradeScope(type, cleanGrade),
-        studentName: cleanStudentName,
-        periodType: type,
-        periodKey: periodKeys[type],
-        ...validatedResult,
-      });
-      (result === "skipped" ? skippedPeriods : updatedPeriods).push(type);
-    } catch (error) {
-      failedPeriods.push(type);
-      lastError = error;
-    }
-  }
-  if (failedPeriods.length > 0 && updatedPeriods.length === 0 && skippedPeriods.length === 0) {
-    throw lastError ?? new Error("리더보드 점수를 저장하지 못했습니다.");
-  }
-  return { updatedPeriods, skippedPeriods, failedPeriods };
 }
 
 function createBingoSessionRef(firestore, sessionId) {

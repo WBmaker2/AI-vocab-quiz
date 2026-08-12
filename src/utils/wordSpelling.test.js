@@ -4,6 +4,7 @@ import {
   calculateSpellingAccuracy,
   calculateSpellingAttemptScore,
   createSpellingMask,
+  createSpellingQuestions,
   isSpellingAnswerCorrect,
   normalizeSpellingItems,
 } from "./wordSpelling.js";
@@ -56,6 +57,33 @@ test("uses the configured clue count for short and medium words", () => {
     createSpellingMask("responsibility", { random: () => 0 }).visibleIndexes.length,
     4,
   );
+});
+
+test("keeps one-letter words fully hidden", () => {
+  const mask = createSpellingMask("I", { random: () => 0 });
+
+  assert.deepEqual(mask.visibleIndexes, []);
+  assert.equal(mask.displayText, "_");
+  assert.equal(mask.characters[0].visible, false);
+});
+
+test("keeps mask history across a second game for the same item set", () => {
+  const usedMasksByWord = new Map();
+  const items = normalizeSpellingItems([
+    { id: "computer", word: "computer", meaning: "컴퓨터" },
+  ]);
+
+  const firstGame = createSpellingQuestions(items, {
+    usedMasksByWord,
+    random: () => 0,
+  });
+  const secondGame = createSpellingQuestions(items, {
+    usedMasksByWord,
+    random: () => 0,
+  });
+
+  assert.notEqual(firstGame[0].mask.signature, secondGame[0].mask.signature);
+  assert.equal(secondGame[0].word, items[0].word);
 });
 
 test("avoids a used mask signature when another pattern exists", () => {
