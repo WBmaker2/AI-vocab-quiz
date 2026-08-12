@@ -44,13 +44,19 @@ export function isSpellingAnswerCorrect(input, expectedWord) {
 
 export function createSpellingQuestions(items, options = {}) {
   const usedMasksByWord = options.usedMasksByWord ?? new Map();
+  const lastSignatureByWord = options.lastSignatureByWord ?? new Map();
   const random = options.random ?? Math.random;
 
   return (Array.isArray(items) ? items : []).map((item) => {
     const usedSignatures = usedMasksByWord.get(item.normalizedWord) ?? new Set();
-    const mask = createSpellingMask(item.word, { usedSignatures, random });
+    const mask = createSpellingMask(item.word, {
+      usedSignatures,
+      previousSignature: lastSignatureByWord.get(item.normalizedWord),
+      random,
+    });
     usedSignatures.add(mask.signature);
     usedMasksByWord.set(item.normalizedWord, usedSignatures);
+    lastSignatureByWord.set(item.normalizedWord, mask.signature);
 
     return { ...item, mask };
   });
@@ -97,7 +103,7 @@ function createMaskCandidates(letterIndexes, clueCount) {
   ]);
 }
 
-function chooseMaskIndexes(candidates, usedSignatures, random) {
+function chooseMaskIndexes(candidates, usedSignatures, random, previousSignature) {
   const randomValue = Number(random());
   const safeRandom = Number.isFinite(randomValue) ? randomValue : 0;
   const start = Math.min(candidates.length - 1, Math.max(0, Math.floor(safeRandom * candidates.length)));
@@ -111,10 +117,10 @@ function chooseMaskIndexes(candidates, usedSignatures, random) {
   }
 
   const fallbackIndex = (start + 1) % candidates.length;
-  const previousSignature = [...usedSignatures].at(-1);
+  const actualPreviousSignature = previousSignature ?? [...usedSignatures].at(-1);
   let fallback = candidates[fallbackIndex] || candidates[0];
 
-  if (candidates.length > 1 && fallback.join(",") === previousSignature) {
+  if (candidates.length > 1 && fallback.join(",") === actualPreviousSignature) {
     fallback = candidates[(fallbackIndex + 1) % candidates.length];
   }
 
@@ -128,6 +134,7 @@ export function createSpellingMask(word, options = {}) {
     .map((character, index) => (isSpellingLetter(character) ? index : -1))
     .filter((index) => index >= 0);
   const usedSignatures = options.usedSignatures ?? new Set();
+  const previousSignature = options.previousSignature;
   const random = options.random ?? Math.random;
   const clueCount = letterIndexes.length === 1
     ? 0
@@ -153,7 +160,12 @@ export function createSpellingMask(word, options = {}) {
       displayText: normalizedWord,
     };
   }
-  const { candidate, signature } = chooseMaskIndexes(candidates, usedSignatures, random);
+  const { candidate, signature } = chooseMaskIndexes(
+    candidates,
+    usedSignatures,
+    random,
+    previousSignature,
+  );
   const visibleSet = new Set(candidate);
 
   const maskCharacters = characters.map((character, index) => {

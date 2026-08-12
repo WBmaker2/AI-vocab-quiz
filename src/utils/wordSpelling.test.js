@@ -69,21 +69,42 @@ test("keeps one-letter words fully hidden", () => {
 
 test("keeps mask history across a second game for the same item set", () => {
   const usedMasksByWord = new Map();
+  const lastSignatureByWord = new Map();
   const items = normalizeSpellingItems([
     { id: "computer", word: "computer", meaning: "컴퓨터" },
   ]);
 
   const firstGame = createSpellingQuestions(items, {
     usedMasksByWord,
+    lastSignatureByWord,
     random: () => 0,
   });
   const secondGame = createSpellingQuestions(items, {
     usedMasksByWord,
+    lastSignatureByWord,
     random: () => 0,
   });
 
   assert.notEqual(firstGame[0].mask.signature, secondGame[0].mask.signature);
   assert.equal(secondGame[0].word, items[0].word);
+});
+
+test("does not repeat the previous mask after deterministic candidate exhaustion", () => {
+  const usedMasksByWord = new Map();
+  const lastSignatureByWord = new Map();
+  const items = normalizeSpellingItems([
+    { id: "cat", word: "cat", meaning: "고양이" },
+  ]);
+  const signatures = Array.from({ length: 8 }, () => createSpellingQuestions(items, {
+    usedMasksByWord,
+    lastSignatureByWord,
+    random: () => 0,
+  })[0].mask.signature);
+
+  assert.equal(usedMasksByWord.get("cat").size, 3);
+  for (let index = 1; index < signatures.length; index += 1) {
+    assert.notEqual(signatures[index], signatures[index - 1]);
+  }
 });
 
 test("avoids a used mask signature when another pattern exists", () => {

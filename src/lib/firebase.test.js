@@ -9,6 +9,7 @@ import {
   validateTypingLeaderboardResult,
 } from "./firebase.js";
 import * as firebase from "./firebase.js";
+import { compareSpellingLeaderboardEntries } from "./spellingLeaderboard.js";
 
 test("shouldReplaceElapsedLeaderboardEntry updates when the existing score is lower", () => {
   assert.equal(
@@ -225,6 +226,18 @@ test("validates the exact spelling score for every completed-question outcome", 
     }).score,
     10,
   );
+});
+
+test("spelling leaderboard comparator returns zero for a complete tie", () => {
+  const entry = {
+    score: 210,
+    correctCount: 2,
+    totalAttempts: 5,
+    elapsedSeconds: 60,
+    updatedAt: { toMillis: () => 1000 },
+  };
+
+  assert.equal(compareSpellingLeaderboardEntries(entry, { ...entry }), 0);
 });
 
 test("rejects impossible spelling leaderboard metrics", () => {

@@ -25,6 +25,7 @@ export function WordSpellingGame({
   const startedAtRef = useRef(0);
   const completionCelebratedRef = useRef(false);
   const usedMasksByWordRef = useRef(new Map());
+  const lastMaskSignatureByWordRef = useRef(new Map());
   const [phase, setPhase] = useState("ready");
   const [questions, setQuestions] = useState([]);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -65,6 +66,7 @@ export function WordSpellingGame({
 
   useEffect(() => {
     usedMasksByWordRef.current.clear();
+    lastMaskSignatureByWordRef.current.clear();
     resetGameState();
   }, [itemSetSignature]);
 
@@ -83,6 +85,7 @@ export function WordSpellingGame({
   useEffect(() => () => {
     window.clearTimeout(transitionTimerRef.current);
     usedMasksByWordRef.current.clear();
+    lastMaskSignatureByWordRef.current.clear();
   }, []);
 
   const canStart = spellingItems.length > 0;
@@ -115,6 +118,7 @@ export function WordSpellingGame({
 
     const nextQuestions = createSpellingQuestions(spellingItems, {
       usedMasksByWord: usedMasksByWordRef.current,
+      lastSignatureByWord: lastMaskSignatureByWordRef.current,
     });
 
     window.clearTimeout(transitionTimerRef.current);

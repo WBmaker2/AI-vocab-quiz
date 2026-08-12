@@ -107,10 +107,7 @@ export function validateSpellingLeaderboardResult({
   };
 }
 
-export function pickBetterSpellingLeaderboardEntry(left, right) {
-  if (!left) return right ?? null;
-  if (!right) return left;
-
+export function compareSpellingLeaderboardEntries(left, right) {
   const comparisons = [
     Number(right.score ?? 0) - Number(left.score ?? 0),
     Number(right.correctCount ?? 0) - Number(left.correctCount ?? 0),
@@ -121,9 +118,14 @@ export function pickBetterSpellingLeaderboardEntry(left, right) {
     (toMillis(right.updatedAt) || toMillis(right.createdAt))
       - (toMillis(left.updatedAt) || toMillis(left.createdAt)),
   ];
-  const firstDifference = comparisons.find((value) => value !== 0);
+  return comparisons.find((value) => value !== 0) ?? 0;
+}
 
-  return firstDifference === undefined || firstDifference <= 0 ? left : right;
+export function pickBetterSpellingLeaderboardEntry(left, right) {
+  if (!left) return right ?? null;
+  if (!right) return left;
+
+  return compareSpellingLeaderboardEntries(left, right) <= 0 ? left : right;
 }
 
 function toMillis(value) {
@@ -264,10 +266,7 @@ async function fetchPeriod({ firestore, schoolId, grade, periodType, periodKey, 
   ));
   const entries = snapshot.docs
     .map((item) => ({ id: item.id, ...item.data() }))
-    .sort((left, right) => {
-      const winner = pickBetterSpellingLeaderboardEntry(left, right);
-      return winner === right ? 1 : winner === left ? -1 : 0;
-    })
+    .sort(compareSpellingLeaderboardEntries)
     .slice(0, limitCount)
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
