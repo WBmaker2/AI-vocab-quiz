@@ -702,7 +702,11 @@ export function TeacherWorkspace({
         className="teacher-workspace-tab-panel"
       >
         {activeTab === "leaderboard" ? (
-          <TeacherLeaderboardTab profile={profile} leaderboard={leaderboard} />
+          <TeacherLeaderboardTab
+            profile={profile}
+            gradeOptions={gradeOptions}
+            leaderboard={leaderboard}
+          />
         ) : null}
 
         {activeTab === "bulk" ? (

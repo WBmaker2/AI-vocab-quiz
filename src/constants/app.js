@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.12.3",
+    date: "2026-08-12",
+    summary: [
+      "교사 리더보드에 조회 학년 선택을 추가해 다른 학년에서 저장한 철자 완성 점수도 바로 확인할 수 있게 했습니다.",
+      "리더보드 조회 학년은 단어 세트 편집 학년과 분리해, 점수를 확인해도 현재 관리 중인 단어 세트가 바뀌지 않도록 보완했습니다.",
+    ],
+  },
+  {
     version: "v1.12.2",
     date: "2026-08-12",
     summary: [

@@ -34,9 +34,14 @@ export function useTeacherLeaderboards({
   const [status, setStatus] = useState("");
   const [tab, setTab] = useState("week");
   const [activityType, setActivityType] = useState("matching");
+  const [leaderboardGrade, setLeaderboardGrade] = useState(grade ?? "");
   const [editingName, setEditingName] = useState("");
   const [draftName, setDraftName] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLeaderboardGrade(grade ?? "");
+  }, [grade]);
 
   useEffect(() => {
     if (!isFirebaseConfigured || userId) {
@@ -48,6 +53,7 @@ export function useTeacherLeaderboards({
     setError("");
     setStatus("");
     setTab("week");
+    setLeaderboardGrade("");
     setEditingName("");
     setDraftName("");
     setSaving(false);
@@ -55,7 +61,7 @@ export function useTeacherLeaderboards({
   }, [userId]);
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !schoolId || !grade) {
+    if (!isFirebaseConfigured || !schoolId || !leaderboardGrade) {
       setBoards({});
       setLoading(false);
       setError("");
@@ -76,7 +82,7 @@ export function useTeacherLeaderboards({
         const nextBoards = await fetchTeacherActivityLeaderboards({
           activityType,
           schoolId,
-          grade,
+          grade: leaderboardGrade,
           limitCount: 20,
         });
 
@@ -105,7 +111,7 @@ export function useTeacherLeaderboards({
     return () => {
       cancelled = true;
     };
-  }, [activityType, formatErrorMessage, grade, schoolId]);
+  }, [activityType, formatErrorMessage, leaderboardGrade, schoolId]);
 
   function updateActivityType(nextType) {
     setActivityType(nextType);
@@ -116,7 +122,7 @@ export function useTeacherLeaderboards({
   }
 
   function refresh() {
-    if (!schoolId || !grade) {
+    if (!schoolId || !leaderboardGrade) {
       setBoards({});
       return Promise.resolve();
     }
@@ -128,7 +134,7 @@ export function useTeacherLeaderboards({
     return fetchTeacherActivityLeaderboards({
       activityType,
       schoolId,
-      grade,
+      grade: leaderboardGrade,
       limitCount: 20,
     })
       .then((nextBoards) => {
@@ -163,7 +169,7 @@ export function useTeacherLeaderboards({
   }
 
   async function renameStudent(oldName, newName) {
-    if (!schoolId || !grade) {
+    if (!schoolId || !leaderboardGrade) {
       setError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
       return false;
     }
@@ -200,7 +206,7 @@ export function useTeacherLeaderboards({
       const result = await renameTeacherActivityLeaderboardStudent({
         activityType,
         schoolId,
-        grade,
+        grade: leaderboardGrade,
         oldStudentName: cleanOldName,
         newStudentName: cleanNewName,
       });
@@ -235,7 +241,7 @@ export function useTeacherLeaderboards({
   }
 
   async function deleteStudent(studentName) {
-    if (!schoolId || !grade) {
+    if (!schoolId || !leaderboardGrade) {
       setError("학교와 학년 정보를 확인한 뒤 다시 시도해 주세요.");
       return false;
     }
@@ -265,7 +271,7 @@ export function useTeacherLeaderboards({
       const result = await deleteTeacherActivityLeaderboardStudent({
         activityType,
         schoolId,
-        grade,
+        grade: leaderboardGrade,
         studentName: cleanStudentName,
       });
 
@@ -305,6 +311,8 @@ export function useTeacherLeaderboards({
     setTab,
     activityType,
     setActivityType: updateActivityType,
+    leaderboardGrade,
+    setLeaderboardGrade,
     editingName,
     draftName,
     saving,

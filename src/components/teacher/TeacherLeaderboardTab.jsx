@@ -5,7 +5,7 @@ import {
   TEACHER_ACTIVITY_LEADERBOARD_DEFINITIONS,
 } from "./teacherLeaderboardView.js";
 
-export function TeacherLeaderboardTab({ profile, leaderboard }) {
+export function TeacherLeaderboardTab({ profile, gradeOptions = [], leaderboard }) {
   const activeLeaderboardDefinition = getTeacherActivityLeaderboardDefinition(
     leaderboard?.activityType,
   );
@@ -78,6 +78,23 @@ export function TeacherLeaderboardTab({ profile, leaderboard }) {
           {leaderboard?.status ? (
             <p className="inline-hint success-hint">{leaderboard.status}</p>
           ) : null}
+
+          <label className="teacher-leaderboard-grade-field">
+            <span>조회 학년</span>
+            <select
+              value={leaderboard?.leaderboardGrade ?? ""}
+              onChange={(event) =>
+                leaderboard?.setLeaderboardGrade?.(event.target.value)
+              }
+              disabled={leaderboard?.loading || leaderboard?.saving}
+            >
+              {gradeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <div
             className="matching-leaderboard-tabs"
