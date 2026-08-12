@@ -82,6 +82,24 @@ async function run() {
     await assertVisible(page, "AI 원어민 단어 퀴즈 쇼");
     await updateInfoButton.waitFor({ state: "visible" });
 
+    const activityButtons = await page
+      .locator('section[aria-labelledby="game-activity-label"] button')
+      .allTextContents();
+    const normalizedButtons = activityButtons.map((text) => text.trim());
+    const fishingIndex = normalizedButtons.indexOf("단어 낚시");
+    const spellingIndex = normalizedButtons.indexOf("철자 완성 게임");
+    const typingIndex = normalizedButtons.indexOf("영어 단어 타자 게임");
+
+    if (
+      fishingIndex === -1 ||
+      spellingIndex === -1 ||
+      typingIndex === -1 ||
+      fishingIndex >= spellingIndex ||
+      spellingIndex >= typingIndex
+    ) {
+      throw new Error("Spelling activity button order is incorrect.");
+    }
+
     for (const viewport of [
       { width: 360, height: 800 },
       { width: 768, height: 900 },

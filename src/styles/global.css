@@ -1432,6 +1432,179 @@ button:disabled {
   background: #fff4e6;
 }
 
+.word-spelling-shell {
+  margin-top: 1rem;
+  min-width: 0;
+}
+
+.word-spelling-grid {
+  align-items: start;
+  min-width: 0;
+}
+
+.word-spelling-start-card,
+.word-spelling-result-card {
+  margin-top: 1rem;
+  min-width: 0;
+}
+
+.word-spelling-rule-grid,
+.word-spelling-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.word-spelling-rule-card,
+.word-spelling-summary-card {
+  min-width: 0;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(23, 50, 77, 0.08);
+  border-radius: 20px;
+  background: rgba(249, 251, 255, 0.96);
+}
+
+.word-spelling-rule-card span,
+.word-spelling-summary-card span {
+  display: block;
+  color: #5d6f81;
+}
+
+.word-spelling-rule-card strong,
+.word-spelling-summary-card strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.55rem;
+  overflow-wrap: anywhere;
+}
+
+.word-spelling-scoreboard {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.word-spelling-mask-card,
+.word-spelling-input-card,
+.word-spelling-feedback-card,
+.word-spelling-tip-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.word-spelling-attempt-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.2rem;
+  max-width: 100%;
+  padding: 0.42rem 0.84rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 239, 210, 0.96), rgba(236, 245, 255, 0.96));
+  color: #c76500;
+  font-size: 0.84rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.word-spelling-clue-card {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(255, 246, 225, 0.94), rgba(238, 247, 255, 0.94));
+}
+
+.word-spelling-clue-card > span {
+  color: #5d6f81;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.word-spelling-mask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.18rem;
+  min-width: 0;
+  color: #17324d;
+  font-size: clamp(1.8rem, 3.5vw, 3rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.word-spelling-mask-character {
+  display: inline-flex;
+  min-width: 0.72em;
+  justify-content: center;
+}
+
+.word-spelling-mask-hidden {
+  border-bottom: 0.14em solid #d56d00;
+  background: rgba(255, 225, 161, 0.72);
+  color: #9b5b00;
+}
+
+.word-spelling-input-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  margin-top: 1rem;
+  min-width: 0;
+}
+
+.word-spelling-textbox {
+  min-width: 0;
+  min-height: 4rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(23, 50, 77, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #17324d;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.word-spelling-textbox:focus {
+  outline: none;
+  border-color: rgba(29, 143, 255, 0.3);
+  box-shadow: 0 0 0 4px rgba(29, 143, 255, 0.12);
+}
+
+.word-spelling-feedback {
+  min-height: 5.2rem;
+}
+
+.word-spelling-feedback-idle {
+  background: #f5f9fd;
+}
+
+.word-spelling-feedback-correct {
+  background: #e7f9ef;
+}
+
+.word-spelling-feedback-wrong,
+.word-spelling-feedback-revealed {
+  background: #fff4e6;
+}
+
+.gi-pulse {
+  animation: gi-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes gi-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(29, 143, 255, 0.12);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(29, 143, 255, 0.03);
+  }
+}
+
 .progression-panel {
   margin-top: 1rem;
   padding: 1.15rem;
@@ -2826,6 +2999,14 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .word-spelling-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .word-spelling-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .bingo-setup-board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2925,7 +3106,9 @@ button:disabled {
   .word-fishing-rule-grid,
   .word-fishing-summary-grid,
   .word-typing-rule-grid,
-  .word-typing-summary-grid {
+  .word-typing-summary-grid,
+  .word-spelling-rule-grid,
+  .word-spelling-summary-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2978,8 +3161,14 @@ button:disabled {
   }
 
   .word-typing-input-form,
-  .word-typing-hint-row {
+  .word-typing-hint-row,
+  .word-spelling-input-form {
     grid-template-columns: 1fr;
+  }
+
+  .word-spelling-shell .matching-leaderboard-item {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .word-fishing-card {
@@ -3178,6 +3367,19 @@ button:disabled {
   .word-fishing-target strong {
     font-size: clamp(1.75rem, 11vw, 2.5rem);
   }
+
+  .word-spelling-mask {
+    gap: 0.1rem;
+    font-size: clamp(1.45rem, 9vw, 2.4rem);
+  }
+
+  .word-spelling-mask-character {
+    min-width: 0.62em;
+  }
+
+  .word-spelling-attempt-badge {
+    white-space: normal;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3192,5 +3394,9 @@ button:disabled {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .gi-pulse {
+    animation: none;
   }
 }

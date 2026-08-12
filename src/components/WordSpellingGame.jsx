@@ -235,7 +235,7 @@ export function WordSpellingGame({
     : "영어 단어 단서";
 
   return (
-    <section className="workspace-panel word-typing-shell">
+    <section className="workspace-panel word-spelling-shell">
       <div className="section-heading">
         <div>
           <p className="mode-label">Spelling Completion</p>
@@ -246,9 +246,9 @@ export function WordSpellingGame({
         </button>
       </div>
 
-      <div className="quiz-grid word-typing-grid">
+      <div className="quiz-grid word-spelling-grid">
         <div className="quiz-main">
-          <article className="scoreboard-card word-typing-scoreboard" aria-label="철자 완성 게임 상태">
+          <article className="scoreboard-card word-spelling-scoreboard" aria-label="철자 완성 게임 상태">
             <div>
               <span>현재 문제</span>
               <strong>{questionIndex + 1} / {questionCount}</strong>
@@ -264,7 +264,7 @@ export function WordSpellingGame({
           </article>
 
           <article
-            className="question-card word-typing-prompt-card"
+            className="question-card word-spelling-mask-card"
             aria-label={maskLabel}
           >
             <div className="question-head">
@@ -272,14 +272,17 @@ export function WordSpellingGame({
                 <p className="mode-label">Hidden Spelling Clue</p>
                 <h3>가려진 철자를 보고 단어를 완성해 보세요</h3>
               </div>
-              <span className="word-typing-combo-badge">{attemptCount}회 입력</span>
+              <span className="word-spelling-attempt-badge">{attemptCount}회 입력</span>
             </div>
 
-            <div className="word-typing-meaning-card">
+            <div className="word-spelling-clue-card">
               <span>영어 단어 단서</span>
-              <strong className="word-typing-meaning">
+              <strong className="word-spelling-mask">
                 {activeQuestion?.mask.characters.map((character, index) => (
-                  <span key={`${activeQuestion.id}-${index}`}>
+                  <span
+                    key={`${activeQuestion.id}-${index}`}
+                    className={character.visible ? "word-spelling-mask-character" : "word-spelling-mask-character word-spelling-mask-hidden"}
+                  >
                     {character.visible ? character.value : "_"}
                   </span>
                 ))}
@@ -288,16 +291,16 @@ export function WordSpellingGame({
             </div>
           </article>
 
-          <article className="question-card word-typing-input-card">
+          <article className="question-card word-spelling-input-card">
             <h3>영어 철자 입력</h3>
-            <form className="word-typing-input-form" onSubmit={handleSubmit}>
+            <form className="word-spelling-input-form" onSubmit={handleSubmit}>
               <label className="sr-only" htmlFor="spelling-answer-input">
                 영어 철자를 입력하세요
               </label>
               <input
                 ref={inputRef}
                 id="spelling-answer-input"
-                className="word-typing-textbox"
+                className="word-spelling-textbox"
                 type="text"
                 value={currentInput}
                 onChange={(event) => setCurrentInput(event.target.value)}
@@ -308,7 +311,7 @@ export function WordSpellingGame({
                 enterKeyHint="done"
                 disabled={questionCompleted}
               />
-              <button className="primary-button" type="submit" disabled={questionCompleted}>
+              <button className="primary-button gi-pulse" type="submit" disabled={questionCompleted}>
                 입력 확인
               </button>
             </form>
@@ -316,10 +319,10 @@ export function WordSpellingGame({
         </div>
 
         <div className="quiz-side">
-          <article className="hint-card word-typing-feedback-card">
+          <article className="hint-card word-spelling-feedback-card">
             <p className="mode-label">Spelling Feedback</p>
             <h3>입력 결과</h3>
-            <div className={`feedback-card word-typing-feedback word-typing-feedback-${feedbackTone}`} aria-live="polite">
+            <div className={`feedback-card word-spelling-feedback word-spelling-feedback-${feedbackTone}`} aria-live="polite">
               <p>{feedbackMessage}</p>
             </div>
             <div className="feedback-meta">
@@ -328,7 +331,7 @@ export function WordSpellingGame({
             </div>
           </article>
 
-          <article className="hint-card word-typing-tip-card">
+          <article className="hint-card word-spelling-tip-card">
             <p className="mode-label">Spelling Progress</p>
             <h3>진행 상황</h3>
             <div className="progression-metrics">

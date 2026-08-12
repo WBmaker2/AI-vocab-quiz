@@ -331,7 +331,7 @@ export function GameLeaderboardPanel({
                 </label>
                 <div className="matching-leaderboard-actions">
                   <button
-                    className="primary-button"
+                    className={`primary-button${activityType === "spelling" ? " gi-pulse" : ""}`}
                     type="button"
                     onClick={() => void handleSaveScore()}
                     disabled={savingScore}

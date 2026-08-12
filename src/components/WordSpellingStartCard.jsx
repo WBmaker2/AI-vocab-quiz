@@ -1,6 +1,6 @@
 export function WordSpellingStartCard({ canStart, itemCount, onStart, onBack }) {
   return (
-    <section className="workspace-panel word-typing-shell">
+    <section className="workspace-panel word-spelling-shell">
       <div className="section-heading">
         <div>
           <p className="mode-label">Spelling Completion</p>
@@ -11,7 +11,7 @@ export function WordSpellingStartCard({ canStart, itemCount, onStart, onBack }) 
         </button>
       </div>
 
-      <article className="form-card word-typing-start-card">
+      <article className="form-card word-spelling-start-card">
         <p className="mode-label">Spelling Completion Mode</p>
         <h3>가려진 철자를 보고 영어 단어 전체를 입력해 보세요</h3>
         <p className="question-copy">
@@ -19,20 +19,20 @@ export function WordSpellingStartCard({ canStart, itemCount, onStart, onBack }) 
           세 번까지 입력할 수 있고, 정확하게 맞힐수록 더 높은 점수를 얻습니다.
         </p>
 
-        <div className="word-typing-rule-grid">
-          <article className="word-typing-rule-card">
+        <div className="word-spelling-rule-grid">
+          <article className="word-spelling-rule-card">
             <span>현재 문제 수</span>
             <strong>{itemCount}개</strong>
           </article>
-          <article className="word-typing-rule-card">
+          <article className="word-spelling-rule-card">
             <span>입력 기회</span>
             <strong>문제당 3번</strong>
           </article>
-          <article className="word-typing-rule-card">
+          <article className="word-spelling-rule-card">
             <span>힌트 방식</span>
             <strong>일부 철자 공개</strong>
           </article>
-          <article className="word-typing-rule-card">
+          <article className="word-spelling-rule-card">
             <span>점수</span>
             <strong>정확할수록 높게</strong>
           </article>

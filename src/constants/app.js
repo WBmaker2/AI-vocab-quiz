@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.12.0",
+    date: "2026-08-09",
+    summary: [
+      "학생 홈의 단어 낚시와 영어 단어 타자 게임 사이에 철자 완성 게임을 추가했습니다.",
+      "단어 길이에 따라 중간 철자 단서를 랜덤으로 보여주고, 3회 시도 점수와 독립 철자 리더보드 등록을 지원합니다.",
+    ],
+  },
+  {
     version: "v1.11.2",
     date: "2026-07-16",
     summary: [
