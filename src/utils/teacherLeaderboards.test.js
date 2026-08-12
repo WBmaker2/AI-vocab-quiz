@@ -15,6 +15,16 @@ test("getTeacherActivityLeaderboardDefinition returns the typing definition", ()
   });
 });
 
+test("getTeacherActivityLeaderboardDefinition returns the spelling definition", () => {
+  const definition = getTeacherActivityLeaderboardDefinition("spelling");
+
+  assert.deepEqual(definition, {
+    type: "spelling",
+    label: "철자 완성",
+    collectionName: "spellingLeaderboards",
+  });
+});
+
 test("summarizeTeacherLeaderboardOutcome joins localized period labels", () => {
   const summary = summarizeTeacherLeaderboardOutcome(
     ["week", "school_all"],

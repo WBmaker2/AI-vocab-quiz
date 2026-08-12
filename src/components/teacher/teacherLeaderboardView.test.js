@@ -35,6 +35,22 @@ test("formatTeacherLeaderboardEntryDetail includes typing-specific metrics", () 
   );
 });
 
+test("formatTeacherLeaderboardEntryDetail includes spelling-specific metrics", () => {
+  const detail = formatTeacherLeaderboardEntryDetail(
+    {
+      elapsedSeconds: 42,
+      correctCount: 9,
+      questionCount: 10,
+      revealedCount: 1,
+      totalAttempts: 12,
+    },
+    "spelling",
+    "week",
+  );
+
+  assert.equal(detail, "00:42 · 정답 9/10 · 공개 1회 · 시도 12회");
+});
+
 test("formatTeacherLeaderboardEntryDetail prepends grade for school-wide matching boards", () => {
   const detail = formatTeacherLeaderboardEntryDetail(
     {

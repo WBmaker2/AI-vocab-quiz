@@ -29,6 +29,12 @@ export function formatTeacherLeaderboardEntryDetail(
     detailParts.push(`정답 ${entry.correctCount ?? 0}`);
     detailParts.push(`오답 ${entry.wrongCount ?? 0}`);
     detailParts.push(`놓침 ${entry.missCount ?? 0}`);
+  } else if (activityType === "spelling") {
+    detailParts.push(
+      `정답 ${entry.correctCount ?? 0}/${entry.questionCount ?? 0}`,
+    );
+    detailParts.push(`공개 ${entry.revealedCount ?? 0}회`);
+    detailParts.push(`시도 ${entry.totalAttempts ?? 0}회`);
   } else if (activityType === "typing") {
     detailParts.push(
       `정답 ${entry.correctCount ?? 0}/${entry.questionCount ?? 0}`,

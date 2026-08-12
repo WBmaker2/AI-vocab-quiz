@@ -18,6 +18,11 @@ export const ACTIVITY_LEADERBOARD_DEFINITIONS = [
     collectionName: "fishingLeaderboards",
   },
   {
+    type: "spelling",
+    label: "철자 완성",
+    collectionName: "spellingLeaderboards",
+  },
+  {
     type: "typing",
     label: "영어 타자",
     collectionName: "typingLeaderboards",
@@ -66,6 +71,60 @@ function hasTypingMetrics(entry) {
     Object.prototype.hasOwnProperty.call(entry, "accuracy") ||
     Object.prototype.hasOwnProperty.call(entry, "bestCombo")
   );
+}
+
+function hasSpellingMetrics(entry) {
+  return Boolean(entry) && (
+    Object.prototype.hasOwnProperty.call(entry, "revealedCount") ||
+    Object.prototype.hasOwnProperty.call(entry, "totalAttempts")
+  );
+}
+
+function pickBetterSpellingLeaderboardEntry(left, right) {
+  if (!left) {
+    return right ?? null;
+  }
+
+  if (!right) {
+    return left;
+  }
+
+  const leftScore = Number(left.score ?? 0);
+  const rightScore = Number(right.score ?? 0);
+
+  if (leftScore !== rightScore) {
+    return rightScore > leftScore ? right : left;
+  }
+
+  const leftCorrectCount = Number(left.correctCount ?? 0);
+  const rightCorrectCount = Number(right.correctCount ?? 0);
+
+  if (leftCorrectCount !== rightCorrectCount) {
+    return rightCorrectCount > leftCorrectCount ? right : left;
+  }
+
+  const leftAttempts = Number(left.totalAttempts ?? Number.POSITIVE_INFINITY);
+  const rightAttempts = Number(right.totalAttempts ?? Number.POSITIVE_INFINITY);
+
+  if (leftAttempts !== rightAttempts) {
+    return rightAttempts < leftAttempts ? right : left;
+  }
+
+  const leftElapsed = Number(left.elapsedSeconds ?? Number.POSITIVE_INFINITY);
+  const rightElapsed = Number(right.elapsedSeconds ?? Number.POSITIVE_INFINITY);
+
+  if (leftElapsed !== rightElapsed) {
+    return rightElapsed < leftElapsed ? right : left;
+  }
+
+  const leftUpdatedAt = toMillis(left.updatedAt) || toMillis(left.createdAt);
+  const rightUpdatedAt = toMillis(right.updatedAt) || toMillis(right.createdAt);
+
+  if (leftUpdatedAt !== rightUpdatedAt) {
+    return rightUpdatedAt > leftUpdatedAt ? right : left;
+  }
+
+  return left;
 }
 
 function pickBetterTypingLeaderboardEntry(left, right) {
@@ -142,6 +201,10 @@ export function createActivityLeaderboardStudentKey(value) {
 }
 
 export function pickBetterActivityLeaderboardEntry(left, right) {
+  if (hasSpellingMetrics(left) || hasSpellingMetrics(right)) {
+    return pickBetterSpellingLeaderboardEntry(left, right);
+  }
+
   return hasTypingMetrics(left) || hasTypingMetrics(right)
     ? pickBetterTypingLeaderboardEntry(left, right)
     : pickBetterLeaderboardEntry(left, right);
