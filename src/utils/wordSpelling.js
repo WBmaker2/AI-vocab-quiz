@@ -96,7 +96,14 @@ function chooseMaskIndexes(candidates, usedSignatures, random) {
     }
   }
 
-  const fallback = candidates[(start + 1) % candidates.length] || candidates[0];
+  const fallbackIndex = (start + 1) % candidates.length;
+  const previousSignature = [...usedSignatures].at(-1);
+  let fallback = candidates[fallbackIndex] || candidates[0];
+
+  if (candidates.length > 1 && fallback.join(",") === previousSignature) {
+    fallback = candidates[(fallbackIndex + 1) % candidates.length];
+  }
+
   return { candidate: fallback, signature: fallback.join(",") };
 }
 

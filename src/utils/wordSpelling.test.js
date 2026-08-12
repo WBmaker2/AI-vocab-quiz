@@ -74,6 +74,34 @@ test("avoids a used mask signature when another pattern exists", () => {
   assert.notEqual(second.signature, first.signature);
 });
 
+test("avoids the immediately previous mask when the candidate pool is exhausted", () => {
+  const discoveryUsedSignatures = new Set();
+  const candidateSignatures = [];
+
+  for (let index = 0; index < 3; index += 1) {
+    const mask = createSpellingMask("cat", {
+      usedSignatures: discoveryUsedSignatures,
+      random: () => 0,
+    });
+    candidateSignatures.push(mask.signature);
+    discoveryUsedSignatures.add(mask.signature);
+  }
+
+  const usedSignatures = new Set([
+    candidateSignatures[0],
+    candidateSignatures[2],
+    candidateSignatures[1],
+  ]);
+  const fallback = createSpellingMask("cat", {
+    usedSignatures,
+    random: () => 0,
+  });
+
+  assert.equal(candidateSignatures.length, 3);
+  assert.equal([...usedSignatures].at(-1), candidateSignatures[1]);
+  assert.notEqual(fallback.signature, candidateSignatures[1]);
+});
+
 test("keeps separators visible in the display text", () => {
   const mask = createSpellingMask("ice-cream", { random: () => 0 });
 
