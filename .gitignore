@@ -5,6 +5,7 @@ site/
 playwright-report/
 test-results/
 .vercel
+.firebase/
 .env.local
 .worktrees/
 .superpowers/

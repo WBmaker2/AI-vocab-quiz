@@ -33,10 +33,12 @@ Spreadsheet bulk import accepts modern `.xlsx` files only. Re-save legacy
 
 ## Deployment
 
-This project is deployed with Vercel.
+Firebase Hosting is the current production target after the same-origin
+authentication migration.
 
-- Primary live URL: `talking-vacab-quiz.vercel.app`
-- Preferred workflow: code change -> `npm run build` -> git commit -> git push -> Vercel deploy
+- Firebase Hosting live URL: `https://talking-vocab-quiz.web.app`
+- Firebase workflow: code change -> `npm run build:firebase` -> git commit -> git push -> `firebase deploy --only hosting`
+- Vercel fallback: `https://talking-vacab-quiz.vercel.app`
 - Shared vocabulary storage uses Firebase so teachers and students can work across different devices
 
 Before every deployment, add a concise entry to `src/constants/app.js` and a

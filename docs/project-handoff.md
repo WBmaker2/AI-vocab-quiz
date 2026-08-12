@@ -244,9 +244,34 @@
 
 ## 8. 현재 버전 기준 핵심 상태
 
-- 현재 반영 버전: **v1.12.0**
-- 배포 대상: **Vercel production**
-- 라이브 주소: <https://talking-vacab-quiz.vercel.app>
+- 현재 코드 버전: **v1.12.1**
+- 현재 라이브 배포: **Vercel production**
+- 현재 라이브 주소: <https://talking-vacab-quiz.vercel.app>
+- Firebase Hosting 라이브 주소: <https://talking-vocab-quiz.web.app>
+
+### 8.0.2 2026-08-12 Firebase Hosting 마이그레이션 및 배포
+
+1. **same-origin 인증 배포 경로 추가**
+   - Firebase Hosting 사이트 `talking-vocab-quiz`와 `.firebaserc`를 저장소에 연결
+   - `dist` SPA 배포와 client-side route fallback을 `firebase.json`에 추가
+   - `npm run build:firebase`가 production `authDomain`을
+     `talking-vocab-quiz.web.app`으로 주입하도록 구성
+
+2. **로그인 안정성 보강**
+   - Google popup 로그인 전에 Firebase Auth persistence 초기화를 기다림
+   - local storage가 막힌 브라우저에서는 session storage를 재시도
+   - Firestore collection, rules, 기존 Vercel 배포는 변경하지 않음
+
+3. **상태 및 다음 단계**
+   - `npm test`: 158개 통과
+   - `npm run test:rules`: 79개 통과
+   - `npm run build:firebase`, `npm run build`, `npm run test:smoke`: 통과
+   - Firebase Hosting production deploy 완료
+   - 공개 URL에서 `v1.12.1`, 콘솔 오류 0건, 실패 요청 0건, auth handler HTTP 200 확인
+   - 공개 URL 교사 로그인 팝업이 same-origin `/__/auth/handler`로 열리는 것을 확인
+   - Google 계정 선택 이후의 실제 교사 프로필 조회와 5·6학년 7~12단원 세트 불러오기는
+     교사 계정 확인이 필요한 후속 브라우저 검증으로 남김
+   - Vercel 주소는 예비 주소로 유지
 
 ### 8.0 2026-08-09 작업 기록
 

@@ -13,6 +13,11 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 ```
 
+For Firebase Hosting production builds, `npm run build:firebase` automatically
+uses the Hosting origin as `authDomain`. The default is
+`talking-vocab-quiz.web.app`; set `FIREBASE_HOSTING_AUTH_DOMAIN` when a custom
+Firebase Hosting domain is connected.
+
 ## Firebase Console steps
 
 1. Create a Firebase project.
@@ -21,6 +26,28 @@ VITE_FIREBASE_APP_ID=your_app_id
 4. Enable the Google provider in Authentication.
 5. Create a Firestore database in production mode.
 6. Apply the Firestore rules from `/firestore.rules`.
+
+## Firebase Hosting
+
+The repository is configured for the `talking-vocab-quiz` Hosting site. The
+build command creates `dist/`, injects `talking-vocab-quiz.web.app` as the
+production Auth domain, and is called automatically by the Hosting predeploy
+hook.
+
+```bash
+npm run build:firebase
+npx firebase hosting:channel:deploy migration-check
+npx firebase deploy --only hosting
+```
+
+Before production login testing, confirm these domains in Firebase
+Authentication and Google OAuth settings:
+
+- `talking-vocab-quiz.web.app`
+- `https://talking-vocab-quiz.web.app/__/auth/handler`
+
+The Vercel address can remain active as a fallback until the Firebase Hosting
+flow is verified.
 
 ## Firestore collections
 

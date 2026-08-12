@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.12.1",
+    date: "2026-08-12",
+    summary: [
+      "프론트엔드를 Firebase Hosting에 배포할 수 있도록 SPA 라우팅과 자동 빌드 설정을 추가했습니다.",
+      "Firebase Hosting 앱과 인증 도우미가 같은 출처를 사용하도록 구성하고, 로그인 전 인증 저장소 초기화를 기다리도록 보강했습니다.",
+    ],
+  },
+  {
     version: "v1.12.0",
     date: "2026-08-09",
     summary: [

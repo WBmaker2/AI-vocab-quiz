@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from "firebase/app";
 import {
   browserLocalPersistence,
+  browserSessionPersistence,
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -104,9 +105,27 @@ const app = isFirebaseConfigured
 export const auth = app ? getAuth(app) : null;
 export const db = app ? getFirestore(app) : null;
 
-if (auth) {
-  setPersistence(auth, browserLocalPersistence).catch(() => {});
+async function initializeAuthPersistence(firebaseAuth) {
+  try {
+    await setPersistence(firebaseAuth, browserLocalPersistence);
+    return "local";
+  } catch (localError) {
+    try {
+      await setPersistence(firebaseAuth, browserSessionPersistence);
+      return "session";
+    } catch (sessionError) {
+      console.warn(
+        "Firebase Auth persistence is unavailable; continuing with in-memory auth.",
+        { localError, sessionError },
+      );
+      return "memory";
+    }
+  }
 }
+
+const authPersistenceReady = auth
+  ? initializeAuthPersistence(auth)
+  : Promise.resolve("disabled");
 
 function ensureFirebase() {
   if (!auth || !db) {
@@ -2132,6 +2151,7 @@ export function subscribeToAuthChanges(callback) {
 
 export async function signInWithGoogle() {
   const { auth: firebaseAuth } = ensureFirebase();
+  await authPersistenceReady;
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
   await signInWithPopup(firebaseAuth, provider);
