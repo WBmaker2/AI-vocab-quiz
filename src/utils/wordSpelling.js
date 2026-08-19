@@ -193,6 +193,138 @@ export function createSpellingMask(word, options = {}) {
   };
 }
 
+function cloneSpellingCharacters(characters) {
+  return (Array.isArray(characters) ? characters : []).map((character) => ({
+    value: character.value,
+    visible: Boolean(character.visible),
+    separator: Boolean(character.separator),
+  }));
+}
+
+function buildSpellingHintDisplay(characters) {
+  return characters
+    .map((character) => (character.visible ? character.value : "_"))
+    .join("");
+}
+
+function getSpellingVisibleIndexes(characters) {
+  return characters
+    .map((character, index) => (character.visible ? index : -1))
+    .filter((index) => index >= 0);
+}
+
+function getSpellingHiddenIndexes(characters) {
+  return characters
+    .map((character, index) => (
+      !character.separator && !character.visible ? index : -1
+    ))
+    .filter((index) => index >= 0);
+}
+
+function getSpellingHintPriority(characters) {
+  const lastLetterIndex = characters.reduce(
+    (lastIndex, character, index) => (
+      character.separator ? lastIndex : index
+    ),
+    -1,
+  );
+
+  return getSpellingHiddenIndexes(characters).sort((left, right) => {
+    const leftEdgeDistance = Math.min(left, lastLetterIndex - left);
+    const rightEdgeDistance = Math.min(right, lastLetterIndex - right);
+
+    return leftEdgeDistance - rightEdgeDistance || left - right;
+  });
+}
+
+function getSpellingHintTarget(level, hiddenCount) {
+  if (hiddenCount <= 0) {
+    return 0;
+  }
+
+  if (level <= 1) {
+    return 1;
+  }
+
+  if (level === 2) {
+    return Math.min(hiddenCount, Math.max(2, Math.ceil(hiddenCount / 2)));
+  }
+
+  return hiddenCount;
+}
+
+function getSpellingHintLabel(level, answerRevealed) {
+  if (answerRevealed) {
+    return "정답 보고 따라 쓰기";
+  }
+
+  return level <= 0 ? "첫 글자 보여줘" : "한 칸 더 보여줘";
+}
+
+function createSpellingHintSnapshot(level, characters) {
+  const nextCharacters = cloneSpellingCharacters(characters);
+  const answerRevealed = getSpellingHiddenIndexes(nextCharacters).length === 0;
+
+  return {
+    level,
+    maxLevel: answerRevealed ? level : 3,
+    characters: nextCharacters,
+    visibleIndexes: getSpellingVisibleIndexes(nextCharacters),
+    displayText: buildSpellingHintDisplay(nextCharacters),
+    hintLabel: getSpellingHintLabel(level, answerRevealed),
+    answerRevealed,
+  };
+}
+
+export function createSpellingHintState(question) {
+  const characters = question?.mask?.characters ?? [];
+  return createSpellingHintSnapshot(0, characters);
+}
+
+export function isSpellingAnswerRevealed(hintState) {
+  return Boolean(
+    hintState?.answerRevealed ??
+      (Array.isArray(hintState?.characters) &&
+        hintState.characters.length > 0 &&
+        getSpellingHiddenIndexes(hintState.characters).length === 0),
+  );
+}
+
+export function revealNextSpellingHint(question, hintState) {
+  const baseCharacters = question?.mask?.characters ?? hintState?.characters ?? [];
+  const currentCharacters = cloneSpellingCharacters(
+    hintState?.characters ?? baseCharacters,
+  );
+  const currentHiddenIndexes = getSpellingHiddenIndexes(currentCharacters);
+
+  if (currentHiddenIndexes.length === 0) {
+    return createSpellingHintSnapshot(
+      Number.isInteger(hintState?.level) ? hintState.level : 0,
+      currentCharacters,
+    );
+  }
+
+  const currentLevel = Number.isInteger(hintState?.level) ? hintState.level : 0;
+  const nextLevel = Math.min(currentLevel + 1, 3);
+  const baseHiddenCount = getSpellingHiddenIndexes(baseCharacters).length;
+  const revealedCount = Math.max(0, baseHiddenCount - currentHiddenIndexes.length);
+  const targetCount = getSpellingHintTarget(nextLevel, baseHiddenCount);
+  const revealCount = Math.max(1, targetCount - revealedCount);
+  const priorityIndexes = getSpellingHintPriority(baseCharacters);
+  const indexesToReveal = priorityIndexes
+    .filter((index) => currentCharacters[index] && !currentCharacters[index].visible)
+    .slice(0, revealCount);
+
+  indexesToReveal.forEach((index) => {
+    currentCharacters[index] = {
+      ...currentCharacters[index],
+      visible: true,
+    };
+  });
+
+  return createSpellingHintSnapshot(nextLevel, currentCharacters);
+}
+
 export function calculateSpellingAttemptScore({ attemptsUsed, revealed } = {}) {
   if (revealed) {
     return 10;

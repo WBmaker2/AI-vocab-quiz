@@ -16,7 +16,8 @@ export function WordSpellingStartCard({ canStart, itemCount, onStart, onBack }) 
         <h3>가려진 철자를 보고 영어 단어 전체를 입력해 보세요</h3>
         <p className="question-copy">
           일부 철자만 보이는 단서를 살펴보고 영어 단어를 완성해 보세요. 문제마다
-          세 번까지 입력할 수 있고, 정확하게 맞힐수록 더 높은 점수를 얻습니다.
+          세 번까지 입력할 수 있고, 어려우면 도움 버튼으로 철자를 한 단계씩 더
+          확인할 수 있습니다. 정확하게 맞힐수록 더 높은 점수를 얻습니다.
         </p>
 
         <div className="word-spelling-rule-grid">
@@ -30,7 +31,7 @@ export function WordSpellingStartCard({ canStart, itemCount, onStart, onBack }) 
           </article>
           <article className="word-spelling-rule-card">
             <span>힌트 방식</span>
-            <strong>일부 철자 공개</strong>
+            <strong>도움 계단형</strong>
           </article>
           <article className="word-spelling-rule-card">
             <span>점수</span>

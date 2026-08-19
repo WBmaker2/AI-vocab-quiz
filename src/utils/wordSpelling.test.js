@@ -5,9 +5,12 @@ import {
   calculateSpellingAttemptScore,
   createSpellingMask,
   createSpellingQuestions,
+  createSpellingHintState,
   isSpellingNextQuestionShortcut,
+  isSpellingAnswerRevealed,
   isSpellingAnswerCorrect,
   normalizeSpellingItems,
+  revealNextSpellingHint,
 } from "./wordSpelling.js";
 
 test("normalizes spelling items and answers", () => {
@@ -166,4 +169,47 @@ test("keeps separators visible in the display text", () => {
   assert.equal(mask.characters[3].visible, true);
   assert.equal(mask.displayText.includes("-"), true);
   assert.equal(mask.displayText, mask.displayText.toLowerCase());
+});
+
+test("reveals spelling hints in helpful stages without changing separators", () => {
+  const item = normalizeSpellingItems([
+    { id: "breakfast", word: "breakfast", meaning: "아침 식사" },
+  ])[0];
+  const question = {
+    ...item,
+    mask: createSpellingMask(item.word, { random: () => 0 }),
+  };
+  const initial = createSpellingHintState(question);
+  const first = revealNextSpellingHint(question, initial);
+  const second = revealNextSpellingHint(question, first);
+
+  assert.equal(initial.level, 0);
+  assert.equal(first.level, 1);
+  assert.equal(second.level, 2);
+  assert.ok(first.characters.filter((character) => character.visible).length >
+    initial.characters.filter((character) => character.visible).length);
+  assert.ok(second.characters.filter((character) => character.visible).length >
+    first.characters.filter((character) => character.visible).length);
+  assert.equal(first.displayText, first.displayText.toLowerCase());
+  assert.equal(first.hintLabel, "한 칸 더 보여줘");
+});
+
+test("finishes the spelling hint ladder with a full answer state", () => {
+  const item = normalizeSpellingItems([
+    { id: "ice-cream", word: "ice-cream", meaning: "아이스크림" },
+  ])[0];
+  const question = {
+    ...item,
+    mask: createSpellingMask(item.word, { random: () => 0 }),
+  };
+  let hintState = createSpellingHintState(question);
+
+  while (!isSpellingAnswerRevealed(hintState)) {
+    hintState = revealNextSpellingHint(question, hintState);
+  }
+
+  assert.equal(hintState.displayText, "ice-cream");
+  assert.equal(hintState.characters[3].separator, true);
+  assert.equal(hintState.characters[3].visible, true);
+  assert.equal(hintState.hintLabel, "정답 보고 따라 쓰기");
 });

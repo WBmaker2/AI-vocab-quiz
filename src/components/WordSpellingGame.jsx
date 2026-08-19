@@ -5,9 +5,12 @@ import {
   calculateSpellingAccuracy,
   calculateSpellingAttemptScore,
   createSpellingQuestions,
+  createSpellingHintState,
   isSpellingNextQuestionShortcut,
+  isSpellingAnswerRevealed,
   isSpellingAnswerCorrect,
   normalizeSpellingItems,
+  revealNextSpellingHint,
   SPELLING_ATTEMPT_LIMIT,
 } from "../utils/wordSpelling.js";
 
@@ -39,6 +42,7 @@ export function WordSpellingGame({
   const [currentInput, setCurrentInput] = useState("");
   const [feedbackTone, setFeedbackTone] = useState("idle");
   const [feedbackMessage, setFeedbackMessage] = useState("가려진 철자를 보고 영어 단어를 입력해 보세요.");
+  const [hintState, setHintState] = useState(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const itemSetSignature = JSON.stringify(spellingItems.map((item) => [
     item.id,
@@ -62,6 +66,7 @@ export function WordSpellingGame({
     setCurrentInput("");
     setFeedbackTone("idle");
     setFeedbackMessage("가려진 철자를 보고 영어 단어를 입력해 보세요.");
+    setHintState(null);
     setElapsedMs(0);
   };
 
@@ -154,20 +159,45 @@ export function WordSpellingGame({
     setCurrentInput("");
     setFeedbackTone("idle");
     setFeedbackMessage("가려진 철자를 보고 영어 단어를 입력해 보세요.");
+    setHintState(createSpellingHintState(nextQuestions[0]));
     setElapsedMs(0);
     setPhase("playing");
   }
 
-  function completeCurrentQuestion(outcome) {
+  function completeCurrentQuestion(outcome, options = {}) {
     setQuestionCompleted(true);
     setFeedbackTone(outcome);
 
     if (outcome === "correct") {
-      setFeedbackMessage(`정답입니다! "${activeQuestion.word}"를 정확하게 썼어요.`);
+      setFeedbackMessage(
+        options.followUp
+          ? `정답을 보고 다시 써서 기억했어요! "${activeQuestion.word}"를 완성했습니다.`
+          : `정답입니다! "${activeQuestion.word}"를 정확하게 썼어요.`,
+      );
       void celebration?.playSuccess?.();
     } else {
       setFeedbackMessage(`정답은 "${activeQuestion.word}"입니다. 다음 문제에서 다시 도전해 보세요.`);
     }
+  }
+
+  function handleRevealHint() {
+    if (!activeQuestion || questionCompleted || isSpellingAnswerRevealed(hintState)) {
+      return;
+    }
+
+    const nextHintState = revealNextSpellingHint(
+      activeQuestion,
+      hintState ?? createSpellingHintState(activeQuestion),
+    );
+    setHintState(nextHintState);
+    setCurrentInput("");
+    setFeedbackTone("hint");
+    setFeedbackMessage(
+      nextHintState.answerRevealed
+        ? `정답이 모두 보였어요. 이제 "${activeQuestion.word}"를 직접 입력해 보세요.`
+        : `좋아요! 철자 단서가 늘었어요. 보이는 글자를 참고해 천천히 써 보세요.`,
+    );
+    inputRef.current?.focus();
   }
 
   function handleSubmit(event) {
@@ -191,7 +221,9 @@ export function WordSpellingGame({
     if (isSpellingAnswerCorrect(answer, activeQuestion.word)) {
       setScore((current) => current + calculateSpellingAttemptScore({ attemptsUsed: nextAttemptCount }));
       setCorrectCount((current) => current + 1);
-      completeCurrentQuestion("correct");
+      completeCurrentQuestion("correct", {
+        followUp: isSpellingAnswerRevealed(hintState),
+      });
       return;
     }
 
@@ -204,7 +236,9 @@ export function WordSpellingGame({
 
     setFeedbackTone("wrong");
     setFeedbackMessage(
-      `다시 한 번 살펴보고 써 보세요. ${SPELLING_ATTEMPT_LIMIT - nextAttemptCount}번 더 입력할 수 있어요.`,
+      isSpellingAnswerRevealed(hintState)
+        ? `보이는 철자를 따라 천천히 다시 써 보세요. ${SPELLING_ATTEMPT_LIMIT - nextAttemptCount}번 더 입력할 수 있어요.`
+        : `다시 한 번 살펴보고 써 보세요. ${SPELLING_ATTEMPT_LIMIT - nextAttemptCount}번 더 입력할 수 있어요.`,
     );
   }
 
@@ -225,6 +259,7 @@ export function WordSpellingGame({
     setCurrentInput("");
     setFeedbackTone("idle");
     setFeedbackMessage("가려진 철자를 보고 영어 단어를 입력해 보세요.");
+    setHintState(createSpellingHintState(questions[questionIndex + 1]));
   }
 
   if (phase === "ready") {
@@ -257,8 +292,11 @@ export function WordSpellingGame({
     );
   }
 
+  const activeHintState = hintState ?? (
+    activeQuestion ? createSpellingHintState(activeQuestion) : null
+  );
   const maskLabel = activeQuestion
-    ? `영어 단어 단서 ${activeQuestion.mask.displayText}, 뜻은 ${activeQuestion.meaning}`
+    ? `영어 단어 단서 ${activeHintState?.displayText ?? activeQuestion.mask.displayText}, 뜻은 ${activeQuestion.meaning}`
     : "영어 단어 단서";
 
   return (
@@ -305,7 +343,7 @@ export function WordSpellingGame({
             <div className="word-spelling-clue-card">
               <span>영어 단어 단서</span>
               <strong className="word-spelling-mask">
-                {activeQuestion?.mask.characters.map((character, index) => (
+                {activeHintState?.characters.map((character, index) => (
                   <span
                     key={`${activeQuestion.id}-${index}`}
                     className={character.visible ? "word-spelling-mask-character" : "word-spelling-mask-character word-spelling-mask-hidden"}
@@ -315,6 +353,25 @@ export function WordSpellingGame({
                 ))}
               </strong>
               <p className="question-copy">뜻: {activeQuestion?.meaning}</p>
+              <div className="word-spelling-hint-row">
+                <span className="word-spelling-hint-status" aria-live="polite">
+                  도움 단계 {Math.min(activeHintState?.level ?? 0, activeHintState?.maxLevel ?? 3)} / {activeHintState?.maxLevel ?? 3}
+                </span>
+                <button
+                  className={
+                    "ghost-button word-spelling-hint-button" +
+                    (!questionCompleted && !activeHintState?.answerRevealed ? " gi-pulse" : "")
+                  }
+                  type="button"
+                  onClick={handleRevealHint}
+                  disabled={questionCompleted || activeHintState?.answerRevealed}
+                  aria-label={activeHintState?.answerRevealed
+                    ? "정답이 모두 보였습니다. 단어를 직접 입력해 보세요."
+                    : "철자 힌트 받기"}
+                >
+                  {activeHintState?.hintLabel ?? "첫 글자 보여줘"}
+                </button>
+              </div>
             </div>
           </article>
 
@@ -354,6 +411,7 @@ export function WordSpellingGame({
             </div>
             <div className="feedback-meta">
               <span>정답은 한 문제당 세 번까지 입력할 수 있어요.</span>
+              <span>어려우면 도움 버튼으로 철자를 한 단계씩 더 확인할 수 있어요.</span>
               <span>결과가 나오면 Enter를 한 번 더 눌러 다음 문제로 이동할 수 있어요.</span>
             </div>
           </article>
