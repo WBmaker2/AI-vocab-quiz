@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { WordSpellingFeedbackModal } from "./WordSpellingFeedbackModal.jsx";
 import { WordSpellingResultCard } from "./WordSpellingResultCard.jsx";
 import { WordSpellingStartCard } from "./WordSpellingStartCard.jsx";
 import {
@@ -402,49 +403,20 @@ export function WordSpellingGame({
           </article>
         </div>
 
-        <div className="quiz-side">
-          <article className="hint-card word-spelling-feedback-card">
-            <p className="mode-label">Spelling Feedback</p>
-            <h3>입력 결과</h3>
-            <div className={`feedback-card word-spelling-feedback word-spelling-feedback-${feedbackTone}`} aria-live="polite">
-              <p>{feedbackMessage}</p>
-            </div>
-            <div className="feedback-meta">
-              <span>정답은 한 문제당 세 번까지 입력할 수 있어요.</span>
-              <span>어려우면 도움 버튼으로 철자를 한 단계씩 더 확인할 수 있어요.</span>
-              <span>결과가 나오면 Enter를 한 번 더 눌러 다음 문제로 이동할 수 있어요.</span>
-            </div>
-          </article>
-
-          <article className="hint-card word-spelling-tip-card">
-            <p className="mode-label">Spelling Progress</p>
-            <h3>진행 상황</h3>
-            <div className="progression-metrics">
-              <div className="progression-metric">
-                <span>맞힌 문제</span>
-                <strong>{correctCount}개</strong>
-              </div>
-              <div className="progression-metric">
-                <span>정확도</span>
-                <strong>{accuracy}%</strong>
-              </div>
-            </div>
-          </article>
-
-        </div>
       </div>
 
-      <div className="toolbar-row">
-        <button
-          className={`primary-button${questionCompleted ? " gi-pulse" : ""}`}
-          type="button"
-          onClick={moveToNextQuestion}
-          disabled={!questionCompleted}
-          aria-keyshortcuts="Enter"
-        >
-          {questionIndex >= questionCount - 1 ? "결과 보기" : "다음 문제"}
-        </button>
-      </div>
+      {questionCompleted ? (
+        <WordSpellingFeedbackModal
+          feedbackTone={feedbackTone}
+          feedbackMessage={feedbackMessage}
+          score={score}
+          correctCount={correctCount}
+          accuracy={accuracy}
+          questionIndex={questionIndex}
+          questionCount={questionCount}
+          onNext={moveToNextQuestion}
+        />
+      ) : null}
     </section>
   );
 }

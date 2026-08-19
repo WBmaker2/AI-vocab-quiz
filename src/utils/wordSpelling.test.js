@@ -36,11 +36,14 @@ test("calculates accuracy from completed questions", () => {
   assert.equal(calculateSpellingAccuracy(0, 0), 0);
 });
 
-test("recognizes only a fresh non-composing Enter as the next-question shortcut", () => {
+test("recognizes only fresh non-composing Enter or Space as the next-question shortcut", () => {
   assert.equal(isSpellingNextQuestionShortcut({ key: "Enter" }), true);
+  assert.equal(isSpellingNextQuestionShortcut({ key: " " }), true);
+  assert.equal(isSpellingNextQuestionShortcut({ key: "Spacebar" }), true);
+  assert.equal(isSpellingNextQuestionShortcut({ key: "Space" }), true);
   assert.equal(isSpellingNextQuestionShortcut({ key: "Enter", isComposing: true }), false);
   assert.equal(isSpellingNextQuestionShortcut({ key: "Enter", repeat: true }), false);
-  assert.equal(isSpellingNextQuestionShortcut({ key: "Space" }), false);
+  assert.equal(isSpellingNextQuestionShortcut({ key: "Tab" }), false);
 });
 
 test("shows an internal clue for long words", () => {

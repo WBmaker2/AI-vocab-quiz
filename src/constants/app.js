@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.13.1",
+    date: "2026-08-20",
+    summary: [
+      "철자 완성 게임의 입력 결과와 진행 상황을 반응형 오버레이 모달로 보여줘 다음 문제를 찾기 위해 스크롤할 필요가 없도록 개선했습니다.",
+      "결과 모달에서 Enter 또는 Space를 누르면 다음 문제로 이동하고, 마우스·터치 사용자를 위한 버튼도 함께 제공합니다.",
+    ],
+  },
+  {
     version: "v1.13.0",
     date: "2026-08-20",
     summary: [

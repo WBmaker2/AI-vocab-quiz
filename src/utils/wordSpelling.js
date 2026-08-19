@@ -43,9 +43,11 @@ export function isSpellingAnswerCorrect(input, expectedWord) {
 }
 
 export function isSpellingNextQuestionShortcut(event) {
+  const key = event?.key;
+
   return Boolean(
     event &&
-      event.key === "Enter" &&
+      (key === "Enter" || key === " " || key === "Spacebar" || key === "Space") &&
       !event.isComposing &&
       !event.repeat,
   );
