@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.13.3",
+    date: "2026-08-20",
+    summary: [
+      "철자 완성 게임과 영어 단어 타자 게임의 정답 입력창에서 이전에 입력한 단어가 자동 추천되지 않도록 브라우저 자동완성을 제한했습니다.",
+      "학생 이름 입력 등 기록이 필요한 입력창은 그대로 두고, 두 쓰기 학습 게임의 정답 입력창에만 적용했습니다.",
+    ],
+  },
+  {
     version: "v1.13.2",
     date: "2026-08-20",
     summary: [

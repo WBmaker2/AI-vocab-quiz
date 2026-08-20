@@ -401,7 +401,11 @@ export function WordSpellingGame({
 
           <article className="question-card word-spelling-input-card">
             <h3>영어 철자 입력</h3>
-            <form className="word-spelling-input-form" onSubmit={handleSubmit}>
+            <form
+              className="word-spelling-input-form"
+              autoComplete="off"
+              onSubmit={handleSubmit}
+            >
               <label className="sr-only" htmlFor="spelling-answer-input">
                 영어 철자를 입력하세요
               </label>
@@ -413,6 +417,7 @@ export function WordSpellingGame({
                 value={currentInput}
                 onChange={(event) => setCurrentInput(event.target.value)}
                 placeholder="영어 철자를 입력하세요"
+                autoComplete="off"
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}

@@ -984,13 +984,18 @@ export function WordTypingGame({
               </button>
             </div>
 
-            <form className="word-typing-input-form" onSubmit={handleSubmit}>
+            <form
+              className="word-typing-input-form"
+              autoComplete="off"
+              onSubmit={handleSubmit}
+            >
               <input
                 ref={inputRef}
                 className="word-typing-textbox"
                 value={currentInput}
                 onChange={(event) => setCurrentInput(event.target.value)}
                 placeholder="영어 단어를 입력하세요"
+                autoComplete="off"
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
