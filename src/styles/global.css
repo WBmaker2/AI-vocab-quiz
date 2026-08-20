@@ -44,6 +44,18 @@ button {
   box-shadow: 0 0 0 5px rgba(9, 105, 199, 0.18);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 #root {
   min-height: 100vh;
 }
@@ -1574,13 +1586,15 @@ button:disabled {
 
 .word-spelling-input-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
   gap: 0.8rem;
   margin-top: 1rem;
   min-width: 0;
 }
 
 .word-spelling-textbox {
+  width: 100%;
   min-width: 0;
   min-height: 4rem;
   padding: 0.95rem 1rem;
@@ -1598,6 +1612,17 @@ button:disabled {
   outline: none;
   border-color: rgba(29, 143, 255, 0.3);
   box-shadow: 0 0 0 4px rgba(29, 143, 255, 0.12);
+}
+
+.word-spelling-input-form > .primary-button {
+  align-self: center;
+  justify-self: start;
+  width: auto;
+  min-width: 6.2rem;
+  min-height: 3rem;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.95rem;
+  white-space: nowrap;
 }
 
 .word-spelling-feedback {
@@ -3351,8 +3376,7 @@ button:disabled {
   }
 
   .word-typing-input-form,
-  .word-typing-hint-row,
-  .word-spelling-input-form {
+  .word-typing-hint-row {
     grid-template-columns: 1fr;
   }
 
