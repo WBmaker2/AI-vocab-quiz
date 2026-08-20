@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.13.2",
+    date: "2026-08-20",
+    summary: [
+      "철자 완성 게임의 입력창을 넓히고 좁은 화면에서는 입력창을 먼저 한 줄 전체로 보여줘 긴 단어도 편하게 입력할 수 있게 했습니다.",
+      "철자를 틀릴 때마다 아쉽지만 틀렸다는 안내와 다시 시도하기·힌트 하나 더 열기 선택을 제공하는 피드백 모달을 추가했습니다.",
+    ],
+  },
+  {
     version: "v1.13.1",
     date: "2026-08-20",
     summary: [

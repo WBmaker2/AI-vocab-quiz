@@ -36,6 +36,7 @@ export function WordSpellingGame({
   const [questionIndex, setQuestionIndex] = useState(0);
   const [attemptCount, setAttemptCount] = useState(0);
   const [questionCompleted, setQuestionCompleted] = useState(false);
+  const [attemptFeedbackOpen, setAttemptFeedbackOpen] = useState(false);
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [revealedCount, setRevealedCount] = useState(0);
@@ -60,6 +61,7 @@ export function WordSpellingGame({
     setQuestionIndex(0);
     setAttemptCount(0);
     setQuestionCompleted(false);
+    setAttemptFeedbackOpen(false);
     setScore(0);
     setCorrectCount(0);
     setRevealedCount(0);
@@ -102,12 +104,17 @@ export function WordSpellingGame({
   const accuracy = calculateSpellingAccuracy(correctCount, questionCount);
 
   useEffect(() => {
-    if (phase !== "playing" || !activeQuestion || questionCompleted) {
+    if (
+      phase !== "playing" ||
+      !activeQuestion ||
+      questionCompleted ||
+      attemptFeedbackOpen
+    ) {
       return;
     }
 
     inputRef.current?.focus();
-  }, [activeQuestion, phase, questionCompleted]);
+  }, [activeQuestion, phase, questionCompleted, attemptFeedbackOpen]);
 
   useEffect(() => {
     if (phase !== "playing" || !questionCompleted) {
@@ -153,6 +160,7 @@ export function WordSpellingGame({
     setQuestionIndex(0);
     setAttemptCount(0);
     setQuestionCompleted(false);
+    setAttemptFeedbackOpen(false);
     setScore(0);
     setCorrectCount(0);
     setRevealedCount(0);
@@ -167,6 +175,7 @@ export function WordSpellingGame({
 
   function completeCurrentQuestion(outcome, options = {}) {
     setQuestionCompleted(true);
+    setAttemptFeedbackOpen(false);
     setFeedbackTone(outcome);
 
     if (outcome === "correct") {
@@ -177,7 +186,9 @@ export function WordSpellingGame({
       );
       void celebration?.playSuccess?.();
     } else {
-      setFeedbackMessage(`정답은 "${activeQuestion.word}"입니다. 다음 문제에서 다시 도전해 보세요.`);
+      setFeedbackMessage(
+        `아쉽지만 틀렸습니다. 정답은 "${activeQuestion.word}"입니다. 다음 문제에서 다시 도전해 보세요.`,
+      );
     }
   }
 
@@ -186,6 +197,7 @@ export function WordSpellingGame({
       return;
     }
 
+    setAttemptFeedbackOpen(false);
     const nextHintState = revealNextSpellingHint(
       activeQuestion,
       hintState ?? createSpellingHintState(activeQuestion),
@@ -201,10 +213,19 @@ export function WordSpellingGame({
     inputRef.current?.focus();
   }
 
+  function handleRetryAttempt() {
+    setAttemptFeedbackOpen(false);
+    setCurrentInput("");
+  }
+
+  function handleHintFromFeedback() {
+    handleRevealHint();
+  }
+
   function handleSubmit(event) {
     event?.preventDefault?.();
 
-    if (!activeQuestion || questionCompleted) {
+    if (!activeQuestion || questionCompleted || attemptFeedbackOpen) {
       return;
     }
 
@@ -241,6 +262,7 @@ export function WordSpellingGame({
         ? `보이는 철자를 따라 천천히 다시 써 보세요. ${SPELLING_ATTEMPT_LIMIT - nextAttemptCount}번 더 입력할 수 있어요.`
         : `다시 한 번 살펴보고 써 보세요. ${SPELLING_ATTEMPT_LIMIT - nextAttemptCount}번 더 입력할 수 있어요.`,
     );
+    setAttemptFeedbackOpen(true);
   }
 
   function moveToNextQuestion() {
@@ -257,6 +279,7 @@ export function WordSpellingGame({
     setQuestionIndex((current) => current + 1);
     setAttemptCount(0);
     setQuestionCompleted(false);
+    setAttemptFeedbackOpen(false);
     setCurrentInput("");
     setFeedbackTone("idle");
     setFeedbackMessage("가려진 철자를 보고 영어 단어를 입력해 보세요.");
@@ -361,11 +384,11 @@ export function WordSpellingGame({
                 <button
                   className={
                     "ghost-button word-spelling-hint-button" +
-                    (!questionCompleted && !activeHintState?.answerRevealed ? " gi-pulse" : "")
+                    (!questionCompleted && !attemptFeedbackOpen && !activeHintState?.answerRevealed ? " gi-pulse" : "")
                   }
                   type="button"
                   onClick={handleRevealHint}
-                  disabled={questionCompleted || activeHintState?.answerRevealed}
+                  disabled={questionCompleted || attemptFeedbackOpen || activeHintState?.answerRevealed}
                   aria-label={activeHintState?.answerRevealed
                     ? "정답이 모두 보였습니다. 단어를 직접 입력해 보세요."
                     : "철자 힌트 받기"}
@@ -394,9 +417,9 @@ export function WordSpellingGame({
                 autoCorrect="off"
                 spellCheck={false}
                 enterKeyHint="done"
-                disabled={questionCompleted}
+                disabled={questionCompleted || attemptFeedbackOpen}
               />
-              <button className="primary-button gi-pulse" type="submit" disabled={questionCompleted}>
+              <button className="primary-button gi-pulse" type="submit" disabled={questionCompleted || attemptFeedbackOpen}>
                 입력 확인
               </button>
             </form>
@@ -404,6 +427,20 @@ export function WordSpellingGame({
         </div>
 
       </div>
+
+      {attemptFeedbackOpen ? (
+        <WordSpellingFeedbackModal
+          feedbackTone={feedbackTone}
+          feedbackMessage={feedbackMessage}
+          questionIndex={questionIndex}
+          questionCount={questionCount}
+          mode="attempt"
+          attemptsRemaining={SPELLING_ATTEMPT_LIMIT - attemptCount}
+          canRevealHint={!activeHintState?.answerRevealed}
+          onRetry={handleRetryAttempt}
+          onRevealHint={handleHintFromFeedback}
+        />
+      ) : null}
 
       {questionCompleted ? (
         <WordSpellingFeedbackModal

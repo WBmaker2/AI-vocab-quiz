@@ -1,0 +1,70 @@
+/* Keep the answer field as the primary control, especially on narrow screens. */
+.word-spelling-input-card {
+  width: 100%;
+}
+
+.word-spelling-input-form {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) max-content;
+}
+
+.word-spelling-textbox {
+  width: 100%;
+  min-width: 0;
+}
+
+.word-spelling-input-form > .primary-button {
+  width: auto;
+  min-width: 5.6rem;
+  max-width: 7rem;
+}
+
+.word-spelling-attempt-prompts {
+  display: grid;
+  gap: 0.3rem;
+  min-height: auto;
+}
+
+.word-spelling-attempt-prompts p {
+  margin: 0;
+}
+
+.word-spelling-attempt-prompts strong {
+  color: #a35300;
+  font-size: 1.15rem;
+}
+
+.word-spelling-feedback-modal-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.word-spelling-feedback-modal-button-group button {
+  width: auto;
+  min-width: 7rem;
+}
+
+@media (max-width: 720px) {
+  .word-spelling-input-form {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .word-spelling-input-form > .primary-button {
+    justify-self: start;
+    min-width: 5.6rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .word-spelling-feedback-modal-button-group {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .word-spelling-feedback-modal-button-group button {
+    width: 100%;
+  }
+}

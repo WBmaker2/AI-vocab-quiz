@@ -5,6 +5,18 @@ import { chromium } from "playwright";
 
 const rootDir = resolve("dist");
 const host = "127.0.0.1";
+const REQUIRED_UI_TIMEOUT_MS = 10000;
+// Only used by isolated CI/local smoke runs when the host restricts Chromium.
+const RESTRICTED_LAUNCH_ARGS = Object.freeze([
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+  "--single-process",
+  "--no-zygote",
+  "--disable-crash-reporter",
+  "--disable-hang-monitor",
+]);
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -45,11 +57,126 @@ function startStaticServer() {
 }
 
 async function assertVisible(page, text) {
-  await page.getByText(text, { exact: false }).waitFor({ state: "visible" });
+  await page.getByText(text, { exact: false }).waitFor({
+    state: "visible",
+    timeout: REQUIRED_UI_TIMEOUT_MS,
+  });
 }
 
 async function assertHidden(page, text) {
-  await page.getByText(text, { exact: false }).waitFor({ state: "hidden" });
+  await page.getByText(text, { exact: false }).waitFor({
+    state: "hidden",
+    timeout: REQUIRED_UI_TIMEOUT_MS,
+  });
+}
+
+function isRestrictedLaunchEnabled() {
+  return (
+    process.env.PLAYWRIGHT_RESTRICTED_ENV === "1" ||
+    process.env.CI === "true"
+  );
+}
+
+function getLaunchOptions(restricted = isRestrictedLaunchEnabled()) {
+  return {
+    headless: true,
+    ...(restricted ? { args: RESTRICTED_LAUNCH_ARGS } : {}),
+  };
+}
+
+function formatError(error) {
+  return error instanceof Error ? error.stack ?? error.message : String(error);
+}
+
+function isLaunchRestrictionError(error) {
+  return /Permission denied \(1100\)|bootstrap_check_in/i.test(formatError(error));
+}
+
+async function launchBrowser() {
+  const restricted = isRestrictedLaunchEnabled();
+
+  try {
+    return await chromium.launch(getLaunchOptions(restricted));
+  } catch (error) {
+    if (restricted || !isLaunchRestrictionError(error)) {
+      throw error;
+    }
+
+    console.warn(
+      "playwright smoke: retrying Chromium with restricted-environment options after a host permission error",
+    );
+    return chromium.launch(getLaunchOptions(true));
+  }
+}
+
+function collectPageDiagnostics(page) {
+  const pageErrors = [];
+  const requestFailures = [];
+  const responseFailures = [];
+
+  page.on("pageerror", (error) => {
+    pageErrors.push(error);
+  });
+  page.on("requestfailed", (request) => {
+    requestFailures.push({
+      errorText: request.failure()?.errorText ?? "unknown request failure",
+      url: request.url(),
+    });
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      responseFailures.push({
+        status: response.status(),
+        url: response.url(),
+      });
+    }
+  });
+
+  return { pageErrors, requestFailures, responseFailures };
+}
+
+function assertNoCriticalPageDiagnostics(diagnostics, baseUrl) {
+  const localRequestFailures = diagnostics.requestFailures.filter(({ url }) =>
+    url.startsWith(baseUrl),
+  );
+  const localResponseFailures = diagnostics.responseFailures.filter(({ url }) =>
+    url.startsWith(baseUrl),
+  );
+  const messages = diagnostics.pageErrors.map(
+    (error) => `pageerror: ${formatError(error)}`,
+  );
+
+  messages.push(
+    ...localRequestFailures.map(
+      ({ errorText, url }) => `requestfailed: ${errorText} (${url})`,
+    ),
+  );
+  messages.push(
+    ...localResponseFailures.map(
+      ({ status, url }) => `response ${status}: ${url}`,
+    ),
+  );
+
+  if (messages.length > 0) {
+    throw new Error(`Critical browser diagnostics detected:\n${messages.join("\n")}`);
+  }
+}
+
+async function waitForSmokeReady(page) {
+  await Promise.all([
+    page.getByText("AI 원어민 단어 퀴즈 쇼", { exact: false }).waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    }),
+    page.getByRole("button", { name: "업데이트 내역" }).waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    }),
+    page.locator(".app-version").waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    }),
+  ]);
 }
 
 async function assertNoHorizontalOverflow(page, width, height) {
@@ -64,13 +191,30 @@ async function assertNoHorizontalOverflow(page, width, height) {
 }
 
 async function run() {
-  const browser = await chromium.launch();
-  const { server, port } = await startStaticServer();
-  const context = await browser.newContext();
-  const page = await context.newPage();
+  let browser;
+  let context;
+  let server;
 
   try {
-    await page.goto(`http://127.0.0.1:${port}`, { waitUntil: "networkidle" });
+    const startedServer = await startStaticServer();
+    server = startedServer.server;
+    const baseUrl = `http://${host}:${startedServer.port}`;
+    browser = await launchBrowser();
+    context = await browser.newContext();
+    const page = await context.newPage();
+    const diagnostics = collectPageDiagnostics(page);
+
+    const response = await page.goto(baseUrl, {
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+      waitUntil: "domcontentloaded",
+    });
+    if (!response || response.status() >= 400) {
+      throw new Error(
+        `Smoke page failed to load: ${response?.status() ?? "no response"}`,
+      );
+    }
+    await waitForSmokeReady(page);
+    assertNoCriticalPageDiagnostics(diagnostics, baseUrl);
 
     const updateInfoButton = page.getByRole("button", { name: "업데이트 내역" });
     const currentVersion = (await page.locator(".app-version").textContent())?.trim();
@@ -80,7 +224,10 @@ async function run() {
     }
 
     await assertVisible(page, "AI 원어민 단어 퀴즈 쇼");
-    await updateInfoButton.waitFor({ state: "visible" });
+    await updateInfoButton.waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
 
     const activityButtons = await page
       .locator('section[aria-labelledby="game-activity-label"] button')
@@ -159,26 +306,59 @@ async function run() {
       exact: true,
     });
     await updateInfoButton.click();
-    await updateDialogHeading.waitFor({ state: "visible" });
+    await updateDialogHeading.waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
     const dialog = page.getByRole("dialog");
-    await dialog.getByText(currentVersion, { exact: true }).waitFor({ state: "visible" });
-    await dialog.getByText("v1.0.0", { exact: true }).waitFor({ state: "visible" });
+    await dialog.getByText(currentVersion, { exact: true }).waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
+    await dialog.getByText("v1.0.0", { exact: true }).waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
 
     await page.keyboard.press("Escape");
-    await updateDialogHeading.waitFor({ state: "hidden" });
-    await updateInfoButton.waitFor({ state: "visible" });
+    await updateDialogHeading.waitFor({
+      state: "hidden",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
+    await updateInfoButton.waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
 
     await updateInfoButton.click();
-    await updateDialogHeading.waitFor({ state: "visible" });
+    await updateDialogHeading.waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
     await page.locator(".update-modal-backdrop").click({ position: { x: 8, y: 8 } });
-    await updateDialogHeading.waitFor({ state: "hidden" });
-    await updateInfoButton.waitFor({ state: "visible" });
+    await updateDialogHeading.waitFor({
+      state: "hidden",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
+    await updateInfoButton.waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
 
     await updateInfoButton.click();
-    await updateDialogHeading.waitFor({ state: "visible" });
+    await updateDialogHeading.waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
     await page.getByRole("button", { name: "닫기" }).click();
-    await updateDialogHeading.waitFor({ state: "hidden" });
-    await updateInfoButton.waitFor({ state: "visible" });
+    await updateDialogHeading.waitFor({
+      state: "hidden",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
+    await updateInfoButton.waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
 
     await page.getByRole("button", { name: "Google 로그인 후 시작" }).click();
     await assertVisible(page, "교사 관리");
@@ -186,18 +366,25 @@ async function run() {
     const teacherView = page.locator(
       '.view-content[aria-label="교사 관리 화면"]',
     );
-    await teacherView.waitFor({ state: "visible" });
+    await teacherView.waitFor({
+      state: "visible",
+      timeout: REQUIRED_UI_TIMEOUT_MS,
+    });
     await page.waitForFunction(
       () =>
         document.activeElement?.getAttribute("aria-label") ===
         "교사 관리 화면",
     );
     await assertNoHorizontalOverflow(page, 360, 800);
+    assertNoCriticalPageDiagnostics(diagnostics, baseUrl);
 
     console.log("playwright smoke: ok");
   } finally {
-    await browser.close();
-    await new Promise((resolveClose) => server.close(resolveClose));
+    await context?.close();
+    await browser?.close();
+    if (server?.listening) {
+      await new Promise((resolveClose) => server.close(resolveClose));
+    }
   }
 }
 
