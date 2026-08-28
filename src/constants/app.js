@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.14.0",
+    date: "2026-08-28",
+    summary: [
+      "말하기 연습의 공백 삽입·숫자 표기·자주 발생하는 유사 발음 철자 변형을 공통 판정 알고리즘에서 보완했습니다.",
+      "단어 낚시는 이미 측정하던 문제 해결 시간을 2~10초 구간에서도 세밀하게 점수에 반영해, 더 빠른 정답이 더 높은 점수를 받도록 개선했습니다.",
+    ],
+  },
+
+  {
     version: "v1.13.3",
     date: "2026-08-20",
     summary: [

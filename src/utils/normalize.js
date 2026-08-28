@@ -121,5 +121,146 @@ export function isSpeechMatch(transcript, expectedWord) {
     return true;
   }
 
-  return numericTranscript.split(" ").includes(numericWord);
+  if (numericTranscript.split(" ").includes(numericWord)) {
+    return true;
+  }
+
+  if (/\d/.test(normalizedTranscript) || /\d/.test(normalizedWord)) {
+    return false;
+  }
+
+  const expectedTokenCount = normalizedWord.split(" ").filter(Boolean).length;
+  const transcriptWindows = getSpeechWindows(
+    normalizedTranscript,
+    expectedTokenCount,
+  );
+  const compactWord = compactNormalizedSpeechText(normalizedWord);
+
+  if (transcriptWindows.some(
+    (window) => compactNormalizedSpeechText(window) === compactWord,
+  )) {
+    return true;
+  }
+
+  const expectedPhonetic = normalizeSpeechPhoneticText(normalizedWord);
+  if (!expectedPhonetic) {
+    return false;
+  }
+
+  return transcriptWindows.some((window) => {
+    const candidatePhonetic = normalizeSpeechPhoneticText(window);
+    return isSpeechPhoneticMatch(candidatePhonetic, expectedPhonetic);
+  });
+}
+function compactNormalizedSpeechText(value) {
+  return value.replace(/\s+/g, "");
+}
+
+function getSpeechWindows(normalizedText, expectedTokenCount) {
+  const tokens = normalizedText.split(" ").filter(Boolean);
+  const maxWindowSize = Math.min(
+    tokens.length,
+    Math.max(1, expectedTokenCount + 1),
+  );
+  const windows = [];
+
+  for (let start = 0; start < tokens.length; start += 1) {
+    for (
+      let size = 1;
+      size <= maxWindowSize && start + size <= tokens.length;
+      size += 1
+    ) {
+      windows.push(tokens.slice(start, start + size).join(" "));
+    }
+  }
+
+  return windows;
+}
+
+function normalizeSpeechPhoneticText(value) {
+  let text = compactNormalizedSpeechText(normalizeSpeechText(value));
+
+  text = text
+    .replace(/^kn/, "n")
+    .replace(/^gn/, "n")
+    .replace(/^ps/, "s")
+    .replace(/sch/g, "sk")
+    .replace(/tch/g, "ch")
+    .replace(/dge/g, "j")
+    .replace(/ph/g, "f")
+    .replace(/ck/g, "k")
+    .replace(/qu/g, "kw")
+    .replace(/wr/g, "r")
+    .replace(/wh/g, "w")
+    .replace(/gh(?=t|$)/g, "")
+    .replace(/th/g, "t")
+    .replace(/c(?=[eiy])/g, "s")
+    .replace(/c/g, "k")
+    .replace(/q/g, "k")
+    .replace(/g(?=[eiy])/g, "j")
+    .replace(/x/g, "ks")
+    .replace(/y/g, "i")
+    .replace(/([aeiou])\1+/g, "$1")
+    .replace(/(.)\1+/g, "$1");
+
+  if (text.length > 3) {
+    text = text.replace(/e$/g, "");
+  }
+
+  return text;
+}
+function getSpeechConsonantSkeleton(value) {
+  return value.replace(/[aeiou]/g, "");
+}
+
+function calculateSpeechEditDistance(left, right, limit) {
+  if (Math.abs(left.length - right.length) > limit) {
+    return limit + 1;
+  }
+
+  let previousRow = Array.from(
+    { length: right.length + 1 },
+    (_, index) => index,
+  );
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const currentRow = [leftIndex];
+
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const substitutionCost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1;
+      const distance = Math.min(
+        previousRow[rightIndex] + 1,
+        currentRow[rightIndex - 1] + 1,
+        previousRow[rightIndex - 1] + substitutionCost,
+      );
+      currentRow.push(distance);
+    }
+
+    previousRow = currentRow;
+  }
+
+  return previousRow[right.length];
+}
+
+function isSpeechPhoneticMatch(candidate, expected) {
+  if (candidate === expected) {
+    return true;
+  }
+
+  if (candidate.length < 5 || expected.length < 5) {
+    return false;
+  }
+
+  if (getSpeechConsonantSkeleton(candidate) !== getSpeechConsonantSkeleton(expected)) {
+    return false;
+  }
+
+  if (
+    candidate[0] !== expected[0] ||
+    candidate[candidate.length - 1] !== expected[expected.length - 1]
+  ) {
+    return false;
+  }
+
+  return calculateSpeechEditDistance(candidate, expected, 1) <= 1;
 }

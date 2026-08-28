@@ -4,12 +4,13 @@ import { formatElapsedSeconds } from "../utils/quiz.js";
 import {
   calculateFishingScore,
   createFishingRound,
+  FISHING_ROUND_DURATION_MS,
   formatAverageReactionTime,
   normalizeFishingItems,
 } from "../utils/wordFishing.js";
 
-const ROUND_DURATION_SECONDS = 10;
-const ROUND_DURATION_MS = ROUND_DURATION_SECONDS * 1000;
+const ROUND_DURATION_MS = FISHING_ROUND_DURATION_MS;
+const ROUND_DURATION_SECONDS = ROUND_DURATION_MS / 1000;
 const TRANSITION_DELAY_MS = 900;
 const MAX_ROUNDS = 10;
 
@@ -31,8 +32,8 @@ function FishingStartCard({ canStart, ttsSupported, itemCount, onStart, onBack }
         <h3>TTS로 읽어주는 영어를 듣고 뜻 카드를 낚아채 보세요</h3>
         <p className="question-copy">
           한 라운드마다 카드 6장이 물고기처럼 떠다닙니다. 영어 단어를 듣고,
-          맞는 뜻 카드 하나만 빠르게 눌러 점수를 얻으세요. 총 10문제,
-          문제당 10초입니다.
+          맞는 뜻 카드 하나를 빠르게 누를수록 더 높은 점수를 얻을 수 있어요.
+          총 10문제, 문제당 {ROUND_DURATION_SECONDS}초입니다.
         </p>
 
         <div className="word-fishing-rule-grid">
@@ -294,6 +295,7 @@ export function WordFishingGame({
       const gainedScore = calculateFishingScore({
         isCorrect: true,
         reactionMs,
+        roundDurationMs: ROUND_DURATION_MS,
       });
       setScore((current) => current + gainedScore);
       setCorrectCount((current) => current + 1);

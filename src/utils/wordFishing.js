@@ -1,3 +1,9 @@
+export const FISHING_ROUND_DURATION_MS = 10_000;
+const FISHING_FAST_THRESHOLD_MS = 2_000;
+const FISHING_BASE_SCORE = 100;
+const FISHING_MAX_SCORE = 140;
+const FISHING_WRONG_SCORE = -30;
+
 function shuffle(list) {
   const next = [...list];
 
@@ -105,22 +111,42 @@ export function createFishingRound(items, usedWordIds = [], candidateCount = 6) 
   };
 }
 
-export function calculateFishingScore({ isCorrect, reactionMs }) {
+export function calculateFishingScore({
+  isCorrect,
+  reactionMs,
+  roundDurationMs = FISHING_ROUND_DURATION_MS,
+}) {
   if (!isCorrect) {
-    return -30;
+    return FISHING_WRONG_SCORE;
   }
 
-  const safeReactionMs = Math.max(0, Number(reactionMs) || 0);
+  const parsedRoundDurationMs = Number(roundDurationMs);
+  const safeRoundDurationMs = Number.isFinite(parsedRoundDurationMs)
+    ? Math.max(FISHING_FAST_THRESHOLD_MS, parsedRoundDurationMs)
+    : FISHING_ROUND_DURATION_MS;
+  const parsedReactionMs = Number(reactionMs);
+  const safeReactionMs = clamp(
+    Number.isFinite(parsedReactionMs) ? parsedReactionMs : 0,
+    0,
+    safeRoundDurationMs,
+  );
 
-  if (safeReactionMs <= 2000) {
-    return 140;
+  if (safeReactionMs <= FISHING_FAST_THRESHOLD_MS) {
+    return FISHING_MAX_SCORE;
   }
 
-  if (safeReactionMs <= 4000) {
-    return 120;
-  }
+  const scoringWindowMs = safeRoundDurationMs - FISHING_FAST_THRESHOLD_MS;
+  const remainingSpeedMs = safeRoundDurationMs - safeReactionMs;
+  const speedBonus = Math.floor(
+    (remainingSpeedMs / scoringWindowMs) *
+      (FISHING_MAX_SCORE - FISHING_BASE_SCORE),
+  );
 
-  return 100;
+  return FISHING_BASE_SCORE + clamp(
+    speedBonus,
+    0,
+    FISHING_MAX_SCORE - FISHING_BASE_SCORE,
+  );
 }
 
 export function formatAverageReactionTime(totalReactionMs, correctCount) {
