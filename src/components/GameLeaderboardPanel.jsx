@@ -73,6 +73,7 @@ function formatLeaderboardEntryDetail(entry, periodType, activityType) {
   } else if (activityType === "spelling") {
     detailParts.push(`정답 ${entry.correctCount ?? 0}/${entry.questionCount ?? 0}`);
     detailParts.push(`공개 ${entry.revealedCount ?? 0}회`);
+    detailParts.push(`도움 ${entry.hintUsedCount ?? 0}회`);
     detailParts.push(`시도 ${entry.totalAttempts ?? 0}회`);
   } else if (activityType === "typing") {
     detailParts.push(`정답 ${entry.correctCount ?? 0}/${entry.questionCount ?? 0}`);

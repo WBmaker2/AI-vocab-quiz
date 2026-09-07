@@ -50,6 +50,7 @@ export function validateSpellingLeaderboardResult({
   correctCount,
   accuracy,
   revealedCount,
+  hintUsedCount = 0,
   totalAttempts,
 }) {
   const cleanQuestionCount = validateInteger(questionCount, "questionCount", {
@@ -63,6 +64,10 @@ export function validateSpellingLeaderboardResult({
   const cleanRevealedCount = validateInteger(revealedCount, "revealedCount", {
     min: 0,
     max: cleanQuestionCount,
+  });
+  const cleanHintUsedCount = validateInteger(hintUsedCount, "hintUsedCount", {
+    min: 0,
+    max: cleanCorrectCount,
   });
 
   if (cleanCorrectCount + cleanRevealedCount !== cleanQuestionCount) {
@@ -103,6 +108,7 @@ export function validateSpellingLeaderboardResult({
     correctCount: cleanCorrectCount,
     accuracy: cleanAccuracy,
     revealedCount: cleanRevealedCount,
+    hintUsedCount: cleanHintUsedCount,
     totalAttempts: cleanTotalAttempts,
   };
 }
@@ -201,6 +207,7 @@ function createWritePayload({ source, schoolId, schoolName, grade, studentName, 
       correctCount: source.correctCount,
       accuracy: source.accuracy,
       revealedCount: source.revealedCount,
+      hintUsedCount: source.hintUsedCount,
       totalAttempts: source.totalAttempts,
     }),
     createdAt: source.createdAt ?? serverTimestamp(),
@@ -238,6 +245,7 @@ async function upsertPeriod({ firestore, ...input }) {
         correctCount: payload.correctCount,
         accuracy: payload.accuracy,
         revealedCount: payload.revealedCount,
+        hintUsedCount: payload.hintUsedCount,
         totalAttempts: payload.totalAttempts,
         updatedAt: serverTimestamp(),
       });

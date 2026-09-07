@@ -1,14 +1,14 @@
 {
   "name": "talking-vocab-quiz",
   "private": true,
-  "version": "1.14.0",
+  "version": "1.16.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build --configLoader runner",
     "build:firebase": "node scripts/build-firebase.mjs",
     "preview": "vite preview",
-    "test": "node --test src/utils/sessionReview.test.js src/utils/quiz.test.js src/utils/listeningQuiz.test.js src/utils/normalize.test.js src/utils/wordFishing.test.js src/utils/speakingAttempts.test.js src/utils/wordTyping.test.js src/utils/wordSpelling.test.js src/utils/activityLeaderboard.test.js src/utils/bingoPlayer.test.js src/utils/studentProfileCapability.test.js src/utils/studentResultSave.test.js src/utils/xlsxImport.test.js src/lib/firebase.test.js src/utils/teacherLeaderboards.test.js src/utils/teacherBingoPreparation.test.js src/utils/studentSetLoader.test.js src/utils/studentRecentSelection.test.js src/utils/teacherSetManager.test.js src/utils/appChrome.test.js src/components/teacher/teacherLeaderboardView.test.js src/components/teacher/teacherBingoView.test.js src/components/teacher/teacherBulkView.test.js src/components/teacher/teacherManageView.test.js src/components/teacher/teacherWorkspaceView.test.js tests/firestore.rules.test.js",
+    "test": "node --test src/utils/sessionReview.test.js src/utils/quiz.test.js src/utils/listeningQuiz.test.js src/utils/normalize.test.js src/utils/speakingAcceptance.test.js src/utils/wordFishing.test.js src/utils/speakingAttempts.test.js src/utils/wordTyping.test.js src/utils/wordSpelling.test.js src/utils/activityLeaderboard.test.js src/utils/bingoPlayer.test.js src/utils/studentProfileCapability.test.js src/utils/studentResultSave.test.js src/utils/xlsxImport.test.js src/lib/firebase.test.js src/utils/teacherLeaderboards.test.js src/utils/teacherBingoPreparation.test.js src/utils/studentSetLoader.test.js src/utils/studentRecentSelection.test.js src/utils/teacherSetManager.test.js src/utils/appChrome.test.js src/components/teacher/teacherLeaderboardView.test.js src/components/teacher/teacherBingoView.test.js src/components/teacher/teacherBulkView.test.js src/components/teacher/teacherManageView.test.js src/components/teacher/teacherWorkspaceView.test.js tests/firestore.rules.test.js",
     "test:rules": "node scripts/run_firestore_rules_tests.mjs",
     "test:smoke": "node scripts/playwright_smoke.js"
   },

@@ -42,13 +42,14 @@ test("formatTeacherLeaderboardEntryDetail includes spelling-specific metrics", (
       correctCount: 9,
       questionCount: 10,
       revealedCount: 1,
+      hintUsedCount: 2,
       totalAttempts: 12,
     },
     "spelling",
     "week",
   );
 
-  assert.equal(detail, "00:42 · 정답 9/10 · 공개 1회 · 시도 12회");
+  assert.equal(detail, "00:42 · 정답 9/10 · 공개 1회 · 도움 2회 · 시도 12회");
 });
 
 test("formatTeacherLeaderboardEntryDetail prepends grade for school-wide matching boards", () => {

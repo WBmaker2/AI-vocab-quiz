@@ -9,6 +9,7 @@ import {
   isSpellingNextQuestionShortcut,
   isSpellingAnswerRevealed,
   isSpellingAnswerCorrect,
+  isSpellingHintUsed,
   normalizeSpellingItems,
   revealNextSpellingHint,
 } from "./wordSpelling.js";
@@ -34,6 +35,13 @@ test("calculates the fixed spelling attempt scores", () => {
 test("calculates accuracy from completed questions", () => {
   assert.equal(calculateSpellingAccuracy(2, 3), 67);
   assert.equal(calculateSpellingAccuracy(0, 0), 0);
+});
+
+test("marks a question as hint-assisted only after a hint stage is used", () => {
+  assert.equal(isSpellingHintUsed({ level: 0 }), false);
+  assert.equal(isSpellingHintUsed({ level: 1 }), true);
+  assert.equal(isSpellingHintUsed({ level: 3 }), true);
+  assert.equal(isSpellingHintUsed(null), false);
 });
 
 test("recognizes only fresh non-composing Enter or Space as the next-question shortcut", () => {

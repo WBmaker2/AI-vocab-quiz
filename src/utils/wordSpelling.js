@@ -292,6 +292,10 @@ export function isSpellingAnswerRevealed(hintState) {
   );
 }
 
+export function isSpellingHintUsed(hintState) {
+  return Number.isInteger(hintState?.level) && hintState.level > 0;
+}
+
 export function revealNextSpellingHint(question, hintState) {
   const baseCharacters = question?.mask?.characters ?? hintState?.characters ?? [];
   const currentCharacters = cloneSpellingCharacters(

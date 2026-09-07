@@ -7,6 +7,7 @@ export function WordSpellingResultCard({
   correctCount,
   questionCount,
   revealedCount,
+  hintUsedCount,
   totalAttempts,
   elapsedSeconds,
   leaderboardContext,
@@ -49,6 +50,10 @@ export function WordSpellingResultCard({
             <strong>{revealedCount}회</strong>
           </article>
           <article className="word-spelling-summary-card">
+            <span>도움으로 맞힌 문제</span>
+            <strong>{hintUsedCount}개</strong>
+          </article>
+          <article className="word-spelling-summary-card">
             <span>총 시도 횟수</span>
             <strong>{totalAttempts}회</strong>
           </article>
@@ -71,6 +76,7 @@ export function WordSpellingResultCard({
             questionCount,
             accuracy,
             revealedCount,
+            hintUsedCount,
             totalAttempts,
           }}
         />

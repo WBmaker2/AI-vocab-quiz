@@ -184,6 +184,7 @@ test("validates spelling leaderboard metrics", () => {
       correctCount: 2,
       accuracy: 67,
       revealedCount: 1,
+      hintUsedCount: 1,
       totalAttempts: 5,
     }),
     {
@@ -193,6 +194,7 @@ test("validates spelling leaderboard metrics", () => {
       correctCount: 2,
       accuracy: 67,
       revealedCount: 1,
+      hintUsedCount: 1,
       totalAttempts: 5,
     },
   );
@@ -261,6 +263,13 @@ test("rejects impossible spelling leaderboard metrics", () => {
       accuracy: 33, revealedCount: 1, totalAttempts: 3,
     }),
     /cover|revealed/i,
+  );
+  assert.throws(
+    () => validateSpellingLeaderboardResult({
+      score: 210, elapsedSeconds: 60, questionCount: 3, correctCount: 2,
+      accuracy: 67, revealedCount: 1, hintUsedCount: 3, totalAttempts: 5,
+    }),
+    /hintUsedCount/i,
   );
 });
 

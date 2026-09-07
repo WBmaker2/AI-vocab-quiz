@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getSpeechRecognitionEndFallbackError } from "../utils/speakingAttempts.js";
+import { extractSpeechCandidates } from "../utils/speakingAcceptance.js";
 
 function getRecognitionConstructor() {
   if (typeof window === "undefined") {
@@ -107,6 +108,7 @@ export function useSpeechRecognition(config = {}) {
   const [supported, setSupported] = useState(isSpeechRecognitionSupported());
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [candidates, setCandidates] = useState([]);
   const [error, setError] = useState("");
   const [browserName, setBrowserName] = useState(browserNameRef.current);
   const [microphoneState, setMicrophoneState] = useState("unknown");
@@ -204,14 +206,12 @@ export function useSpeechRecognition(config = {}) {
     };
 
     recognition.onresult = (event) => {
-      const value = Array.from(event.results)
-        .flatMap((result) => Array.from(result))
-        .map((result) => result.transcript)
-        .join(" ")
-        .trim();
+      const nextCandidates = extractSpeechCandidates(event);
+      const value = nextCandidates[0] ?? "";
 
       resultReceivedRef.current = Boolean(value);
       setTranscript(value);
+      setCandidates(nextCandidates);
       config.onResult?.(value, event);
     };
 
@@ -248,6 +248,7 @@ export function useSpeechRecognition(config = {}) {
       errorReceivedRef.current = false;
       setMicrophoneState("unknown");
       setTranscript("");
+      setCandidates([]);
       setError("");
       recognitionRef.current.start();
       return true;
@@ -270,6 +271,7 @@ export function useSpeechRecognition(config = {}) {
     microphoneStateRef.current = "unknown";
     setMicrophoneState("unknown");
     setTranscript("");
+    setCandidates([]);
     setError("");
   }
 
@@ -279,6 +281,7 @@ export function useSpeechRecognition(config = {}) {
     supported,
     listening,
     transcript,
+    candidates,
     error,
     start,
     stop,

@@ -623,7 +623,7 @@ service cloud.firestore {
           'scopeKey', 'schoolId', 'schoolName', 'grade', 'studentName',
           'studentNameNormalized', 'periodType', 'periodKey', 'score',
           'elapsedSeconds', 'questionCount', 'correctCount', 'accuracy',
-          'revealedCount', 'totalAttempts', 'createdAt', 'updatedAt'
+          'revealedCount', 'hintUsedCount', 'totalAttempts', 'createdAt', 'updatedAt'
         ])
         && data.scopeKey is string && data.scopeKey.size() > 0
         && data.schoolId is string && data.schoolId.size() > 0
@@ -643,6 +643,7 @@ service cloud.firestore {
         && isNonNegativeInteger(data.correctCount) && data.correctCount <= data.questionCount
         && isNonNegativeInteger(data.revealedCount) && data.revealedCount <= data.questionCount
         && data.correctCount + data.revealedCount == data.questionCount
+        && isNonNegativeInteger(data.hintUsedCount) && data.hintUsedCount <= data.correctCount
         && isNonNegativeInteger(data.accuracy) && data.accuracy <= 100
         && math.abs(data.accuracy * data.questionCount - data.correctCount * 100) <= data.questionCount
         && data.totalAttempts is int

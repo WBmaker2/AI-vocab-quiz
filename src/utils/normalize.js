@@ -32,6 +32,33 @@ const TENS_NUMBER_WORDS = new Map([
   ["ninety", 90],
 ]);
 
+const PROTECTED_SPEECH_CONFUSIONS = new Set([
+  "sheep|ship",
+  "led|red",
+  "lice|rice",
+  "three|tree",
+]);
+
+function isProtectedSpeechPair(left, right) {
+  return PROTECTED_SPEECH_CONFUSIONS.has([left, right].sort().join("|"));
+}
+
+export function hasProtectedSpeechConfusion(transcript, expectedWord) {
+  const normalizedTranscript = normalizeSpeechText(transcript);
+  const normalizedExpected = normalizeSpeechText(expectedWord);
+
+  if (!normalizedTranscript || !normalizedExpected || normalizedTranscript === normalizedExpected) {
+    return false;
+  }
+
+  const expectedTokens = normalizedExpected.split(" ");
+  return normalizedTranscript.split(" ").some((transcriptToken) => {
+    return expectedTokens.some((expectedToken) => {
+      return isProtectedSpeechPair(transcriptToken, expectedToken);
+    });
+  });
+}
+
 export function normalizeSpeechText(value) {
   return String(value ?? "")
     .toLowerCase()
@@ -104,6 +131,22 @@ export function isSpeechMatch(transcript, expectedWord) {
 
   if (normalizedTranscript === normalizedWord) {
     return true;
+  }
+
+  const transcriptTokens = normalizedTranscript.split(" ");
+  const expectedTokens = normalizedWord.split(" ");
+  const hasProtectedTokenPair = expectedTokens.length === transcriptTokens.length
+    && expectedTokens.some((token, index) => isProtectedSpeechPair(transcriptTokens[index], token));
+
+  if (
+    isProtectedSpeechPair(normalizedTranscript, normalizedWord)
+    || hasProtectedTokenPair
+    || (
+      expectedTokens.length === 1
+      && transcriptTokens.some((token) => isProtectedSpeechPair(token, normalizedWord))
+    )
+  ) {
+    return false;
   }
 
   if (normalizedTranscript.split(" ").includes(normalizedWord)) {

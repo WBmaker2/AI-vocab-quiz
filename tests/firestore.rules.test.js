@@ -166,6 +166,7 @@ function createSpellingLeaderboardDoc(overrides = {}) {
     correctCount: 2,
     accuracy: 67,
     revealedCount: 1,
+    hintUsedCount: 1,
     totalAttempts: 5,
     createdAt: createTimestamp(10),
     updatedAt: createTimestamp(100),
@@ -1094,6 +1095,7 @@ rulesTest(
     await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ totalAttempts: 2 })));
     await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ totalAttempts: 10 })));
     await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ score: 200 })));
+    await assertFails(setDoc(entry, createSpellingLeaderboardDoc({ hintUsedCount: 3 })));
   },
 );
 

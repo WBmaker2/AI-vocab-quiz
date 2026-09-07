@@ -10,6 +10,7 @@ import {
   isSpellingNextQuestionShortcut,
   isSpellingAnswerRevealed,
   isSpellingAnswerCorrect,
+  isSpellingHintUsed,
   normalizeSpellingItems,
   revealNextSpellingHint,
   SPELLING_ATTEMPT_LIMIT,
@@ -40,8 +41,10 @@ export function WordSpellingGame({
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [revealedCount, setRevealedCount] = useState(0);
+  const [hintUsedCount, setHintUsedCount] = useState(0);
   const [totalAttempts, setTotalAttempts] = useState(0);
   const [currentInput, setCurrentInput] = useState("");
+  const [inputError, setInputError] = useState("");
   const [feedbackTone, setFeedbackTone] = useState("idle");
   const [feedbackMessage, setFeedbackMessage] = useState("가려진 철자를 보고 영어 단어를 입력해 보세요.");
   const [hintState, setHintState] = useState(null);
@@ -65,8 +68,10 @@ export function WordSpellingGame({
     setScore(0);
     setCorrectCount(0);
     setRevealedCount(0);
+    setHintUsedCount(0);
     setTotalAttempts(0);
     setCurrentInput("");
+    setInputError("");
     setFeedbackTone("idle");
     setFeedbackMessage("가려진 철자를 보고 영어 단어를 입력해 보세요.");
     setHintState(null);
@@ -101,7 +106,10 @@ export function WordSpellingGame({
   const activeQuestion = questions[questionIndex] ?? null;
   const questionCount = questions.length;
   const elapsedSeconds = Math.max(0, Math.ceil(elapsedMs / 1000));
-  const accuracy = calculateSpellingAccuracy(correctCount, questionCount);
+  const completedQuestionCount = questionCompleted
+    ? Math.min(questionIndex + 1, questionCount)
+    : 0;
+  const accuracy = calculateSpellingAccuracy(correctCount, completedQuestionCount);
 
   useEffect(() => {
     if (
@@ -164,8 +172,10 @@ export function WordSpellingGame({
     setScore(0);
     setCorrectCount(0);
     setRevealedCount(0);
+    setHintUsedCount(0);
     setTotalAttempts(0);
     setCurrentInput("");
+    setInputError("");
     setFeedbackTone("idle");
     setFeedbackMessage("가려진 철자를 보고 영어 단어를 입력해 보세요.");
     setHintState(createSpellingHintState(nextQuestions[0]));
@@ -180,8 +190,10 @@ export function WordSpellingGame({
 
     if (outcome === "correct") {
       setFeedbackMessage(
-        options.followUp
+        options.answerRevealed
           ? `정답을 보고 다시 써서 기억했어요! "${activeQuestion.word}"를 완성했습니다.`
+          : options.hintUsed
+            ? `힌트를 보고도 직접 써서 기억했어요! "${activeQuestion.word}"를 완성했습니다.`
           : `정답입니다! "${activeQuestion.word}"를 정확하게 썼어요.`,
       );
       void celebration?.playSuccess?.();
@@ -204,6 +216,7 @@ export function WordSpellingGame({
     );
     setHintState(nextHintState);
     setCurrentInput("");
+    setInputError("");
     setFeedbackTone("hint");
     setFeedbackMessage(
       nextHintState.answerRevealed
@@ -216,6 +229,7 @@ export function WordSpellingGame({
   function handleRetryAttempt() {
     setAttemptFeedbackOpen(false);
     setCurrentInput("");
+    setInputError("");
   }
 
   function handleHintFromFeedback() {
@@ -231,20 +245,28 @@ export function WordSpellingGame({
 
     const answer = currentInput.trim();
     if (!answer) {
-      setFeedbackTone("wrong");
-      setFeedbackMessage("먼저 영어 단어를 입력해 주세요.");
+      setInputError("먼저 영어 단어를 써 주세요.");
+      inputRef.current?.focus();
       return;
     }
+
+    setInputError("");
 
     const nextAttemptCount = attemptCount + 1;
     setAttemptCount(nextAttemptCount);
     setTotalAttempts((current) => current + 1);
 
     if (isSpellingAnswerCorrect(answer, activeQuestion.word)) {
+      const hintUsed = isSpellingHintUsed(hintState);
+      const answerRevealed = isSpellingAnswerRevealed(hintState);
       setScore((current) => current + calculateSpellingAttemptScore({ attemptsUsed: nextAttemptCount }));
       setCorrectCount((current) => current + 1);
+      if (hintUsed) {
+        setHintUsedCount((current) => current + 1);
+      }
       completeCurrentQuestion("correct", {
-        followUp: isSpellingAnswerRevealed(hintState),
+        hintUsed,
+        answerRevealed,
       });
       return;
     }
@@ -281,6 +303,7 @@ export function WordSpellingGame({
     setQuestionCompleted(false);
     setAttemptFeedbackOpen(false);
     setCurrentInput("");
+    setInputError("");
     setFeedbackTone("idle");
     setFeedbackMessage("가려진 철자를 보고 영어 단어를 입력해 보세요.");
     setHintState(createSpellingHintState(questions[questionIndex + 1]));
@@ -304,6 +327,7 @@ export function WordSpellingGame({
         correctCount={correctCount}
         questionCount={questionCount}
         revealedCount={revealedCount}
+        hintUsedCount={hintUsedCount}
         totalAttempts={totalAttempts}
         elapsedSeconds={elapsedSeconds}
         leaderboardContext={leaderboardContext}
@@ -415,7 +439,10 @@ export function WordSpellingGame({
                 className="word-spelling-textbox"
                 type="text"
                 value={currentInput}
-                onChange={(event) => setCurrentInput(event.target.value)}
+                onChange={(event) => {
+                  setCurrentInput(event.target.value);
+                  setInputError("");
+                }}
                 placeholder="영어 철자를 입력하세요"
                 autoComplete="off"
                 autoCapitalize="none"
@@ -428,6 +455,14 @@ export function WordSpellingGame({
                 입력 확인
               </button>
             </form>
+            <p
+              className="word-spelling-input-feedback"
+              role="status"
+              aria-live="polite"
+              hidden={!inputError}
+            >
+              {inputError}
+            </p>
           </article>
         </div>
 

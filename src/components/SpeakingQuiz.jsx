@@ -10,7 +10,7 @@ import {
   buildSessionReviewItems,
   registerSessionReviewMiss,
 } from "../utils/sessionReview.js";
-import { isSpeechMatch } from "../utils/normalize.js";
+import { isSpeakingAnswerAccepted } from "../utils/speakingAcceptance.js";
 import {
   canAdvanceSpeakingQuestion,
   isSpeakingConfigurationError,
@@ -81,11 +81,11 @@ function getStatusMessage({
   }
 
   if (status === "correct") {
-    return `좋아요. "${question.word}" 발음이 맞게 인식되었습니다.`;
+    return `좋아요. "${question.word}" 단어가 맞게 인식되었습니다.`;
   }
 
   if (status === "incorrect" && transcript) {
-    return `인식 결과는 "${transcript}"입니다. 다시 말해보거나 다음 단어로 넘어갈 수 있습니다.`;
+    return `인식 결과는 "${transcript}"입니다. 단어를 다시 듣고 한 번 더 말해보세요.`;
   }
 
   if (status === "empty") {
@@ -105,7 +105,7 @@ export function SpeakingQuiz({
   celebration,
   onBack,
 }) {
-  const recognition = useSpeechRecognition({ lang: "en-US" });
+  const recognition = useSpeechRecognition({ lang: "en-US", maxAlternatives: 3 });
   const [questions, setQuestions] = useState(() =>
     createSpeakingSequence(items),
   );
@@ -255,7 +255,7 @@ export function SpeakingQuiz({
     if (isReviewPlaying) {
       setReviewAttemptTranscript(transcript);
 
-      if (isSpeechMatch(transcript, activeQuestion.word)) {
+      if (isSpeakingAnswerAccepted(recognition.candidates, activeQuestion.word)) {
         resetReviewQuestionFailureState();
         setReviewStatus((current) => {
           if (current !== "correct") {
@@ -274,7 +274,7 @@ export function SpeakingQuiz({
 
     setAttemptTranscript(transcript);
 
-    if (isSpeechMatch(transcript, activeQuestion.word)) {
+    if (isSpeakingAnswerAccepted(recognition.candidates, activeQuestion.word)) {
       resetQuestionFailureState();
       setStatus((current) => {
         if (current !== "correct") {
@@ -293,6 +293,7 @@ export function SpeakingQuiz({
     question?.id,
     question?.word,
     recognition.listening,
+    recognition.candidates,
     recognition.transcript,
     reviewQuestion?.id,
     reviewQuestion?.word,

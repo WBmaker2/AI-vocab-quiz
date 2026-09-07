@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 export function WordSpellingFeedbackModal({
   feedbackTone,
@@ -15,23 +16,65 @@ export function WordSpellingFeedbackModal({
   onRetry,
   onRevealHint,
 }) {
+  const modalRef = useRef(null);
   const nextButtonRef = useRef(null);
   const isAttemptFeedback = mode === "attempt";
   const isLastQuestion = questionIndex >= questionCount - 1;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
+    const previouslyFocused = document.activeElement;
     document.body.style.overflow = "hidden";
     nextButtonRef.current?.focus();
 
+    function getFocusableElements() {
+      return Array.from(
+        modalRef.current?.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((element) => element.getClientRects().length > 0);
+    }
+
+    function handleKeyDown(event) {
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        modalRef.current?.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+
     return () => {
+      document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
+      if (previouslyFocused instanceof HTMLElement && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
     };
   }, []);
 
-  return (
+  const modal = (
     <div className="word-spelling-feedback-modal-backdrop">
       <section
+        ref={modalRef}
+        tabIndex={-1}
         className={
           "word-spelling-feedback-modal" +
           (isAttemptFeedback ? " word-spelling-feedback-modal-attempt" : "")
@@ -153,4 +196,6 @@ export function WordSpellingFeedbackModal({
       </section>
     </div>
   );
+
+  return typeof document === "undefined" ? modal : createPortal(modal, document.body);
 }

@@ -3262,6 +3262,7 @@ export async function saveSpellingLeaderboardScore({
   correctCount,
   accuracy,
   revealedCount,
+  hintUsedCount,
   totalAttempts,
   now = new Date(),
 }) {
@@ -3276,6 +3277,7 @@ export async function saveSpellingLeaderboardScore({
     correctCount,
     accuracy,
     revealedCount,
+    hintUsedCount,
     totalAttempts,
     now,
   });

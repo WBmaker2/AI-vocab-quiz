@@ -45,7 +45,7 @@ test("isSpeechMatch accepts conservative similar pronunciation transcripts", () 
   assert.equal(isSpeechMatch("kik", "kick"), true);
   assert.equal(isSpeechMatch("fone", "phone"), true);
   assert.equal(isSpeechMatch("nite", "night"), true);
-  assert.equal(isSpeechMatch("tree", "three"), true);
+  assert.equal(isSpeechMatch("tree", "three"), false);
   assert.equal(isSpeechMatch("orinj", "orange"), true);
   assert.equal(isSpeechMatch("colour", "color"), true);
 });
@@ -54,4 +54,5 @@ test("isSpeechMatch rejects unrelated words and numeric lookalikes", () => {
   assert.equal(isSpeechMatch("pick", "kick"), false);
   assert.equal(isSpeechMatch("dog", "kick"), false);
   assert.equal(isSpeechMatch("13", "thirty"), false);
+  assert.equal(isSpeechMatch("I said tree", "three"), false);
 });
