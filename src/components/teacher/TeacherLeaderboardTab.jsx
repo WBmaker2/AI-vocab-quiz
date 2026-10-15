@@ -1,4 +1,5 @@
 import { LEADERBOARD_PERIOD_DEFINITIONS } from "../../utils/leaderboard.js";
+import { TeacherWeakWordsPanel } from "./TeacherWeakWordsPanel.jsx";
 import {
   formatTeacherLeaderboardEntryDetail,
   getTeacherActivityLeaderboardDefinition,
@@ -43,6 +44,7 @@ export function TeacherLeaderboardTab({ profile, gradeOptions = [], leaderboard 
   }
 
   return (
+    <>
     <article className="form-card teacher-leaderboard-card">
       <div className="section-heading compact">
         <div>
@@ -212,5 +214,7 @@ export function TeacherLeaderboardTab({ profile, gradeOptions = [], leaderboard 
         </>
       )}
     </article>
+    <TeacherWeakWordsPanel schoolId={profile?.schoolId} gradeOptions={gradeOptions} />
+    </>
   );
 }

@@ -11,6 +11,7 @@ function toPlainVocabularyItem(item) {
     word: String(item.word ?? "").trim(),
     meaning: String(item.meaning ?? "").trim(),
     imageHint: String(item.imageHint ?? "").trim(),
+    imageUrl: String(item.imageUrl ?? "").trim(),
     exampleSentence: String(item.exampleSentence ?? "").trim(),
   };
 }
@@ -47,6 +48,7 @@ export function mergeVocabularyItems(existingItems, importedItems) {
       mergedItems[existingIndex] = {
         ...current,
         imageHint: current.imageHint || plainItem.imageHint,
+        imageUrl: current.imageUrl || plainItem.imageUrl,
         exampleSentence: current.exampleSentence || plainItem.exampleSentence,
       };
     }

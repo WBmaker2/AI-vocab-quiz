@@ -3708,3 +3708,33 @@ button:disabled {
   font-size: 0.78rem;
   font-weight: 700;
 }
+
+.word-image {
+  display: block;
+  width: 7rem;
+  height: 7rem;
+  object-fit: cover;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.word-image-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.5rem;
+  line-height: 1;
+  background: none;
+  object-fit: contain;
+}
+
+.word-image-thumb {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 14px;
+  font-size: 2rem;
+}
+
+.vocab-card-head {
+  align-items: center;
+}

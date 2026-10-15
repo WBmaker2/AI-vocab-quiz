@@ -35,6 +35,7 @@ export function createDraftVocabularyItem(item, index) {
     word: item.word?.trim() ?? "",
     meaning: item.meaning?.trim() ?? "",
     imageHint: item.imageHint?.trim() ?? "",
+    imageUrl: item.imageUrl?.trim() ?? "",
     exampleSentence: item.exampleSentence?.trim() ?? "",
     createdAt: new Date().toISOString(),
   };

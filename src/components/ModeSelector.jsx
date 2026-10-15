@@ -37,6 +37,7 @@ export function ModeSelector({
   onOpenTeacher,
   onOpenListening,
   onOpenSpeaking,
+  onOpenDictation,
   onOpenMatching,
   onOpenFishing,
   onOpenSpelling,
@@ -373,6 +374,14 @@ export function ModeSelector({
                 disabled={!hasVocabulary}
               >
                 말하기 연습
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onOpenDictation}
+                disabled={!hasVocabulary}
+              >
+                받아쓰기
               </button>
             </div>
           </section>

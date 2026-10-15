@@ -970,6 +970,43 @@ service cloud.firestore {
       }
     }
 
+    function isWordMissReportDocument(data) {
+      return data.keys().hasOnly([
+          'schoolId',
+          'schoolName',
+          'grade',
+          'unit',
+          'teacherUserId',
+          'teacherName',
+          'word',
+          'meaning',
+          'activityType',
+          'createdAt'
+        ])
+        && data.schoolId is string
+        && data.schoolId.size() > 0
+        && data.schoolId.size() <= 100
+        && data.grade is string
+        && data.grade.size() > 0
+        && data.grade.size() <= 20
+        && data.teacherUserId is string
+        && data.teacherUserId.size() > 0
+        && data.teacherUserId.size() <= 100
+        && data.word is string
+        && data.word.size() > 0
+        && data.word.size() <= 100
+        && data.meaning is string
+        && data.meaning.size() <= 100
+        && data.activityType in ['listening', 'speaking', 'typing'];
+    }
+
+    match /wordMissReports/{reportId} {
+      allow read: if isTeacherForSchool(resource.data.schoolId);
+      allow create: if isWordMissReportDocument(request.resource.data);
+      allow update: if false;
+      allow delete: if isTeacherForSchool(resource.data.schoolId);
+    }
+
     match /spellingLeaderboards/{scopeKey} {
       allow read, write: if false;
 

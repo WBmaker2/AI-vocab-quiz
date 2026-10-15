@@ -1,4 +1,6 @@
-export function getGuidance(error) {
+export function getGuidance(error, browserName = "unknown") {
+  const isStableSttBrowser = browserName === "chrome" || browserName === "edge";
+
   if (error === "microphone-permission-denied") {
     return {
       title: "마이크 권한이 필요합니다",
@@ -28,6 +30,13 @@ export function getGuidance(error) {
   }
 
   if (error === "speech-recognition-service-unavailable" || error === "speech-recognition-network-error") {
+    if (isStableSttBrowser) {
+      return {
+        title: "음성 인식 서버에 연결하지 못했습니다",
+        body: "마이크는 정상이지만 크롬이 구글 음성 서버에 닿지 못했습니다. 학교망 차단·VPN·보안 프로그램·광고차단 확장을 확인하거나 시크릿 창에서 다시 시도하세요. 다른 망(핫스팟)에서 되면 망 차단이 원인입니다.",
+      };
+    }
+
     return {
       title: "브라우저 음성 인식을 시작하지 못했습니다",
       body: "마이크 권한과 입력 장치는 정상일 수 있지만, 현재 브라우저의 STT 서비스가 시작되지 않았습니다. 새로고침 후 다시 시도하거나 Chrome 또는 Edge에서 확인하세요.",

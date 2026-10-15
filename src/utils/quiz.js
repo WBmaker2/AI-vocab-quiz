@@ -50,6 +50,7 @@ export function createListeningQuestions(items, choicePool = items) {
       word: item.word,
       meaning: item.meaning,
       imageHint: item.imageHint,
+      imageUrl: item.imageUrl ?? "",
       exampleSentence: item.exampleSentence,
       choices: shuffle([item.meaning, ...distractors]),
     };
@@ -62,6 +63,7 @@ export function createSpeakingSequence(items) {
     word: item.word,
     meaning: item.meaning,
     imageHint: item.imageHint,
+    imageUrl: item.imageUrl ?? "",
     exampleSentence: item.exampleSentence,
   }));
 }

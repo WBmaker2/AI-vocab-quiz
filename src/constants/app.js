@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.18.0",
+    date: "2026-10-15",
+    summary: [
+      "브라우저에 맞는 음성 인식 안내를 보여주고, 단어 그림 카드(URL·기본 그림)를 듣기·말하기·목록에 표시합니다.",
+      "Safari용 실험적 기기 내 인식, 선생님용 자주 틀린 단어 보기, 받아쓰기 연습을 추가했습니다.",
+      "10개 화면 파일을 500줄 아래로 나누고 단계별 필수 버튼에 강조 효과를 넓혔습니다.",
+    ],
+  },
+  {
     version: "v1.17.1",
     date: "2026-10-15",
     summary: [

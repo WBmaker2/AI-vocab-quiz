@@ -3357,3 +3357,65 @@ rulesTest(
     );
   },
 );
+
+function createWordMissReportDoc(overrides = {}) {
+  return {
+    schoolId: "school-1",
+    schoolName: "테스트초",
+    grade: "3",
+    unit: "1",
+    teacherUserId: "teacher-1",
+    teacherName: "김선생",
+    word: "pants",
+    meaning: "바지",
+    activityType: "speaking",
+    createdAt: createTimestamp(300),
+    ...overrides,
+  };
+}
+
+rulesTest(
+  "anonymous student can create a valid word miss report",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(
+      setDoc(doc(studentDb, "wordMissReports", "report-1"), createWordMissReportDoc()),
+    );
+  },
+);
+
+rulesTest(
+  "word miss reports reject invalid activity types and empty words",
+  async () => {
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      setDoc(doc(studentDb, "wordMissReports", "bad-1"), createWordMissReportDoc({ activityType: "bingo" })),
+    );
+    await assertFails(
+      setDoc(doc(studentDb, "wordMissReports", "bad-2"), createWordMissReportDoc({ word: "" })),
+    );
+  },
+);
+
+rulesTest(
+  "only the school teacher can read and clear word miss reports",
+  async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await seedTeacher(context);
+      await seedTeacher(context, "teacher-2", { schoolId: "school-2", schoolName: "다른초" });
+      await setDoc(doc(context.firestore(), "wordMissReports", "report-1"), createWordMissReportDoc());
+    });
+
+    const teacherDb = testEnv.authenticatedContext("teacher-1").firestore();
+    await assertSucceeds(getDoc(doc(teacherDb, "wordMissReports", "report-1")));
+
+    const otherDb = testEnv.authenticatedContext("teacher-2").firestore();
+    await assertFails(getDoc(doc(otherDb, "wordMissReports", "report-1")));
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(studentDb, "wordMissReports", "report-1")));
+
+    await assertFails(updateDoc(doc(teacherDb, "wordMissReports", "report-1"), { meaning: "수정" }));
+    await assertSucceeds(deleteDoc(doc(teacherDb, "wordMissReports", "report-1")));
+  },
+);

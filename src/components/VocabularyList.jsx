@@ -1,3 +1,5 @@
+import { WordImage } from "./WordImage.jsx";
+
 export function VocabularyList({
   items,
   onEdit,
@@ -21,6 +23,7 @@ export function VocabularyList({
       {items.map((item) => (
         <article className="vocab-card" key={item.id}>
           <div className="vocab-card-head">
+            <WordImage item={item} variant="thumb" />
             <div>
               <p className="vocab-word">{item.word}</p>
               <p className="vocab-meaning">{item.meaning}</p>

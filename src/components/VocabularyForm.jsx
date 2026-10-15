@@ -57,6 +57,17 @@ export function VocabularyForm({
           />
         </label>
 
+        <label className="field">
+          <span>그림 주소(URL)</span>
+          <input
+            name="imageUrl"
+            value={values.imageUrl ?? ""}
+            onChange={onChange}
+            placeholder="https://..."
+            inputMode="url"
+          />
+        </label>
+
         <label className="field field-wide">
           <span>예문</span>
           <input

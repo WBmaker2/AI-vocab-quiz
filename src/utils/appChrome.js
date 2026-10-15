@@ -27,6 +27,12 @@ const COMPACT_LAYOUTS = {
     subtitle: "영어 단어를 듣고 또렷하게 말해보세요.",
     focusLabel: "말하기 연습 화면",
   },
+  dictation: {
+    eyebrow: "Dictation Quiz",
+    title: "받아쓰기",
+    subtitle: "소리를 듣고 영어 단어를 직접 써보세요.",
+    focusLabel: "받아쓰기 화면",
+  },
   matching: {
     eyebrow: "Word Matching",
     title: "단어 짝 맞추기",

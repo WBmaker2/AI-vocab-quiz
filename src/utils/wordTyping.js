@@ -17,6 +17,10 @@ export function normalizeTypingAnswer(value) {
   return normalizeWordPart(value).toLowerCase();
 }
 
+export function formatAverageSeconds(value) {
+  return `${Number(value ?? 0).toFixed(1)}초`;
+}
+
 export function normalizeTypingItems(items) {
   return (Array.isArray(items) ? items : [])
     .map((item, index) => {

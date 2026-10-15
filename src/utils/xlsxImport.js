@@ -8,6 +8,7 @@ const HEADER_ALIASES = {
   word: ["English", "Word", "영어", "영단어", "단어"],
   meaning: ["Korean", "Meaning", "뜻", "의미", "한국어", "해석"],
   imageHint: ["ImageHint", "Hint", "이미지힌트", "이미지 힌트", "힌트"],
+  imageUrl: ["ImageURL", "ImageUrl", "이미지URL", "이미지 URL", "그림주소", "그림 주소", "사진"],
   exampleSentence: [
     "ExampleSentence",
     "Sentence",
@@ -47,6 +48,7 @@ function getRequiredColumns(headers) {
     word: findColumnIndex(headers, HEADER_ALIASES.word),
     meaning: findColumnIndex(headers, HEADER_ALIASES.meaning),
     imageHint: findColumnIndex(headers, HEADER_ALIASES.imageHint),
+    imageUrl: findColumnIndex(headers, HEADER_ALIASES.imageUrl),
     exampleSentence: findColumnIndex(headers, HEADER_ALIASES.exampleSentence),
   };
 
@@ -144,6 +146,7 @@ export async function parseVocabularyWorkbook(file, { readSheet = readBrowserShe
       word: getCell(row, columns.word),
       meaning: getCell(row, columns.meaning),
       imageHint: getCell(row, columns.imageHint),
+      imageUrl: getCell(row, columns.imageUrl),
       exampleSentence: getCell(row, columns.exampleSentence),
     };
     const missing = getMissingRequiredFields(item);
@@ -159,6 +162,7 @@ export async function parseVocabularyWorkbook(file, { readSheet = readBrowserShe
       word: item.word,
       meaning: item.meaning,
       imageHint: item.imageHint,
+        imageUrl: item.imageUrl,
       exampleSentence: item.exampleSentence,
     });
     itemsByUnit.set(item.unit, unitItems);

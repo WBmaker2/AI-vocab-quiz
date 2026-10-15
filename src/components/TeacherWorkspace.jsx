@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TeacherBingoTab } from "./teacher/TeacherBingoTab.jsx";
+import { TeacherProfileSection } from "./teacher/TeacherProfileSection.jsx";
+import {
+  ApprovalPendingGate,
+  LoadingGate,
+  OnboardingGate,
+  ProfileErrorGate,
+  RemoteConfigGate,
+  SignInGate,
+} from "./teacher/TeacherWorkspaceGates.jsx";
 import { TeacherBulkTab } from "./teacher/TeacherBulkTab.jsx";
 import { TeacherLeaderboardTab } from "./teacher/TeacherLeaderboardTab.jsx";
 import { TeacherManageTab } from "./teacher/TeacherManageTab.jsx";
@@ -12,6 +21,7 @@ const EMPTY_FORM = {
   word: "",
   meaning: "",
   imageHint: "",
+  imageUrl: "",
   exampleSentence: "",
 };
 
@@ -299,221 +309,27 @@ export function TeacherWorkspace({
   });
 
   if (!remoteConfigured) {
-    return (
-      <section className="workspace-panel">
-        <div className="section-heading">
-          <div>
-            <p className="mode-label">Teacher Mode</p>
-            <h2>선생님 모드 설정 필요</h2>
-          </div>
-          <button className="ghost-button" onClick={onBack}>
-            홈으로
-          </button>
-        </div>
-
-        <article className="empty-card">
-          <h3>Firebase 환경 변수가 필요합니다</h3>
-          <p>
-            Google 로그인과 교사별 단어 저장을 사용하려면 Firebase 웹 앱 설정값을
-            먼저 입력하세요.
-          </p>
-        </article>
-      </section>
-    );
+    return <RemoteConfigGate onBack={onBack} />;
   }
 
   if (auth.loading || profileLoading) {
-    return (
-      <section className="workspace-panel">
-        <div className="section-heading">
-          <div>
-            <p className="mode-label">Teacher Mode</p>
-            <h2>선생님 정보를 확인하는 중입니다</h2>
-          </div>
-          <button className="ghost-button" onClick={onBack}>
-            홈으로
-          </button>
-        </div>
-
-        <article className="empty-card">
-          <h3>잠시만 기다리세요</h3>
-          <p>로그인 상태와 선생님 프로필을 확인하고 있습니다.</p>
-        </article>
-      </section>
-    );
+    return <LoadingGate onBack={onBack} />;
   }
 
   if (!auth.signedIn) {
-    return (
-      <section className="workspace-panel">
-        <div className="section-heading">
-          <div>
-            <p className="mode-label">Teacher Mode</p>
-            <h2>Google 로그인 후 시작</h2>
-          </div>
-          <button className="ghost-button" onClick={onBack}>
-            홈으로
-          </button>
-        </div>
-
-        <article className="form-card">
-          <p className="inline-hint">
-            선생님 모드는 Google 로그인 후 사용할 수 있습니다. 로그인하면 내
-            학교와 단어 세트만 관리할 수 있습니다.
-          </p>
-          {auth.error ? (
-            <p className="inline-hint warning-hint">{auth.error}</p>
-          ) : null}
-          <div className="toolbar-row">
-            <button className="primary-button" onClick={auth.signInWithGoogle}>
-              Google로 로그인
-            </button>
-          </div>
-        </article>
-      </section>
-    );
+    return <SignInGate onBack={onBack} auth={auth} />;
   }
 
   if (profileError) {
-    return (
-      <section className="workspace-panel">
-        <div className="section-heading">
-          <div>
-            <p className="mode-label">Teacher Mode</p>
-            <h2>선생님 정보를 불러오지 못했습니다</h2>
-          </div>
-          <button className="ghost-button" onClick={auth.signOut}>
-            로그아웃
-          </button>
-        </div>
-
-        <article className="empty-card">
-          <h3>프로필 오류</h3>
-          <p>{profileError}</p>
-        </article>
-      </section>
-    );
+    return <ProfileErrorGate auth={auth} profileError={profileError} />;
   }
 
   if (requiresOnboarding) {
-    return (
-      <section className="workspace-panel">
-        <div className="section-heading">
-          <div>
-            <p className="mode-label">Teacher Onboarding</p>
-            <h2>선생님 정보 등록</h2>
-          </div>
-          <div className="toolbar-row">
-            <button className="ghost-button" onClick={onBack}>
-              홈으로
-            </button>
-            <button className="ghost-button" onClick={auth.signOut}>
-              로그아웃
-            </button>
-          </div>
-        </div>
-
-        <article className="form-card">
-          <p className="inline-hint">
-            처음 한 번만 학교 이름과 선생님 이름을 등록하면, 이후에는 내 단어
-            세트만 관리할 수 있습니다.
-          </p>
-
-          <div className="form-grid compact-grid">
-            <label className="field field-wide">
-              <span>학교 이름</span>
-              <input
-                value={onboarding.schoolName}
-                onChange={(event) =>
-                  onboarding.updateField("schoolName", event.target.value)
-                }
-                placeholder="예: 서울초등학교"
-              />
-            </label>
-
-            <label className="field field-wide">
-              <span>선생님 이름</span>
-              <input
-                value={onboarding.teacherName}
-                onChange={(event) =>
-                  onboarding.updateField("teacherName", event.target.value)
-                }
-                placeholder="예: 김영어"
-              />
-            </label>
-          </div>
-
-          {onboarding.searching ? (
-            <p className="inline-hint">비슷한 학교를 찾는 중입니다...</p>
-          ) : null}
-
-          {onboarding.suggestions.length > 0 ? (
-            <div className="selection-chip-group" aria-label="학교 추천">
-              {onboarding.suggestions.map((school) => (
-                <button
-                  key={school.id}
-                  className="choice-chip"
-                  onClick={() => onboarding.chooseSchool(school)}
-                >
-                  {school.name}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {onboarding.error ? (
-            <p className="inline-hint warning-hint">{onboarding.error}</p>
-          ) : null}
-          {onboarding.status ? (
-            <p className="inline-hint success-hint">{onboarding.status}</p>
-          ) : null}
-
-          <div className="toolbar-row">
-            <button
-              className="primary-button"
-              onClick={onboarding.save}
-              disabled={onboarding.saving}
-            >
-              {onboarding.saving ? "저장 중..." : "선생님 정보 저장"}
-            </button>
-          </div>
-        </article>
-      </section>
-    );
+    return <OnboardingGate onBack={onBack} auth={auth} onboarding={onboarding} />;
   }
 
   if (profilePanelMode === "approval-pending") {
-    return (
-      <section className="workspace-panel approval-wait-panel">
-        <div className="section-heading">
-          <div>
-            <p className="mode-label">Teacher Approval</p>
-            <h2>선생님 승인 대기</h2>
-          </div>
-          <div className="toolbar-row">
-            <button className="ghost-button" onClick={onBack}>
-              홈으로
-            </button>
-            <button className="ghost-button" onClick={auth.signOut}>
-              로그아웃
-            </button>
-          </div>
-        </div>
-
-        <article className="approval-wait-card">
-          <p className="mode-label">Approval Requested</p>
-          <h3>관리자 확인 후 단어 세트를 관리할 수 있습니다</h3>
-          <p>
-            {profile.schoolName} · {profile.teacherName} 정보로 승인 요청이
-            접수되었습니다. 학교 관리자가 승인하면 이 화면에서 관리 기능을 바로
-            사용할 수 있습니다.
-          </p>
-          <p className="inline-hint">
-            학교 정보가 잘못되었다면 관리자에게 문의해 주세요.
-          </p>
-        </article>
-      </section>
-    );
+    return <ApprovalPendingGate onBack={onBack} auth={auth} profile={profile} />;
   }
 
   return (
@@ -536,130 +352,7 @@ export function TeacherWorkspace({
         </div>
       </div>
 
-      {profilePanelMode === "expanded" ? (
-        <article className="form-card">
-          <div className="section-heading compact">
-            <div>
-              <p className="mode-label">Teacher Profile</p>
-              <h3>학교와 선생님 정보</h3>
-            </div>
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={handleCancelProfileEditor}
-            >
-              수정 닫기
-            </button>
-          </div>
-
-          <p className="inline-hint">
-            현재 등록 정보: {profile.schoolName} · {profile.teacherName}
-          </p>
-
-            <div className="form-grid compact-grid">
-              <label className="field field-wide">
-                <span>학교 이름</span>
-                <input
-                  value={onboarding.schoolName}
-                  onChange={(event) =>
-                    onboarding.updateField("schoolName", event.target.value)
-                  }
-                  placeholder="예: 서울초등학교"
-                />
-              </label>
-
-              <label className="field field-wide">
-                <span>선생님 이름</span>
-                <input
-                  value={onboarding.teacherName}
-                  onChange={(event) =>
-                    onboarding.updateField("teacherName", event.target.value)
-                  }
-                  placeholder="예: 김영어"
-                />
-              </label>
-            </div>
-
-            {onboarding.searching ? (
-              <p className="inline-hint">비슷한 학교를 찾는 중입니다...</p>
-            ) : null}
-
-            {onboarding.suggestions.length > 0 ? (
-              <div className="selection-chip-group" aria-label="학교 추천">
-                {onboarding.suggestions.map((school) => (
-                  <button
-                    key={school.id}
-                    className="choice-chip"
-                    onClick={() => onboarding.chooseSchool(school)}
-                  >
-                    {school.name}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {onboarding.error ? (
-              <p className="inline-hint warning-hint">{onboarding.error}</p>
-            ) : null}
-            {onboarding.status ? (
-              <p className="inline-hint success-hint">{onboarding.status}</p>
-            ) : null}
-
-            <div className="toolbar-row">
-              <button
-                className="primary-button"
-                type="button"
-                onClick={handleSaveProfileEditor}
-                disabled={onboarding.saving}
-              >
-                {onboarding.saving ? "저장 중..." : "정보 저장"}
-              </button>
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={handleCancelProfileEditor}
-                disabled={onboarding.saving}
-              >
-                취소
-              </button>
-            </div>
-
-            <div className="toolbar-row">
-              <button
-                className="ghost-button danger-button"
-                type="button"
-                onClick={handleDeleteTeacherProfile}
-                disabled={onboarding.saving}
-              >
-                선생님 정보 삭제
-              </button>
-              <button
-                className="ghost-button danger-button"
-                type="button"
-                onClick={handleDeleteSchoolProfile}
-                disabled={onboarding.saving}
-              >
-                학교 정보 삭제
-              </button>
-            </div>
-        </article>
-      ) : (
-        <article className="teacher-profile-strip">
-          <div className="teacher-profile-strip-copy">
-            <p className="mode-label">Teacher Profile</p>
-            <p className="teacher-profile-strip-meta">
-              {profile.schoolName} · {profile.teacherName}
-            </p>
-          </div>
-          <button
-            className="ghost-button ghost-button-compact"
-            type="button"
-            onClick={handleOpenProfileEditor}
-          >
-            정보 수정
-          </button>
-        </article>
-      )}
+      <TeacherProfileSection expanded={profilePanelMode === "expanded"} profile={profile} onboarding={onboarding} onCancelProfileEditor={handleCancelProfileEditor} onSaveProfileEditor={handleSaveProfileEditor} onDeleteTeacherProfile={handleDeleteTeacherProfile} onDeleteSchoolProfile={handleDeleteSchoolProfile} onOpenProfileEditor={handleOpenProfileEditor} />
 
       <div className="teacher-workspace-tabs-wrap">
         <div className="teacher-summary-chips" aria-label="현재 단어 세트 요약">
