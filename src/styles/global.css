@@ -3640,3 +3640,71 @@ button:disabled {
     animation: none;
   }
 }
+
+.mic-level-meter {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(23, 50, 77, 0.09);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.mic-level-track {
+  height: 0.65rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(23, 50, 77, 0.1);
+}
+
+.mic-level-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1d8fff, #22c07a);
+  transition: width 120ms linear;
+}
+
+.mic-level-label {
+  margin: 0;
+  color: #51677e;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.speech-rate-toggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.speech-rate-label {
+  color: #51677e;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.chip-button {
+  min-height: 2.5rem;
+  padding: 0.3rem 0.85rem;
+  border: 1px solid rgba(23, 50, 77, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #3f556b;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.chip-button[aria-pressed="true"] {
+  border-color: rgba(29, 143, 255, 0.45);
+  background: #e8f3ff;
+  color: #0b5cad;
+}
+
+.speech-voice-label {
+  color: #7b8fa3;
+  font-size: 0.78rem;
+  font-weight: 700;
+}

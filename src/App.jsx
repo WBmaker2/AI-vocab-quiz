@@ -389,6 +389,7 @@ function App() {
         {view === APP_VIEWS.LISTENING ? (
           <ListeningQuiz
             items={library.student.items}
+            studentGrade={library.student.selection?.grade}
             remoteConfigured={library.remoteConfigured}
             progressionContext={library.student.progressionContext}
             studentNameDraft={library.student.nameDraft}
@@ -402,6 +403,7 @@ function App() {
         {view === APP_VIEWS.SPEAKING ? (
           <SpeakingQuiz
             items={library.student.items}
+            studentGrade={library.student.selection?.grade}
             remoteConfigured={library.remoteConfigured}
             progressionContext={library.student.progressionContext}
             studentNameDraft={library.student.nameDraft}

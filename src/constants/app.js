@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.17.0",
+    date: "2026-10-15",
+    summary: [
+      "TTS 영어 목소리를 기기마다 같은 음성으로 고정하고 보통/천천히 속도 선택을 추가했습니다. 3~4학년은 첫 진입 시 천천히가 자동 제안됩니다.",
+      "말하기 인식에 그날 단어 세트 문법 편향을 적용하고, 말하는 동안 중간 인식 결과와 마이크 입력 크기 막대를 보여줍니다.",
+      "말하기 시작 버튼에 강조 깜빡임을 넣어 다음에 눌러야 할 버튼을 바로 찾을 수 있게 했습니다.",
+    ],
+  },
+  {
     version: "v1.16.0",
     date: "2026-09-07",
     summary: [

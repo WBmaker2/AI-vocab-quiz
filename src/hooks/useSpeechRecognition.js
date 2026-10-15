@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getSpeechRecognitionEndFallbackError } from "../utils/speakingAttempts.js";
 import { extractSpeechCandidates } from "../utils/speakingAcceptance.js";
+import { attachSpeechGrammar, buildSpeechGrammar } from "../utils/speechGrammar.js";
 
 function getRecognitionConstructor() {
   if (typeof window === "undefined") {
@@ -109,6 +110,7 @@ export function useSpeechRecognition(config = {}) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [candidates, setCandidates] = useState([]);
+  const [interimTranscript, setInterimTranscript] = useState("");
   const [error, setError] = useState("");
   const [browserName, setBrowserName] = useState(browserNameRef.current);
   const [microphoneState, setMicrophoneState] = useState("unknown");
@@ -171,6 +173,10 @@ export function useSpeechRecognition(config = {}) {
     recognition.maxAlternatives = config.maxAlternatives ?? 1;
     recognition.continuous = config.continuous ?? false;
 
+    if (Array.isArray(config.vocabulary) && config.vocabulary.length > 0) {
+      attachSpeechGrammar(recognition, buildSpeechGrammar(config.vocabulary));
+    }
+
     recognition.onstart = () => {
       stopRequestedRef.current = false;
       resultReceivedRef.current = false;
@@ -206,12 +212,30 @@ export function useSpeechRecognition(config = {}) {
     };
 
     recognition.onresult = (event) => {
+      const interimParts = [];
+
+      for (const result of Array.from(event?.results ?? [])) {
+        if (result?.isFinal === false) {
+          const part = String(result?.[0]?.transcript ?? "").trim();
+
+          if (part) {
+            interimParts.push(part);
+          }
+        }
+      }
+
+      setInterimTranscript(interimParts.join(" "));
       const nextCandidates = extractSpeechCandidates(event);
       const value = nextCandidates[0] ?? "";
 
       resultReceivedRef.current = Boolean(value);
       setTranscript(value);
       setCandidates(nextCandidates);
+
+      if (value) {
+        setInterimTranscript("");
+      }
+
       config.onResult?.(value, event);
     };
 
@@ -233,6 +257,7 @@ export function useSpeechRecognition(config = {}) {
     config.lang,
     config.maxAlternatives,
     config.onResult,
+    config.vocabularyKey,
   ]);
 
   function start() {
@@ -249,6 +274,7 @@ export function useSpeechRecognition(config = {}) {
       setMicrophoneState("unknown");
       setTranscript("");
       setCandidates([]);
+      setInterimTranscript("");
       setError("");
       recognitionRef.current.start();
       return true;
@@ -272,6 +298,7 @@ export function useSpeechRecognition(config = {}) {
     setMicrophoneState("unknown");
     setTranscript("");
     setCandidates([]);
+    setInterimTranscript("");
     setError("");
   }
 
@@ -282,6 +309,7 @@ export function useSpeechRecognition(config = {}) {
     listening,
     transcript,
     candidates,
+    interimTranscript,
     error,
     start,
     stop,

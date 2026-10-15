@@ -6,6 +6,7 @@ import { ScoreBoard } from "./ScoreBoard.jsx";
 import { StudentProgressPanel } from "./StudentProgressPanel.jsx";
 import { createListeningQuestions } from "../utils/quiz.js";
 import { getListeningAnnouncementWord } from "../utils/listeningQuiz.js";
+import { SpeechRateToggle } from "./SpeechRateToggle.jsx";
 import {
   buildSessionReviewItems,
   registerSessionReviewMiss,
@@ -34,6 +35,7 @@ export function ListeningQuiz({
   speech,
   celebration,
   onBack,
+  studentGrade,
 }) {
   const [questions, setQuestions] = useState(() =>
     createListeningQuestions(items),
@@ -151,7 +153,6 @@ export function ListeningQuiz({
 
     speech.speak(announcementWord, {
       lang: "en-US",
-      rate: 0.9,
     });
   });
 
@@ -171,6 +172,12 @@ export function ListeningQuiz({
     announcedQuestionIdRef.current = announcementKey;
     announceQuestion(targetQuestion);
   }, [announceQuestion, isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion]);
+
+  const { warmup } = speech ?? {};
+
+  useEffect(() => {
+    warmup?.();
+  }, [warmup]);
 
   useEffect(() => {
     if (status !== "correct" || !question) {
@@ -545,6 +552,8 @@ export function ListeningQuiz({
                 </button>
               </div>
 
+              <SpeechRateToggle speech={speech} studentGrade={studentGrade} />
+
               <p className="question-copy">
                 방금 틀린 문제만 다시 모았습니다. 이번에는 뜻을 천천히 골라보세요.
               </p>
@@ -685,6 +694,8 @@ export function ListeningQuiz({
                 {speech.speaking ? "읽는 중..." : "다시 듣기"}
               </button>
             </div>
+
+            <SpeechRateToggle speech={speech} studentGrade={studentGrade} />
 
             <p className="question-copy">
               영어 단어를 듣고 가장 알맞은 뜻을 선택하세요.
