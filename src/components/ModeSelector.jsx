@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+const SHOW_DICTATION_BUTTON = false;
+
 export function ModeSelector({
   gradeOptions,
   remoteConfigured,
@@ -375,6 +377,7 @@ export function ModeSelector({
               >
                 말하기 연습
               </button>
+              {SHOW_DICTATION_BUTTON ? (
               <button
                 type="button"
                 className="secondary-button"
@@ -383,6 +386,7 @@ export function ModeSelector({
               >
                 받아쓰기
               </button>
+              ) : null}
             </div>
           </section>
 
