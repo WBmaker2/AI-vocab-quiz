@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  hasPluralSpeechVariant,
+  hasSpeechHomophoneMatch,
   isSpeechMatch,
   normalizeSpeechNumberText,
   normalizeSpeechText,
@@ -55,4 +57,26 @@ test("isSpeechMatch rejects unrelated words and numeric lookalikes", () => {
   assert.equal(isSpeechMatch("dog", "kick"), false);
   assert.equal(isSpeechMatch("13", "thirty"), false);
   assert.equal(isSpeechMatch("I said tree", "three"), false);
+});
+
+test("isSpeechMatch accepts homophone transcripts", () => {
+  assert.equal(isSpeechMatch("Where", "wear"), true);
+  assert.equal(isSpeechMatch("wear", "where"), true);
+  assert.equal(isSpeechMatch("see", "sea"), true);
+  assert.equal(isSpeechMatch("here", "hear"), true);
+  assert.equal(isSpeechMatch("weak", "week"), true);
+  assert.equal(isSpeechMatch("write", "right"), true);
+  assert.equal(hasSpeechHomophoneMatch("Where", "wear"), true);
+  assert.equal(hasSpeechHomophoneMatch("wear", "shirts"), false);
+});
+
+test("isSpeechMatch accepts plural suffix variants", () => {
+  assert.equal(isSpeechMatch("t-shirts", "t-shirt"), true);
+  assert.equal(isSpeechMatch("t-shirt", "t-shirts"), true);
+  assert.equal(isSpeechMatch("apples", "apple"), true);
+  assert.equal(isSpeechMatch("boxes", "box"), true);
+  assert.equal(isSpeechMatch("families", "family"), true);
+  assert.equal(hasPluralSpeechVariant("t-shirts", "t-shirt"), true);
+  assert.equal(hasPluralSpeechVariant("glass", "class"), false);
+  assert.equal(hasPluralSpeechVariant("cat", "dog"), false);
 });

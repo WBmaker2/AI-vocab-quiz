@@ -43,6 +43,136 @@ function isProtectedSpeechPair(left, right) {
   return PROTECTED_SPEECH_CONFUSIONS.has([left, right].sort().join("|"));
 }
 
+const SPEECH_HOMOPHONE_SETS = [
+  ["wear", "where", "ware"],
+  ["sea", "see"],
+  ["hear", "here"],
+  ["week", "weak"],
+  ["right", "write", "rite"],
+  ["pair", "pear", "pare"],
+  ["peace", "piece"],
+  ["son", "sun"],
+  ["sent", "cent", "scent"],
+  ["buy", "by", "bye"],
+  ["flour", "flower"],
+  ["night", "knight"],
+  ["new", "knew"],
+  ["hole", "whole"],
+  ["hour", "our"],
+  ["dear", "deer"],
+  ["fair", "fare"],
+  ["tail", "tale"],
+  ["ate", "eight"],
+  ["to", "too", "two"],
+  ["no", "know"],
+  ["rain", "rein"],
+  ["meat", "meet"],
+  ["plain", "plane"],
+  ["break", "brake"],
+  ["stair", "stare"],
+  ["mail", "male"],
+  ["wait", "weight"],
+];
+
+const SPEECH_HOMOPHONE_GROUP = new Map();
+
+for (const set of SPEECH_HOMOPHONE_SETS) {
+  for (const word of set) {
+    if (!SPEECH_HOMOPHONE_GROUP.has(word)) {
+      SPEECH_HOMOPHONE_GROUP.set(word, set);
+    }
+  }
+}
+
+export function hasSpeechHomophoneMatch(transcript, expectedWord) {
+  const candidateTokens = normalizeSpeechText(transcript).split(" ").filter(Boolean);
+  const expectedTokens = normalizeSpeechText(expectedWord).split(" ").filter(Boolean);
+
+  if (candidateTokens.length === 0 || candidateTokens.length !== expectedTokens.length) {
+    return false;
+  }
+
+  let homophoneUsed = false;
+
+  for (let index = 0; index < candidateTokens.length; index += 1) {
+    const left = candidateTokens[index];
+    const right = expectedTokens[index];
+
+    if (left === right) {
+      continue;
+    }
+
+    const group = SPEECH_HOMOPHONE_GROUP.get(left);
+
+    if (group && group.includes(right)) {
+      homophoneUsed = true;
+      continue;
+    }
+
+    return false;
+  }
+
+  return homophoneUsed;
+}
+
+function isPluralVariantPair(left, right) {
+  if (left === right || !left || !right) {
+    return false;
+  }
+
+  const [shorter, longer] = left.length <= right.length ? [left, right] : [right, left];
+
+  if (shorter.length < 2) {
+    return false;
+  }
+
+  if (longer === `${shorter}s` || longer === `${shorter}es`) {
+    return true;
+  }
+
+  const leftStem = left.endsWith("ies") ? `${left.slice(0, -3)}y` : null;
+  const rightStem = right.endsWith("ies") ? `${right.slice(0, -3)}y` : null;
+
+  if (leftStem && leftStem === right && left.slice(0, -3).length >= 2) {
+    return true;
+  }
+
+  if (rightStem && rightStem === left && right.slice(0, -3).length >= 2) {
+    return true;
+  }
+
+  return false;
+}
+
+export function hasPluralSpeechVariant(transcript, expectedWord) {
+  const candidateTokens = normalizeSpeechText(transcript).split(" ").filter(Boolean);
+  const expectedTokens = normalizeSpeechText(expectedWord).split(" ").filter(Boolean);
+
+  if (candidateTokens.length === 0 || candidateTokens.length !== expectedTokens.length) {
+    return false;
+  }
+
+  let variantUsed = false;
+
+  for (let index = 0; index < candidateTokens.length; index += 1) {
+    const left = candidateTokens[index];
+    const right = expectedTokens[index];
+
+    if (left === right) {
+      continue;
+    }
+
+    if (isPluralVariantPair(left, right)) {
+      variantUsed = true;
+      continue;
+    }
+
+    return false;
+  }
+
+  return variantUsed;
+}
+
 export function hasProtectedSpeechConfusion(transcript, expectedWord) {
   const normalizedTranscript = normalizeSpeechText(transcript);
   const normalizedExpected = normalizeSpeechText(expectedWord);
@@ -150,6 +280,13 @@ export function isSpeechMatch(transcript, expectedWord) {
   }
 
   if (normalizedTranscript.split(" ").includes(normalizedWord)) {
+    return true;
+  }
+
+  if (
+    hasSpeechHomophoneMatch(transcript, expectedWord)
+    || hasPluralSpeechVariant(transcript, expectedWord)
+  ) {
     return true;
   }
 

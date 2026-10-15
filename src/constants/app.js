@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.17.1",
+    date: "2026-10-15",
+    summary: [
+      "말하기 연습에서 wear/where 같은 동음이의어와 t-shirts/t-shirt 같은 복수형 변형을 정답으로 인정하도록 판정을 보완했습니다.",
+      "sea/see, hear/here, week/weak, right/write 등 초등 어휘 수준의 동음이의어 28쌍과 -s/-es/-ies 복수형을 함께 대비했습니다.",
+    ],
+  },
+  {
     version: "v1.17.0",
     date: "2026-10-15",
     summary: [
