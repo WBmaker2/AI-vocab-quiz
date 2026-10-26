@@ -43,3 +43,12 @@ v1.18.0에서 큰 화면 파일을 작은 컴포넌트로 분리하는 과정에
 
 - Firestore 규칙 변경 없음
 - Vercel production만 재배포
+
+### 배포 결과
+
+- Vercel production: `dpl_DD59dZtA4ozsUKWeMceguypg6LVh`
+- Production URL: <https://talking-vacab-quiz.vercel.app>
+- 라이브 번들에서 `v1.18.2` 확인
+- 라이브 확인: 공개 단어 세트를 불러와 단어 낚시 시작/카드 6개 표시, 영어 단어 타자 게임 시작/입력 화면 표시 확인
+- 라이브 확인 중 페이지 오류 없음
+- 실제 학생 이름과 기록 저장은 사용하지 않음

@@ -134,12 +134,12 @@ export const FISHING_ROUND_DURATION_SECONDS = FISHING_ROUND_DURATION_MS / 1000;
 
 ### Task 6: 배포
 
-- [ ] `git status`, `git diff` 확인 후 의도한 파일만 커밋
-- [ ] 원격 브랜치 `codex/typing-leaderboards`로 push
-- [ ] `CI=1 npx --yes vercel --prod --yes`로 Vercel production 배포
-- [ ] 라이브 번들에서 `v1.18.2` 확인
-- [ ] 라이브에서 단어 세트를 불러와 두 게임 시작/첫 문제 동작 확인
-- [ ] Firestore 규칙은 변경 없음, 재배포하지 않음
+- [x] `git status`, `git diff` 확인 후 의도한 파일만 커밋
+- [x] 원격 브랜치 `codex/typing-leaderboards`로 push
+- [x] `CI=1 npx --yes vercel --prod --yes`로 Vercel production 배포
+- [x] 라이브 번들에서 `v1.18.2` 확인
+- [x] 라이브에서 단어 세트를 불러와 두 게임 시작/첫 문제 동작 확인
+- [x] Firestore 규칙은 변경 없음, 재배포하지 않음
 
 ---
 
