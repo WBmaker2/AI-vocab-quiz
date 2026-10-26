@@ -52,6 +52,10 @@
 
 ## 6. 운영 참고
 
-- 배포는 하지 않았습니다. Vercel production 반영 시 `vercel.json` 헤더가 함께 적용됩니다.
+- 커밋: `93d9aca` (`feat: release technical debt hardening v1.19.1`)
+- 푸시: `origin/codex/typing-leaderboards`
+- Vercel production 배포: `dpl_9yGdFuMSBbcxquE6BZkB8sTnY3k3`
+- 라이브 확인: <https://talking-vacab-quiz.vercel.app> HTTP 200, `v1.19.1`, 콘솔 오류 0건, 실패 요청 0건
+- 배포 보안 헤더 확인: `x-content-type-options`, `referrer-policy`, `x-frame-options`, `permissions-policy`, `cross-origin-opener-policy`, `strict-transport-security` 응답 확인
 - App Check를 켜려면 Firebase Console > App Check에서 reCAPTCHA v3 provider를 등록하고, 빌드 환경에 `VITE_FIREBASE_APP_CHECK_SITE_KEY`를 넣은 뒤 선택적으로 enforcement를 활성화합니다.
 - 인기 학교 목록은 최대 5분간 이전 값을 보여 줄 수 있습니다.
