@@ -34,3 +34,12 @@
 - Firestore 규칙은 Vercel 배포와 별개로 Firebase에 배포해야 한다.
 - `npx firebase deploy --only firestore:rules --project talking-vocab-quiz`
 - 앱 업데이트 내역 반영을 위해 Vercel production도 재배포한다.
+
+### 배포 결과
+
+- Firestore 규칙: `talking-vocab-quiz` 프로젝트에 배포 완료
+- Vercel production: `dpl_RnkqRTGghiwZujPZ3gZEmBw2UcDz`
+- Production URL: <https://talking-vacab-quiz.vercel.app>
+- 라이브 번들에서 `v1.18.1` 업데이트 내역 확인
+- 운영 환경 QA: 임시 capability 프로필 생성/업데이트 성공 후 `firestore:delete`로 삭제
+- 실제 학생 이름과 실제 기록은 사용하지 않음

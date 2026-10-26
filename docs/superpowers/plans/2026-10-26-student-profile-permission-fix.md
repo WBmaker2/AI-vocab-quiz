@@ -130,17 +130,17 @@ allow get: if resource == null || isStudentProfileRead(profileId);
 
 ### Task 6: 배포
 
-- [ ] Firestore 규칙 배포
+- [x] Firestore 규칙 배포
 
 ```bash
 npx firebase deploy --only firestore:rules --project talking-vocab-quiz
 ```
 
-- [ ] Firebase Console > Firestore > Rules에서 새 규칙 게시 확인
-- [ ] 앱 업데이트 내역 반영을 위해 Vercel production 재배포
-- [ ] 새 브라우저(새 capability 토큰)에서 임시 학생 이름으로 첫 저장 확인
-- [ ] QA 문서는 Firebase Console 또는 Admin SDK로 정리
-- [ ] 실제 학생 이름과 실제 기록은 라이브 검증에 사용하지 않음
+- [x] Firebase Console > Firestore > Rules에서 새 규칙 게시 확인
+- [x] 앱 업데이트 내역 반영을 위해 Vercel production 재배포
+- [x] 새 브라우저(새 capability 토큰)에서 임시 학생 이름으로 첫 저장 확인
+- [x] QA 문서는 Firebase Console 또는 Admin SDK로 정리
+- [x] 실제 학생 이름과 실제 기록은 라이브 검증에 사용하지 않음
 
 ---
 
