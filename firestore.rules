@@ -757,7 +757,7 @@ service cloud.firestore {
     }
 
     match /studentProfiles/{profileId} {
-      allow get: if isStudentProfileRead(profileId);
+      allow get: if resource == null || isStudentProfileRead(profileId);
       allow list: if false;
 
       allow create: if isStudentProfileWrite(profileId)

@@ -117,6 +117,11 @@ new device-private profile instead. Consequently, existing personal growth
 history starts fresh once on the updated device-private model. Public leaderboard
 history remains shared and is not reset by this migration.
 
+Firestore rules allow a `get` of a missing capability document so the first
+save transaction can read before it creates the profile. Existing documents
+still require the full field and capability-token validation, and listing the
+collection remains disabled.
+
 ### Leaderboard score bounds
 
 Student leaderboard writes are checked both in the client and Firestore rules:

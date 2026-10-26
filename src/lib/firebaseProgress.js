@@ -142,12 +142,15 @@ export function createNextStudentProfile({
   comparisonResult,
   newlyEarnedBadges,
 }) {
+  const persistedSchoolName = currentProfile.schoolName || schoolName;
+  const persistedStudentName = currentProfile.studentName || studentName;
+
   const nextProfile = {
     schoolId,
-    schoolName,
+    schoolName: persistedSchoolName,
     grade,
-    studentName,
-    studentNameNormalized: normalizeStudentNameKey(studentName),
+    studentName: persistedStudentName,
+    studentNameNormalized: normalizeStudentNameKey(persistedStudentName),
     profileToken,
     totalSessions: currentProfile.totalSessions + 1,
     listeningSessions: currentProfile.listeningSessions,

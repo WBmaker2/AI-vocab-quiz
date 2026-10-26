@@ -12,6 +12,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  runTransaction,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -917,6 +918,87 @@ rulesTest(
       ),
     );
     await assertSucceeds(getDoc(doc(studentDb, "studentProfiles", profileId)));
+  },
+);
+
+rulesTest(
+  "studentProfiles allows a transaction to create a missing profile",
+  async () => {
+    const profileId = createStudentProfileId();
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    const profileRef = doc(studentDb, "studentProfiles", profileId);
+
+    await assertSucceeds(
+      runTransaction(studentDb, async (transaction) => {
+        const snapshot = await transaction.get(profileRef);
+        assert.equal(snapshot.exists(), false);
+        transaction.set(
+          profileRef,
+          createStudentProfileDoc({
+            listeningSessions: 1,
+            typingSessions: 0,
+            typingBestScore: 0,
+            typingBestCorrectCount: 0,
+            typingBestAccuracy: 0,
+            typingBestQuestionCount: 0,
+            typingBestHintUsedCount: 0,
+            typingBestCombo: 0,
+            typingBestElapsedSeconds: 0,
+            typingLastPlayedAt: null,
+            earnedBadges: ["first_challenge"],
+          }),
+        );
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "studentProfiles allows a transaction to update an existing profile",
+  async () => {
+    const profileId = createStudentProfileId();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), "studentProfiles", profileId),
+        createStudentProfileDoc(),
+      );
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    const profileRef = doc(studentDb, "studentProfiles", profileId);
+
+    await assertSucceeds(
+      runTransaction(studentDb, async (transaction) => {
+        const snapshot = await transaction.get(profileRef);
+        transaction.update(profileRef, {
+          totalSessions: 2,
+          typingSessions: 2,
+          typingLastPlayedAt: createTimestamp(200),
+          createdAt: snapshot.data().createdAt,
+          updatedAt: createTimestamp(200),
+        });
+      }),
+    );
+  },
+);
+
+rulesTest(
+  "studentProfiles still rejects reads for malformed profile documents",
+  async () => {
+    const profileId = createStudentProfileId();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), "studentProfiles", profileId),
+        createStudentProfileDoc({
+          profileToken: "fedcba9876543210fedcba9876543210",
+        }),
+      );
+    });
+
+    const studentDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(studentDb, "studentProfiles", profileId)));
   },
 );
 

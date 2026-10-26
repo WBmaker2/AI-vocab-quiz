@@ -9,6 +9,7 @@ import {
   validateTypingLeaderboardResult,
 } from "./firebase.js";
 import * as firebase from "./firebase.js";
+import { createNextStudentProfile } from "./firebaseProgress.js";
 import { compareSpellingLeaderboardEntries } from "./spellingLeaderboard.js";
 
 test("shouldReplaceElapsedLeaderboardEntry updates when the existing score is lower", () => {
@@ -297,6 +298,52 @@ test("saveTeacherVocabularyImportBatch rejects more than 500 operations before F
     .catch((error) => error);
 
   assert.match(result?.message ?? "", /500/);
+});
+
+test("createNextStudentProfile preserves stored profile identity on update", () => {
+  const nextProfile = createNextStudentProfile({
+    currentProfile: {
+      schoolId: "school-1",
+      schoolName: "테스트초",
+      grade: "3",
+      studentName: "Minsu",
+      studentNameNormalized: "minsu",
+      profileToken: "0123456789abcdef0123456789abcdef",
+      totalSessions: 1,
+      listeningSessions: 1,
+      speakingSessions: 0,
+      matchingSessions: 0,
+      typingSessions: 0,
+      listeningBestScore: 10,
+      listeningBestCorrectCount: 10,
+      speakingBestScore: 0,
+      speakingBestCorrectCount: 0,
+      matchingBestScore: 0,
+      matchingBestTime: 0,
+      typingBestScore: 0,
+      typingBestCorrectCount: 0,
+      typingBestAccuracy: 0,
+      typingBestQuestionCount: 0,
+      typingBestHintUsedCount: 0,
+      typingBestCombo: 0,
+      typingBestElapsedSeconds: 0,
+      typingLastPlayedAt: null,
+      earnedBadges: ["first_challenge"],
+      createdAt: "existing-created-at",
+    },
+    schoolId: "school-1",
+    schoolName: "새이름초",
+    grade: "3",
+    studentName: "minsu",
+    profileToken: "0123456789abcdef0123456789abcdef",
+    activityType: "listening",
+    comparisonResult: { isNewBest: false },
+    newlyEarnedBadges: [],
+  });
+
+  assert.equal(nextProfile.schoolName, "테스트초");
+  assert.equal(nextProfile.studentName, "Minsu");
+  assert.equal(nextProfile.studentNameNormalized, "minsu");
 });
 
 test("teacher vocabulary import writes publisher and all units through one batch commit", async () => {
