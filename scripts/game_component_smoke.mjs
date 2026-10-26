@@ -32,7 +32,8 @@ function isIgnorableConsoleError(text) {
   return /favicon\.ico|Failed to load resource/i.test(text);
 }
 
-async function runCase(browser, baseUrl, { name, game, action }) {
+async function runCase(baseUrl, { name, game, action }) {
+  const browser = await chromium.launch(getLaunchOptions());
   const page = await browser.newPage();
   const diagnostics = [];
 
@@ -67,7 +68,8 @@ async function runCase(browser, baseUrl, { name, game, action }) {
       diagnostics.length > 0 ? `\n${diagnostics.join("\n")}` : "";
     throw new Error(`${formatError(error)}${diagnosticText}`);
   } finally {
-    await page.close();
+    await page.close().catch(() => {});
+    await browser.close().catch(() => {});
   }
 }
 
@@ -79,8 +81,6 @@ async function run() {
     },
     logLevel: "silent",
   });
-  let browser;
-
   try {
     await server.listen();
     const address = server.httpServer.address();
@@ -91,7 +91,6 @@ async function run() {
     }
 
     const baseUrl = `http://127.0.0.1:${port}`;
-    browser = await chromium.launch(getLaunchOptions());
     const failures = [];
 
     const cases = [
@@ -141,7 +140,7 @@ async function run() {
 
     for (const testCase of cases) {
       try {
-        await runCase(browser, baseUrl, testCase);
+        await runCase(baseUrl, testCase);
       } catch (error) {
         failures.push(`${testCase.name}: ${formatError(error)}`);
       }
@@ -153,7 +152,6 @@ async function run() {
 
     console.log("game component smoke: ok");
   } finally {
-    await browser?.close();
     await server.close();
   }
 }
