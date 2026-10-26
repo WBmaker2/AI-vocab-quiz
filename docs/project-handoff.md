@@ -244,7 +244,8 @@
 
 ## 8. 현재 버전 기준 핵심 상태
 
-- 현재 코드 버전: **v1.19.0**
+- 현재 코드 버전: **v1.19.1**
+- v1.19.1: 학교 검색 인덱스, 배포 보안 헤더, 선택적 App Check, axe 접근성 검사, ESLint 경고 0개
 - 현재 라이브 배포: **Vercel production**
 - 현재 라이브 주소: <https://talking-vacab-quiz.vercel.app>
 - Firebase Hosting 라이브 주소: <https://talking-vocab-quiz.web.app>

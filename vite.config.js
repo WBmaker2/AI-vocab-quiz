@@ -22,6 +22,13 @@ export default defineConfig({
           }
 
           if (
+            normalizedId.includes("/node_modules/@firebase/app-check") ||
+            normalizedId.includes("/node_modules/firebase/app-check")
+          ) {
+            return "firebase-app-check";
+          }
+
+          if (
             normalizedId.includes("/node_modules/firebase/") ||
             normalizedId.includes("/node_modules/@firebase/")
           ) {

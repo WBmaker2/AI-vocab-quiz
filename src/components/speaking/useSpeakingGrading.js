@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { isSpeakingAnswerAccepted } from "../../utils/speakingAcceptance.js";
 import {
   isSpeakingConfigurationError,
@@ -27,7 +27,7 @@ export function useSpeakingGrading({
     setFailedAttempts,
   } = actions;
 
-  useEffect(() => {
+  const gradeTranscript = useEffectEvent(() => {
     const activeQuestion = isReviewPlaying ? reviewQuestion : question;
 
     if (!activeQuestion || recognition.listening) {
@@ -75,18 +75,21 @@ export function useSpeakingGrading({
     setBlockingError("");
     setFailedAttempts((current) => current + 1);
     setStatus("incorrect");
+  });
+
+  useEffect(() => {
+    gradeTranscript();
   }, [
     isReviewPlaying,
     question?.id,
     question?.word,
     recognition.listening,
-    recognition.candidates,
     recognition.transcript,
     reviewQuestion?.id,
     reviewQuestion?.word,
   ]);
 
-  useEffect(() => {
+  const gradeRecognitionError = useEffectEvent(() => {
     const activeQuestion = isReviewPlaying ? reviewQuestion : question;
 
     if (!activeQuestion || !recognition.error) {
@@ -127,5 +130,9 @@ export function useSpeakingGrading({
 
     setBlockingError("");
     setStatus("incorrect");
+  });
+
+  useEffect(() => {
+    gradeRecognitionError();
   }, [isReviewPlaying, question?.id, recognition.error, reviewQuestion?.id]);
 }

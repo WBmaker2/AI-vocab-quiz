@@ -100,6 +100,14 @@ export function isSpeechRecognitionSupported() {
 }
 
 export function useSpeechRecognition(config = {}) {
+  const {
+    continuous = false,
+    interimResults = false,
+    lang = "en-US",
+    maxAlternatives = 1,
+    onResult,
+    vocabulary,
+  } = config ?? {};
   const recognitionRef = useRef(null);
   const browserNameRef = useRef(detectBrowserName());
   const microphoneStateRef = useRef("unknown");
@@ -164,17 +172,17 @@ export function useSpeechRecognition(config = {}) {
 
     if (!Recognition) {
       recognitionRef.current = null;
-      return;
+      return undefined;
     }
 
     const recognition = new Recognition();
-    recognition.lang = config.lang ?? "en-US";
-    recognition.interimResults = config.interimResults ?? false;
-    recognition.maxAlternatives = config.maxAlternatives ?? 1;
-    recognition.continuous = config.continuous ?? false;
+    recognition.lang = lang;
+    recognition.interimResults = interimResults;
+    recognition.maxAlternatives = maxAlternatives;
+    recognition.continuous = continuous;
 
-    if (Array.isArray(config.vocabulary) && config.vocabulary.length > 0) {
-      attachSpeechGrammar(recognition, buildSpeechGrammar(config.vocabulary));
+    if (Array.isArray(vocabulary) && vocabulary.length > 0) {
+      attachSpeechGrammar(recognition, buildSpeechGrammar(vocabulary));
     }
 
     recognition.onstart = () => {
@@ -236,7 +244,7 @@ export function useSpeechRecognition(config = {}) {
         setInterimTranscript("");
       }
 
-      config.onResult?.(value, event);
+      onResult?.(value, event);
     };
 
     recognitionRef.current = recognition;
@@ -252,12 +260,12 @@ export function useSpeechRecognition(config = {}) {
       recognitionRef.current = null;
     };
   }, [
-    config.continuous,
-    config.interimResults,
-    config.lang,
-    config.maxAlternatives,
-    config.onResult,
-    config.vocabularyKey,
+    continuous,
+    interimResults,
+    lang,
+    maxAlternatives,
+    onResult,
+    vocabulary,
   ]);
 
   function start() {

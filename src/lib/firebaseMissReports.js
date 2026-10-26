@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDocs, limit, query, Timestamp, where, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocs, limit, query, Timestamp, where, writeBatch } from "firebase/firestore";
 import { ensureFirebase } from "./firebaseCore.js";
 
 export const WORD_MISS_REPORT_COLLECTION = "wordMissReports";

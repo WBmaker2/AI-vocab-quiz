@@ -174,7 +174,7 @@ export function GameLeaderboardPanel({
     return () => {
       cancelled = true;
     };
-  }, [canUseLeaderboard, grade, handlers, refreshVersion, schoolId]);
+  }, [canUseLeaderboard, definition.label, grade, handlers, refreshVersion, schoolId]);
 
   useEffect(() => {
     setShowSaveForm(false);

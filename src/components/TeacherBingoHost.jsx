@@ -184,13 +184,15 @@ export function TeacherBingoHost({
   }, [normalizedStudents]);
 
   useEffect(() => {
+    const changeBadgeTimers = changeBadgeTimersRef.current;
+
     return () => {
       window.clearTimeout(revealTimerRef.current);
       window.clearTimeout(resetTimerRef.current);
-      changeBadgeTimersRef.current.forEach((timeoutId) => {
+      changeBadgeTimers.forEach((timeoutId) => {
         window.clearTimeout(timeoutId);
       });
-      changeBadgeTimersRef.current.clear();
+      changeBadgeTimers.clear();
     };
   }, []);
 

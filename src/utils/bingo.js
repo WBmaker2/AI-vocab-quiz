@@ -19,14 +19,7 @@ export {
   createEmptyBingoBoardCells,
   finalizeBingoBoardPlacements,
 } from "./bingoSetup.js";
-import {
-  createBingoBoard,
-  createBingoSetupBoard,
-  createBingoSetupPool,
-  createEmptyBingoBoardCells,
-  finalizeBingoBoardPlacements,
-  getBoardCellIndexes,
-} from "./bingoSetup.js";
+import { getBoardCellIndexes } from "./bingoSetup.js";
 export function normalizeBingoText(value) {
   return String(value ?? "")
     .trim()

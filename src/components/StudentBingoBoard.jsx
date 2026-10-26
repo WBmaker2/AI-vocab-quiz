@@ -53,8 +53,14 @@ export function StudentBingoBoard({
   const autoFinalizeTriggeredRef = useRef(false);
   const lastSavedSetupKeyRef = useRef("");
 
-  const sourceBoard = Array.isArray(boardWords) ? boardWords : [];
-  const sourceTiles = Array.isArray(sourceBoard[0]) ? sourceBoard.flat() : sourceBoard;
+  const sourceBoard = useMemo(
+    () => (Array.isArray(boardWords) ? boardWords : []),
+    [boardWords],
+  );
+  const sourceTiles = useMemo(
+    () => (Array.isArray(sourceBoard[0]) ? sourceBoard.flat() : sourceBoard),
+    [sourceBoard],
+  );
   const normalizedTiles = useMemo(
     () => sourceTiles.map(normalizeTile).filter((tile) => tile.word),
     [sourceTiles],

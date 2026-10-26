@@ -57,7 +57,6 @@ export function createCombinedStudentResultStatus({
   progressSaved,
   progress,
   leaderboardError,
-  progressError,
 }) {
   const cleanActivityLabel = String(activityLabel ?? "").trim();
   const cleanStudentName = normalizeStudentResultName(studentName);

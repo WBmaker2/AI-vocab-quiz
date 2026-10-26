@@ -46,16 +46,10 @@ export function ListeningQuiz({
     progressionError,
     progressionComparison,
     newlyEarnedBadges,
-    progressionStudentName,
     hasSavedProgress,
     progressionDisabledReason,
     handleSaveProgress,
     resetProgression,
-    setProgressionStatus,
-    setProgressionError,
-    setProgressionComparison,
-    setNewlyEarnedBadges,
-    setProgressionStudentName,
   } = useActivityProgression({
     remoteConfigured,
     progressionContext,
@@ -92,7 +86,7 @@ export function ListeningQuiz({
     setReviewSelectedAnswer("");
     setReviewStatus("idle");
     setReviewSummary(null);
-  }, [items]);
+  }, [items, resetProgression]);
 
   const totalQuestions = questions.length;
   const question = questions[questionIndex];
@@ -125,6 +119,21 @@ export function ListeningQuiz({
     });
   });
 
+  function handleReplayQuestion(targetQuestion) {
+    const announcementWord = getListeningAnnouncementWord(
+      targetQuestion,
+      isReviewPlaying ? reviewQuestion : question,
+    );
+
+    if (!announcementWord) {
+      return;
+    }
+
+    speech.speak(announcementWord, {
+      lang: "en-US",
+    });
+  }
+
   useEffect(() => {
     const targetQuestion = isReviewPlaying ? reviewQuestion : question;
 
@@ -140,7 +149,7 @@ export function ListeningQuiz({
 
     announcedQuestionIdRef.current = announcementKey;
     announceQuestion(targetQuestion);
-  }, [announceQuestion, isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion]);
+  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion]);
 
   const { warmup } = speech ?? {};
 
@@ -346,7 +355,7 @@ export function ListeningQuiz({
           reviewStatus={reviewStatus}
           speech={speech}
           studentGrade={studentGrade}
-          onReplay={() => announceQuestion(reviewQuestion)}
+          onReplay={() => handleReplayQuestion(reviewQuestion)}
           onSelectReviewChoice={handleSelectReviewChoice}
           onNextReviewQuestion={handleNextReviewQuestion}
         />
@@ -388,7 +397,7 @@ export function ListeningQuiz({
         status={status}
         speech={speech}
         studentGrade={studentGrade}
-        onReplay={() => announceQuestion(question)}
+        onReplay={() => handleReplayQuestion(question)}
         onSelectChoice={handleSelectChoice}
         onNext={handleNext}
       />

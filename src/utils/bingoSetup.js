@@ -1,9 +1,7 @@
 import {
-  createBingoWordId,
   determineBingoBoardSize,
   normalizeBingoItems,
   normalizeBingoText,
-  normalizeBingoWordKey,
   shuffle,
 } from "./bingo.js";
 

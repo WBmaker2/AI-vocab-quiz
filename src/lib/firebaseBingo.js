@@ -1,18 +1,15 @@
-import { doc, getDoc, runTransaction, serverTimestamp, setDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from "firebase/firestore";
 import {
-  canMarkBingoCell,
   computeBingoLines,
   createBingoSessionCode,
   createBingoSetupBoard,
-  createBingoWordId,
   determineBingoBoardSize,
   normalizeBingoItems,
   normalizeBingoText,
-  selectNextBingoWord,
 } from "../utils/bingo.js";
 import { createBingoBoard } from "../utils/bingoSetup.js";
 import { normalizeBingoRank } from "../utils/bingoPlayer.js";
-import { db, ensureFirebase } from "./firebaseCore.js";
+import { ensureFirebase } from "./firebaseCore.js";
 
 export function createBingoSessionRef(firestore, sessionId) {
   return doc(firestore, "bingoSessions", String(sessionId ?? "").trim());

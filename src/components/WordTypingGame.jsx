@@ -48,6 +48,7 @@ export function WordTypingGame({
   const completionCelebratedRef = useRef(false);
   const announcedQuestionIdRef = useRef("");
   const transitionLockedRef = useRef(false);
+  const cancelSpeech = speech?.cancel;
 
   const [phase, setPhase] = useState("ready");
   const [questions, setQuestions] = useState([]);
@@ -73,7 +74,7 @@ export function WordTypingGame({
   const [reviewHintUsedIds, setReviewHintUsedIds] = useState([]);
 
   useEffect(() => {
-    speech.cancel();
+    cancelSpeech?.();
     window.clearTimeout(transitionTimerRef.current);
     transitionLockedRef.current = false;
     announcedQuestionIdRef.current = "";
@@ -98,14 +99,14 @@ export function WordTypingGame({
     setReviewScore(0);
     setReviewSummary(null);
     setReviewHintUsedIds([]);
-  }, [items, speech.cancel]);
+  }, [items, cancelSpeech]);
 
   useEffect(() => {
     return () => {
-      speech.cancel();
+      cancelSpeech?.();
       window.clearTimeout(transitionTimerRef.current);
     };
-  }, [speech.cancel]);
+  }, [cancelSpeech]);
 
   const canStart = typingItems.length > 0;
   const currentQuestion = questions[questionIndex] ?? null;
@@ -131,7 +132,7 @@ export function WordTypingGame({
   const elapsedSeconds = Math.max(0, Math.ceil(elapsedMs / 1000));
   const accuracy = questionCount > 0 ? Math.round((correctCount / questionCount) * 100) : 0;
 
-  const speakCurrentWord = useEffectEvent(() => {
+  function speakCurrentWord() {
     if (!activeQuestion) {
       return;
     }
@@ -140,9 +141,11 @@ export function WordTypingGame({
       lang: "en-US",
       rate: 0.88,
     });
-  });
+  }
 
-  const moveToNextQuestion = useEffectEvent((delayMs) => {
+  const speakCurrentWordEvent = useEffectEvent(speakCurrentWord);
+
+  function moveToNextQuestion(delayMs) {
     window.clearTimeout(transitionTimerRef.current);
     transitionTimerRef.current = window.setTimeout(() => {
       if (questionIndex >= questions.length - 1) {
@@ -160,9 +163,9 @@ export function WordTypingGame({
       setFeedbackTone("idle");
       setFeedbackMessage("뜻을 보고, 발음을 들은 뒤 영어 단어를 정확하게 입력해 보세요.");
     }, delayMs);
-  });
+  }
 
-  const moveToNextReviewQuestion = useEffectEvent((delayMs) => {
+  function moveToNextReviewQuestion(delayMs) {
     window.clearTimeout(transitionTimerRef.current);
     transitionTimerRef.current = window.setTimeout(() => {
       if (reviewIndex >= reviewItems.length - 1) {
@@ -184,7 +187,7 @@ export function WordTypingGame({
       setFeedbackTone("idle");
       setFeedbackMessage("뜻을 보고, 발음을 들은 뒤 영어 단어를 정확하게 입력해 보세요.");
     }, delayMs);
-  });
+  }
 
   useEffect(() => {
     if ((phase !== "playing" && phase !== "review") || !activeQuestion) {
@@ -199,12 +202,12 @@ export function WordTypingGame({
 
     announcedQuestionIdRef.current = announcementKey;
     questionStartRef.current = Date.now();
-    speakCurrentWord();
+    speakCurrentWordEvent();
     window.setTimeout(() => {
       inputRef.current?.focus();
       inputRef.current?.select?.();
     }, 0);
-  }, [activeQuestion, phase, speakCurrentWord]);
+  }, [activeQuestion, phase]);
 
   useEffect(() => {
     if (phase !== "complete" || completionCelebratedRef.current) {

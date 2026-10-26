@@ -201,7 +201,7 @@ export function useStudentSetLoader({ formatErrorMessage }) {
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -233,7 +233,7 @@ export function useStudentSetLoader({ formatErrorMessage }) {
       cancelled = true;
       schoolSearchGate.begin();
     };
-  }, []);
+  }, [schoolSearchGate]);
 
   async function refreshFeaturedSchools() {
     if (!isFirebaseConfigured) {

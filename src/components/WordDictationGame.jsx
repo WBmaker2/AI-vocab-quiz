@@ -77,6 +77,14 @@ export function WordDictationGame({
     speech.speak(targetQuestion.word, { lang: "en-US" });
   });
 
+  function handleReplayQuestion(targetQuestion) {
+    if (!targetQuestion?.word) {
+      return;
+    }
+
+    speech.speak(targetQuestion.word, { lang: "en-US" });
+  }
+
   useEffect(() => {
     const targetQuestion = isReviewPlaying ? reviewQuestion : question;
 
@@ -92,7 +100,7 @@ export function WordDictationGame({
 
     announcedQuestionIdRef.current = announcementKey;
     announceQuestion(targetQuestion);
-  }, [announceQuestion, isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion]);
+  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion]);
 
   useEffect(() => {
     if (status !== "correct" || !question) {
@@ -358,7 +366,7 @@ export function WordDictationGame({
               value: reviewDraft,
               answered: hasReviewAnswered,
               currentStatus: reviewStatus,
-              onReplay: () => announceQuestion(reviewQuestion),
+              onReplay: () => handleReplayQuestion(reviewQuestion),
               onChange: setReviewDraft,
               onSubmit: handleReviewSubmit,
               replayLabel: "다시 듣기",
@@ -449,7 +457,7 @@ export function WordDictationGame({
             value: draft,
             answered: hasAnswered,
             currentStatus: status,
-            onReplay: () => announceQuestion(question),
+            onReplay: () => handleReplayQuestion(question),
             onChange: setDraft,
             onSubmit: handleSubmit,
             replayLabel: "다시 듣기",

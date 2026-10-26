@@ -1,4 +1,4 @@
-import { db, ensureFirebase } from "./firebaseCore.js";
+import { ensureFirebase } from "./firebaseCore.js";
 import { runTransaction, serverTimestamp } from "firebase/firestore";
 import { normalizeBingoText } from "../utils/bingo.js";
 import { createEmptyBingoBoardCells, finalizeBingoBoardPlacements } from "../utils/bingoSetup.js";

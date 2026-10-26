@@ -1,8 +1,6 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
-import { GameLeaderboardPanel } from "./GameLeaderboardPanel.jsx";
 import { FishingStartCard } from "./fishing/FishingStartCard.jsx";
 import { FishingResultCard } from "./fishing/FishingResultCard.jsx";
-import { formatElapsedSeconds } from "../utils/quiz.js";
 import {
   calculateFishingScore,
   createFishingRound,
@@ -52,9 +50,10 @@ export function WordFishingGame({
   const announcementRef = useRef("");
   const transitionTimerRef = useRef(null);
   const completionCelebratedRef = useRef(false);
+  const cancelSpeech = speech?.cancel;
 
   useEffect(() => {
-    speech.cancel();
+    cancelSpeech?.();
     window.clearTimeout(transitionTimerRef.current);
     roundLockRef.current = false;
     announcementRef.current = "";
@@ -73,16 +72,16 @@ export function WordFishingGame({
     setSelectedCandidateId("");
     setReactionTotalMs(0);
     setElapsedTotalMs(0);
-  }, [items, speech.cancel]);
+  }, [items, cancelSpeech]);
 
   useEffect(() => {
     return () => {
-      speech.cancel();
+      cancelSpeech?.();
       window.clearTimeout(transitionTimerRef.current);
     };
-  }, [speech.cancel]);
+  }, [cancelSpeech]);
 
-  const queueRound = useEffectEvent((nextUsedWordIds, nextRoundIndex) => {
+  function queueRound(nextUsedWordIds, nextRoundIndex) {
     const nextRound = createFishingRound(fishingItems, nextUsedWordIds, 6);
 
     if (!nextRound) {
@@ -106,15 +105,15 @@ export function WordFishingGame({
     setFeedbackMessage("영어를 듣고 맞는 뜻 카드를 낚아채 보세요.");
     setFeedbackTone("idle");
     setSelectedCandidateId("");
-  });
+  }
 
-  const completeGame = useEffectEvent(() => {
+  function completeGame() {
     speech.cancel();
     setPhase("complete");
     setRound(null);
-  });
+  }
 
-  const advanceRound = useEffectEvent(() => {
+  function advanceRound() {
     const nextRoundNumber = roundIndex + 1;
 
     if (nextRoundNumber >= totalRounds || usedWordIds.length >= fishingItems.length) {
@@ -123,9 +122,9 @@ export function WordFishingGame({
     }
 
     queueRound(usedWordIds, nextRoundNumber);
-  });
+  }
 
-  const resolveRound = useEffectEvent((outcome, candidateId = "") => {
+  function resolveRound(outcome, candidateId = "") {
     if (!round || roundLockRef.current) {
       return;
     }
@@ -172,7 +171,9 @@ export function WordFishingGame({
     transitionTimerRef.current = window.setTimeout(() => {
       advanceRound();
     }, TRANSITION_DELAY_MS);
-  });
+  }
+
+  const resolveRoundEvent = useEffectEvent(resolveRound);
 
   const announceRoundWord = useEffectEvent(() => {
     if (!round) {
@@ -196,11 +197,11 @@ export function WordFishingGame({
 
     announcementRef.current = round.id;
     announceRoundWord();
-  }, [announceRoundWord, phase, round]);
+  }, [phase, round]);
 
   useEffect(() => {
     if (phase !== "playing" || !round) {
-      return;
+      return undefined;
     }
 
     roundStartRef.current = Date.now();
@@ -214,14 +215,14 @@ export function WordFishingGame({
     }, 200);
 
     const timeoutId = window.setTimeout(() => {
-      resolveRound("timeout");
+      resolveRoundEvent("timeout");
     }, ROUND_DURATION_MS);
 
     return () => {
       window.clearInterval(intervalId);
       window.clearTimeout(timeoutId);
     };
-  }, [phase, round?.id, resolveRound]);
+  }, [phase, round]);
 
   useEffect(() => {
     if (phase !== "complete" || completionCelebratedRef.current) {

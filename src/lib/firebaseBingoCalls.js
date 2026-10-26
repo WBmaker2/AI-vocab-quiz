@@ -1,4 +1,4 @@
-import { db, ensureFirebase } from "./firebaseCore.js";
+import { ensureFirebase } from "./firebaseCore.js";
 import { runTransaction, serverTimestamp, Timestamp } from "firebase/firestore";
 import { canMarkBingoCell, computeBingoLines, createBingoWordId, normalizeBingoText, selectNextBingoWord } from "../utils/bingo.js";
 import { createBingoPlayerRef, createBingoSessionRef, normalizeBingoPlayerDocument, normalizeBingoSessionDocument } from "./firebaseBingo.js";
@@ -11,7 +11,6 @@ export async function callBingoWord({
   teacherUserId,
   mode,
   word,
-  meaning,
   random = Math.random,
 }) {
   const { db: firestore } = ensureFirebase();
@@ -19,7 +18,6 @@ export async function callBingoWord({
   const sessionRef = createBingoSessionRef(firestore, cleanSessionId);
   const cleanWordId = String(wordId ?? "").trim();
   const cleanWord = normalizeBingoText(word);
-  const cleanMeaning = normalizeBingoText(meaning);
   const cleanTeacherUserId = normalizeBingoText(teacherUserId);
   const cleanMode = normalizeBingoText(mode).toLowerCase();
 

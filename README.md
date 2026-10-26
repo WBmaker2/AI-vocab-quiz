@@ -6,6 +6,13 @@
 - Copy `.env.example` to `.env.local` and set the Firebase config values
 - `npm run dev`
 
+Optional security settings:
+- `VITE_FIREBASE_APP_CHECK_SITE_KEY` enables Firebase App Check when configured.
+- `VITE_FIREBASE_APP_CHECK_DEBUG_TOKEN` is for local debugging only. Do not set it in production.
+
+Vercel and Firebase Hosting apply the shared security headers from
+`vercel.json` and `firebase.json`.
+
 New teacher accounts start in approval-waiting state. A project administrator
 must set `teachers/{uid}.isActive` to `true` from a trusted Firebase Console
 or Admin SDK environment before the teacher can manage school data.
@@ -22,11 +29,11 @@ new personal record. Public leaderboard records remain shared.
 ## Verification
 
 - `npm test`
-- `npm run lint`
+- `npm run lint` (fails on any warning)
 - `npm run test:rules`
 - `npm run test:activities`
 - `npm run build`
-- `npm run test:smoke`
+- `npm run test:smoke` (includes axe WCAG 2 A/AA checks)
 - `npm audit --omit=dev`
 
 Spreadsheet bulk import accepts modern `.xlsx` files only. Re-save legacy

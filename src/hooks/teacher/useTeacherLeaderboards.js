@@ -65,7 +65,7 @@ export function useTeacherLeaderboards({
       setStatus("");
       setEditingName("");
       setDraftName("");
-      return;
+      return undefined;
     }
 
     let cancelled = false;

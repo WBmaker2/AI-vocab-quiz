@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { WordSpellingFeedbackModal } from "./WordSpellingFeedbackModal.jsx";
 import { WordSpellingResultCard } from "./WordSpellingResultCard.jsx";
 import { WordSpellingStartCard } from "./WordSpellingStartCard.jsx";
@@ -110,6 +110,7 @@ export function WordSpellingGame({
     ? Math.min(questionIndex + 1, questionCount)
     : 0;
   const accuracy = calculateSpellingAccuracy(correctCount, completedQuestionCount);
+  const moveToNextQuestionEvent = useEffectEvent(moveToNextQuestion);
 
   useEffect(() => {
     if (
@@ -135,7 +136,7 @@ export function WordSpellingGame({
       }
 
       event.preventDefault();
-      moveToNextQuestion();
+      moveToNextQuestionEvent();
     }
 
     document.addEventListener("keydown", handleNextQuestionShortcut);

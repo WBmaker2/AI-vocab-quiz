@@ -167,6 +167,6 @@ export function useSpeechSynthesis() {
       hasStoredRatePreset,
       warmup,
     }),
-    [cancel, hasStoredRatePreset, ratePreset, speak, speaking, voiceLabel, voices, warmup],
+    [cancel, hasStoredRatePreset, ratePreset, setRatePreset, speak, speaking, voiceLabel, voices, warmup],
   );
 }

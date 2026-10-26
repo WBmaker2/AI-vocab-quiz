@@ -119,7 +119,7 @@ function App() {
   useEffect(() => {
     if (!hasMountedViewRef.current) {
       hasMountedViewRef.current = true;
-      return;
+      return undefined;
     }
 
     const frameId = window.requestAnimationFrame(() => {
@@ -213,6 +213,9 @@ function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        본문으로 건너뛰기
+      </a>
       <div className="app-backdrop app-backdrop-left" />
       <div className="app-backdrop app-backdrop-right" />
 
@@ -278,6 +281,7 @@ function App() {
 
         <div
           ref={viewContentRef}
+          id="main-content"
           className="view-content"
           tabIndex={-1}
           role="region"

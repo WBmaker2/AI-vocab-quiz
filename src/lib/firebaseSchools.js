@@ -5,14 +5,16 @@ import {
   signOut,
 } from "firebase/auth";
 import { auth, authPersistenceReady, ensureFirebase } from "./firebaseCore.js";
-import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
+import {
+  createSchoolSearchRange,
+  normalizeSchoolSearchName,
+} from "../utils/schoolSearch.js";
 
-export function normalizeSchoolName(value) {
-  return String(value ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
+export const normalizeSchoolName = normalizeSchoolSearchName;
+
+const PUBLISHED_SCHOOL_CACHE_KEY = "publishedSchools.v1";
+const PUBLISHED_SCHOOL_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export function createSchoolId(normalizedName) {
   return encodeURIComponent(normalizedName);
@@ -52,12 +54,40 @@ export async function signOutCurrentUser() {
 }
 
 export async function searchSchoolsByName(queryText) {
-  const normalized = normalizeSchoolName(queryText);
+  const normalized = normalizeSchoolSearchName(queryText);
+  const range = createSchoolSearchRange(normalized);
 
-  if (!normalized) {
+  if (!range) {
     return [];
   }
 
+  const { db: firestore } = ensureFirebase();
+  const snapshot = await getDocs(
+    query(
+      collection(firestore, "schools"),
+      where("normalizedName", ">=", range.start),
+      where("normalizedName", "<", range.end),
+      orderBy("normalizedName"),
+      limit(8),
+    ),
+  );
+
+  const schools = snapshot.docs
+    .map((item) => ({
+      id: item.id,
+      name: String(item.data().name ?? "").trim(),
+      normalizedName: String(item.data().normalizedName ?? "").trim(),
+    }))
+    .filter((school) => school.name && school.normalizedName);
+
+  if (schools.length > 0) {
+    return schools.slice(0, 8).map(({ id, name }) => ({ id, name }));
+  }
+
+  return searchPublishedSchoolsFallback(normalized);
+}
+
+async function searchPublishedSchoolsFallback(normalized) {
   const schools = await listPublishedSchools();
 
   return schools
@@ -72,7 +102,54 @@ export async function listPopularSchools(limitCount = 5) {
   return schools.slice(0, limitCount).map(({ id, name }) => ({ id, name }));
 }
 
-export async  function listPublishedSchools() {
+function readPublishedSchoolsCache() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(PUBLISHED_SCHOOL_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    if (Date.now() - Number(parsed.savedAt ?? 0) > PUBLISHED_SCHOOL_CACHE_TTL_MS) {
+      return null;
+    }
+
+    return Array.isArray(parsed.schools) ? parsed.schools : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePublishedSchoolsCache(schools) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      PUBLISHED_SCHOOL_CACHE_KEY,
+      JSON.stringify({ savedAt: Date.now(), schools }),
+    );
+  } catch {
+    // Cache failures must not block school search.
+  }
+}
+
+export async function listPublishedSchools() {
+  const cachedSchools = readPublishedSchoolsCache();
+
+  if (cachedSchools) {
+    return cachedSchools;
+  }
+
   const { db: firestore } = ensureFirebase();
   const snapshot = await getDocs(
     query(collection(firestore, "vocabularySets"), where("published", "==", true)),
@@ -84,7 +161,7 @@ export async  function listPublishedSchools() {
     const data = item.data();
     const schoolId = String(data.schoolId ?? "").trim();
     const schoolName = String(data.schoolName ?? "").trim();
-    const normalizedName = normalizeSchoolName(schoolName);
+    const normalizedName = normalizeSchoolSearchName(schoolName);
 
     if (!schoolId || !schoolName || !normalizedName) {
       return;
@@ -105,7 +182,7 @@ export async  function listPublishedSchools() {
     });
   });
 
-  return Array.from(schoolUsage.values())
+  const schools = Array.from(schoolUsage.values())
     .sort((left, right) => {
       const countCompare = right.setCount - left.setCount;
       if (countCompare !== 0) {
@@ -116,6 +193,10 @@ export async  function listPublishedSchools() {
         sensitivity: "base",
       });
     });
+
+  writePublishedSchoolsCache(schools);
+
+  return schools;
 }
 
 export async function findOrCreateSchool(name) {

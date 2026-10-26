@@ -79,7 +79,7 @@ export function useVocabularyLibrary() {
   useEffect(() => {
     if (!isFirebaseConfigured) {
       setAuthLoading(false);
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -119,14 +119,14 @@ export function useVocabularyLibrary() {
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
-      return;
+      return undefined;
     }
 
     if (!userId) {
       setTeacherProfile(null);
       setTeacherProfileError("");
       setOnboarding(EMPTY_ONBOARDING);
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -174,7 +174,7 @@ export function useVocabularyLibrary() {
 
   useEffect(() => {
     if (!isFirebaseConfigured || !userId) {
-      return;
+      return undefined;
     }
 
     const schoolName = onboarding.schoolName.trim();
@@ -184,7 +184,7 @@ export function useVocabularyLibrary() {
         suggestions: [],
         searching: false,
       }));
-      return;
+      return undefined;
     }
 
     let cancelled = false;

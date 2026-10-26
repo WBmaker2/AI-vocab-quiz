@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_TEACHER_SELECTION,
   createDraftVocabularyItem,
@@ -125,6 +125,10 @@ export function useTeacherSetManager({
     userId,
   ]);
 
+  const queueAutoSaveEvent = useEffectEvent(() => queueAutoSave());
+  const recordTeacherSetEditEvent = useEffectEvent(() => recordTeacherSetEdit());
+  const refreshCatalogEvent = useEffectEvent((...args) => refreshCatalog(...args));
+
   useEffect(() => {
     if (!autoSaveToken) {
       return;
@@ -145,9 +149,9 @@ export function useTeacherSetManager({
         importing,
       })
     ) {
-      queueAutoSave();
+      queueAutoSaveEvent();
     }
-  }, [autoSaveToken, saving, importing]);
+  }, [autoSaveToken, dirty, saving, importing]);
 
   useEffect(
     () => () => {
@@ -162,7 +166,7 @@ export function useTeacherSetManager({
     }
 
     if (!userId || !teacherProfile?.userId) {
-      recordTeacherSetEdit();
+      recordTeacherSetEditEvent();
       clearTeacherAutoSaveTimer(autoSaveTimerRef);
       setAutoSaveToken(0);
       setCatalog([]);
@@ -192,7 +196,7 @@ export function useTeacherSetManager({
       return;
     }
 
-    refreshCatalog(teacherProfile.userId);
+    void refreshCatalogEvent(teacherProfile.userId);
   }, [teacherProfile?.userId]);
 
   useEffect(() => {
@@ -207,7 +211,7 @@ export function useTeacherSetManager({
 
   async function refreshCatalog(nextUserId = userId, revision = null) {
     if (!isFirebaseConfigured || !nextUserId) {
-      return;
+      return undefined;
     }
 
     return refreshTeacherSetCatalog({

@@ -1,7 +1,7 @@
 # 운영 기준 문서
 
-- 최종 갱신: 2026-10-26
-- 현재 버전: `v1.19.0`
+- 최종 갱신: 2026-10-27
+- 현재 버전: `v1.19.1`
 - 라이브 주소: <https://talking-vacab-quiz.vercel.app>
 - Firebase 프로젝트: `talking-vocab-quiz`
 
@@ -44,9 +44,10 @@ npm audit --omit=dev
 ```
 
 - `npm test`: `src/**/*.test.js`를 자동 수집해 실행
+- `npm run lint`: 경고 0개 기준 (`--max-warnings=0`)
 - `npm run test:rules`: Firestore Emulator 기반 보안 규칙 테스트
 - `npm run test:activities`: 듣기·말하기·짝 맞추기·낚시·철자·타자·받아쓰기·빙고·교사 탭·오류 경계 스모크
-- `npm run test:smoke`: 빌드 결과 홈/교사 진입·업데이트 모달·반응형 스모크
+- `npm run test:smoke`: 빌드 결과 홈/교사 진입·업데이트 모달·반응형 스모크 + axe WCAG 2 A/AA 접근성 검사
 - `npm run test:games`: 기존 낚시·타자 중심 스모크 (현재 `test:activities`와 같은 스크립트)
 
 ## 4. CI
@@ -54,7 +55,7 @@ npm audit --omit=dev
 | job | 내용 |
 |---|---|
 | `unit-build-smoke` | audit, unit test, build, browser smoke |
-| `static-checks` | ESLint `no-undef` 포함 정적 검사 |
+| `static-checks` | ESLint `no-undef` 포함 정적 검사, 경고 0개 기준 |
 | `game-smoke` | 학생 활동·교사 탭·오류 경계 컴포넌트 스모크 |
 | `firestore-rules` | Firestore Emulator 규칙 테스트 |
 
@@ -81,8 +82,24 @@ npm audit --omit=dev
 - 학생 개인 기록은 기기 전용 capability 토큰으로 보호한다.
 - `studentProfiles`는 문서가 없을 때만 get을 허용하고 기존 문서는 전체 검증한다.
 - 공개 리더보드는 익명 읽기가 가능하므로 학생 실명 노출 정책을 별도로 검토한다.
+- 리더보드·오답 리포트의 익명 쓰기는 아직 제한하지 않았다. 학급/학생 식별자 도입 전까지는 App Check와 Firebase 사용량 모니터링으로 남용을 감시한다.
 - 교사 승인은 현재 Firebase Console/Admin SDK 수동 승인이다.
 - Firestore 규칙 변경 시 `npm run test:rules` 필수.
+
+### 배포 보안 헤더
+
+- `vercel.json`과 `firebase.json`의 `hosting.headers`가 같은 보안 헤더를 설정한다.
+  - `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`
+  - `Permissions-Policy`: 마이크는 same-origin만 허용
+  - `Cross-Origin-Opener-Policy: same-origin-allow-popups`: Google 로그인 팝업 유지
+  - `Strict-Transport-Security`
+- `tests/security-headers.test.js`가 두 설정 파일의 필수 헤더를 검사한다.
+
+### App Check
+
+- `VITE_FIREBASE_APP_CHECK_SITE_KEY`가 있을 때만 reCAPTCHA v3 provider를 지연 초기화한다.
+- `VITE_FIREBASE_APP_CHECK_DEBUG_TOKEN`은 로컬 디버깅 전용이며 운영 빌드에 넣지 않는다.
+- 코드는 연결 지점만 제공한다. Firebase Console에서 App Check provider 등록과 enforcement를 별도로 켜야 실제 차단이 시작된다.
 
 ## 7. 문서 지도
 
@@ -102,5 +119,9 @@ npm audit --omit=dev
 - 브라우저 TTS/STT 품질은 기기·브라우저에 따라 다르다.
 - Safari 음성 인식은 실험적이며 fallback이 필요하다.
 - 학생 기록은 브라우저 저장소를 지우면 새 기록으로 시작한다.
-- 학교 검색은 현재 공개 단어 세트를 읽어 집계한다. 대규모 확장 전 카탈로그 인덱스가 필요하다.
+- 학교 검색은 `schools` 컬렉션의 `normalizedName` prefix 쿼리를 사용한다. 기존 데이터에 학교 문서가 없을 때만 공개 세트 fallback을 사용한다.
+- `schools` 디렉터리에는 아직 공개 세트가 없는 학교도 포함될 수 있다. 단원 목록이 비어 있으면 공개된 세트가 없다는 안내를 따른다.
+- 학교 이름을 바꾸면 이전 `schools` 문서가 남을 수 있다. 안정적인 학교 ID와 문서 정리는 후속 작업이다.
+- 인기 학교 목록은 공개 세트 집계를 5분간 sessionStorage에 캐시한다. 대규모 확장 전에는 학교별 집계 문서가 필요하다.
+- 리더보드·오답 리포트의 익명 쓰기 제한은 학급/학생 식별자 도입 이후로 미뤘다.
 - 교사 승인·학교명 변경·데이터 정리는 아직 관리자 콘솔이 없다.

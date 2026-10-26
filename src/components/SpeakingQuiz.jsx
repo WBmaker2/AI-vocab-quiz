@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition.js";
 import { useMissReporting } from "./progression/useMissReporting.js";
 import { SpeakingQuestionCard } from "./speaking/SpeakingQuestionCard.jsx";
@@ -20,12 +20,7 @@ import {
   buildSessionReviewItems,
   registerSessionReviewMiss,
 } from "../utils/sessionReview.js";
-import { isSpeakingAnswerAccepted } from "../utils/speakingAcceptance.js";
-import {
-  canAdvanceSpeakingQuestion,
-  isSpeakingConfigurationError,
-  shouldCountSpeechRecognitionErrorAsAttempt,
-} from "../utils/speakingAttempts.js";
+import { canAdvanceSpeakingQuestion } from "../utils/speakingAttempts.js";
 
 const SESSION_REVIEW_LIMIT = 3;
 
@@ -67,16 +62,10 @@ export function SpeakingQuiz({
     progressionError,
     progressionComparison,
     newlyEarnedBadges,
-    progressionStudentName,
     hasSavedProgress,
     progressionDisabledReason,
     handleSaveProgress,
     resetProgression,
-    setProgressionStatus,
-    setProgressionError,
-    setProgressionComparison,
-    setNewlyEarnedBadges,
-    setProgressionStudentName,
   } = useActivityProgression({
     remoteConfigured,
     progressionContext,
@@ -109,7 +98,7 @@ export function SpeakingQuiz({
     setReviewBlockingError("");
   }
 
-  useEffect(() => {
+  const resetSpeakingGame = useEffectEvent(() => {
     setQuestions(createSpeakingSequence(items));
     setQuestionIndex(0);
     setScore(0);
@@ -129,7 +118,11 @@ export function SpeakingQuiz({
     resetReviewQuestionFailureState();
     setReviewSummary(null);
     recognition.reset();
-  }, [items]);
+  });
+
+  useEffect(() => {
+    resetSpeakingGame();
+  }, [items, resetProgression]);
 
   const { warmup } = speech ?? {};
 

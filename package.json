@@ -1,7 +1,7 @@
 {
   "name": "talking-vocab-quiz",
   "private": true,
-  "version": "1.19.0",
+  "version": "1.19.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,7 @@
     "test:smoke": "node scripts/playwright_smoke.js",
     "test:games": "node scripts/game_component_smoke.mjs",
     "test:activities": "node scripts/game_component_smoke.mjs",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
@@ -25,6 +25,7 @@
     "web-vitals": "^5.3.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^9.39.5",
     "@firebase/rules-unit-testing": "^5.0.1",
     "@vitejs/plugin-react": "^5.2.0",

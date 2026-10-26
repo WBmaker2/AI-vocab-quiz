@@ -1,11 +1,13 @@
 # 프로젝트 개선·발전 아이디어 기록
 
 - 작성일: 2026-10-26
-- 현재 버전: `v1.18.2`
+- 최종 갱신: 2026-10-27
+- 현재 버전: `v1.19.1`
 - 목적: 기능·UX·학습·운영·기술 부채 아이디어를 한곳에 기록하고, 이후 릴리스에서 선택해 구현한다.
 - 구현 상태 표시
-  - `구현 중`: `docs/superpowers/plans/2026-10-26-stability-quality-improvements.md`
+  - `구현 완료`: 릴리스에 반영된 항목
   - `후보`: 아직 일정이 정해지지 않은 아이디어
+  - 최근 계획: `docs/superpowers/plans/2026-10-27-technical-debt-hardening.md`
 
 ---
 
@@ -21,6 +23,9 @@
 | 테스트 자동 발견 | `npm test`의 수동 파일 나열을 제거하고 `*.test.js`를 자동 수집 | 구현 완료 (v1.19.0) |
 | 문서 단일화 | 버전·배포 대상·PRD non-goals 불일치를 정리하고 “현재 운영 기준” 문서를 단일 출처로 지정 | 구현 완료 (v1.19.0) |
 | E2E 매트릭스 확대 | 낚시·타자 외 듣기·말하기·짝 맞추기·철자·받아쓰기·교사 탭까지 시작/복귀 스모크 확대 | 구현 완료 (v1.19.0) |
+| 접근성 자동 검사 | Playwright 스모크에 axe WCAG 2 A/AA 검사를 넣고 홈·교사 화면의 critical/serious 위반 차단 | 구현 완료 (v1.19.1) |
+| 린트 경고 0 | ESLint 경고 135개를 모두 정리하고 `--max-warnings=0`으로 CI 게이트 강화 | 구현 완료 (v1.19.1) |
+| 배포 보안 헤더 | Vercel/Firebase Hosting에 nosniff, Referrer-Policy, X-Frame-Options, Permissions-Policy, COOP, HSTS 적용 | 구현 완료 (v1.19.1) |
 | 배포 전 프리뷰 E2E | Vercel preview 배포에 대해 핵심 활동 스모크 실행 | 후보 |
 | 빌드 크기 예산 | 초기 로드와 활동별 청크 크기 기준을 정하고 초과 시 경고 | 후보 |
 | 장애 대응 런북 | 권한 오류, Firebase 장애, 음성 API 실패별 복구 절차 문서화 | 후보 |
@@ -80,11 +85,11 @@
 
 | 아이디어 | 내용 | 상태 |
 |---|---|---|
-| 학교 카탈로그 인덱스 | 공개 단어 세트 전체 읽기 대신 학교별 집계 문서/서버 검색 사용 | 후보 |
+| 학교 카탈로그 인덱스 | `schools` prefix 검색 + 공개 세트 fallback + 인기 학교 5분 캐시 | 부분 구현 (v1.19.1) |
 | 안정적인 학교 ID | 이름 기반 ID를 고정 ID + 변경 가능한 표시 이름 구조로 전환 | 후보 |
 | 관리자 콘솔 | 교사 승인, 학교명 수정, 데이터 정리, 사용량 통계 | 후보 |
 | 데이터 보존 정책 | 학생 기록·빙고 세션·오답 리포트 TTL 및 관리자 삭제 도구 | 후보 |
-| App Check·rate limit | 익명 쓰기와 공개 리더보드 남용 방지 | 후보 |
+| App Check·rate limit | App Check 연결 지점 추가. enforcement·rate limit은 후속 | 부분 구현 (v1.19.1) |
 | Cloud Functions 검토 | 집계·정리·승인·복잡한 검증을 서버로 이동하고 규칙 단순화 | 후보 |
 | PWA/오프라인 | 마지막 단어 세트·정적 자산 캐시, 온라인 복귀 시 결과 동기화 | 후보 |
 | 다중 교사/공동 수업 | 학교 공동 단어 라이브러리, 공동 리더보드, 보조 교사 권한 | 후보 |
@@ -95,13 +100,15 @@
 
 ## 6. 우선순위 메모
 
-### 단기 quick wins
+### 단기 quick wins (v1.19.0~v1.19.1 완료)
 1. 활동별 Error Boundary
 2. 친절한 오류 메시지
-3. ESLint `no-undef`
-4. 테스트 자동 발견
+3. ESLint `no-undef` + 경고 0
+4. 테스트 자동 발견 + axe 접근성 검사
 5. CI audit 게이트 정리
 6. 문서 단일화
+7. 학교 검색 인덱스
+8. 배포 보안 헤더
 
 ### 중기 제품 임팩트
 1. 수업 코드/QR + 딥링크
@@ -110,16 +117,16 @@
 4. 교사용 성장 리포트/숙제 모드
 
 ### 장기 구조 전환
-1. 학교 카탈로그 인덱스 + 안정적인 학교 ID
+1. 안정적인 학교 ID + 학교별 집계 문서
 2. 관리자 콘솔 + 데이터 보존 정책
-3. Cloud Functions/App Check 기반 운영 안정성
+3. Cloud Functions + App Check enforcement + rate limit
 4. PWA/오프라인 + 다중 교사
 
 ---
 
-## 7. 이번 구현 범위
+## 7. v1.19.0 구현 범위
 
-이번 릴리스에서는 **안정성·품질 아이디어 8개만** 구현한다.
+v1.19.0 릴리스에서는 **안정성·품질 아이디어 8개만** 구현했다.
 
 - 활동별 Error Boundary
 - 친절한 오류 메시지
@@ -131,3 +138,18 @@
 - E2E 매트릭스 확대
 
 상세 단계는 `docs/superpowers/plans/2026-10-26-stability-quality-improvements.md`를 따른다.
+
+
+---
+
+## 8. v1.19.1 구현 범위
+
+v1.19.1 릴리스에서는 **기술 부채 정리**만 구현했다.
+
+- 학교 검색을 `schools` prefix 인덱스로 전환 + 공개 세트 fallback + 인기 학교 캐시
+- Vercel/Firebase Hosting 보안 헤더
+- 선택적 App Check 연결 지점
+- skip link, 누락 CSS 변수, axe 접근성 자동 검사
+- ESLint 경고 0개와 `--max-warnings=0` 게이트
+
+상세 단계는 `docs/superpowers/plans/2026-10-27-technical-debt-hardening.md`를 따른다.

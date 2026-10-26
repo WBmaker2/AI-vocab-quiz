@@ -1,6 +1,7 @@
 import http from "node:http";
 import { existsSync, createReadStream } from "node:fs";
 import { extname, join, resolve } from "node:path";
+import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
 
 const rootDir = resolve("dist");
@@ -190,6 +191,26 @@ async function assertNoHorizontalOverflow(page, width, height) {
   }
 }
 
+async function assertNoA11yViolations(page, label) {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  const violations = results.violations.filter(
+    (violation) =>
+      violation.impact === "critical" || violation.impact === "serious",
+  );
+
+  if (violations.length > 0) {
+    const details = violations
+      .map(
+        (violation) =>
+          `${violation.id}: ${violation.help} (${violation.nodes.length} node(s))`,
+      )
+      .join("\n");
+    throw new Error(`Accessibility violations on ${label}:\n${details}`);
+  }
+}
+
 async function run() {
   let browser;
   let context;
@@ -215,6 +236,7 @@ async function run() {
     }
     await waitForSmokeReady(page);
     assertNoCriticalPageDiagnostics(diagnostics, baseUrl);
+    await assertNoA11yViolations(page, "home");
 
     const updateInfoButton = page.getByRole("button", { name: "업데이트 내역" });
     const currentVersion = (await page.locator(".app-version").textContent())?.trim();
@@ -377,6 +399,7 @@ async function run() {
     );
     await assertNoHorizontalOverflow(page, 360, 800);
     assertNoCriticalPageDiagnostics(diagnostics, baseUrl);
+    await assertNoA11yViolations(page, "teacher-workspace");
 
     console.log("playwright smoke: ok");
   } finally {

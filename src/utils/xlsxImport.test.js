@@ -22,7 +22,7 @@ function createWorkbookRows(dataRows) {
   ];
 }
 
-function parseRows(rows, onRemoteWrite = () => {}) {
+function parseRows(rows, _onRemoteWrite = () => {}) {
   return parseVocabularyWorkbook(createNamedFile("vocabulary.xlsx"), {
     readSheet: async () => rows,
   });
