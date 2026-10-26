@@ -76,3 +76,12 @@
 
 - Firestore 규칙 변경 없음
 - Vercel production 재배포
+
+### 배포 결과
+
+- Vercel production: `dpl_DgF6HWo8UM3mxoXtjQyXjy3w8LUb`
+- Production URL: <https://talking-vacab-quiz.vercel.app>
+- 라이브 번들에서 `v1.19.0` 확인
+- 라이브 확인: 공개 단어 세트를 불러와 단어 낚시 시작/카드 6개, 영어 단어 타자 게임 입력 화면 확인
+- Firestore 규칙 변경 없음
+- `@grpc/grpc-js` override 적용 후 `npm audit --omit=dev` 0건

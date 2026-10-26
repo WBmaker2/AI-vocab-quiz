@@ -182,11 +182,11 @@
 - [x] `npm run test:smoke`
 - [x] `npm audit --omit=dev`
 - [x] `docs/changes/2026-10-26-stability-quality.md` 작성
-- [ ] git diff 확인 후 의도한 파일만 커밋
-- [ ] 원격 브랜치 push
-- [ ] Vercel production 배포
-- [ ] 라이브 번들 버전과 주요 활동 진입 확인
-- [ ] CI `static-checks`, `activity-smoke`, `firestore-rules` 통과 확인
+- [x] git diff 확인 후 의도한 파일만 커밋
+- [x] 원격 브랜치 push
+- [x] Vercel production 배포
+- [x] 라이브 번들 버전과 주요 활동 진입 확인
+- [x] CI `static-checks`, `activity-smoke`, `firestore-rules` 통과 확인
 
 ---
 

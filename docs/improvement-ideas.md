@@ -13,14 +13,14 @@
 
 | 아이디어 | 내용 | 상태 |
 |---|---|---|
-| 활동별 Error Boundary | 게임/활동 하나의 렌더링 오류가 앱 전체 빈 화면으로 번지지 않게 활동 단위로 오류를 잡고 “다시 시도”·“홈으로” 복구 동선 제공 | 구현 중 |
-| 친절한 오류 메시지 | `Missing or insufficient permissions.` 같은 원문 대신 권한·네트워크·저장 실패를 한국어로 안내하고 재시도 동선 제공 | 구현 중 |
-| TypeScript 또는 ESLint `no-undef` | 미정의 상수, 빠진 return, 잘못된 JSX 참조를 빌드 전에 정적 검사 | 구현 중 |
-| 프로덕션 관측성 | Sentry/GlitchTip 연결 지점, Web Vitals, `unhandledrejection`, Error Boundary 오류 수집 | 구현 중 |
-| CI audit 게이트 정리 | `@grpc/grpc-js` high 항목 때문에 unit/build/smoke가 skip되는 문제 해결 또는 위험 수용 정책 명문화 | 구현 중 |
-| 테스트 자동 발견 | `npm test`의 수동 파일 나열을 제거하고 `*.test.js`를 자동 수집 | 구현 중 |
-| 문서 단일화 | 버전·배포 대상·PRD non-goals 불일치를 정리하고 “현재 운영 기준” 문서를 단일 출처로 지정 | 구현 중 |
-| E2E 매트릭스 확대 | 낚시·타자 외 듣기·말하기·짝 맞추기·철자·받아쓰기·교사 탭까지 시작/복귀 스모크 확대 | 구현 중 |
+| 활동별 Error Boundary | 게임/활동 하나의 렌더링 오류가 앱 전체 빈 화면으로 번지지 않게 활동 단위로 오류를 잡고 “다시 시도”·“홈으로” 복구 동선 제공 | 구현 완료 (v1.19.0) |
+| 친절한 오류 메시지 | `Missing or insufficient permissions.` 같은 원문 대신 권한·네트워크·저장 실패를 한국어로 안내하고 재시도 동선 제공 | 구현 완료 (v1.19.0) |
+| TypeScript 또는 ESLint `no-undef` | 미정의 상수, 빠진 return, 잘못된 JSX 참조를 빌드 전에 정적 검사 | 구현 완료 (v1.19.0) |
+| 프로덕션 관측성 | Sentry/GlitchTip 연결 지점, Web Vitals, `unhandledrejection`, Error Boundary 오류 수집 | 구현 완료 (v1.19.0) |
+| CI audit 게이트 정리 | `@grpc/grpc-js` high 항목 때문에 unit/build/smoke가 skip되는 문제 해결 또는 위험 수용 정책 명문화 | 구현 완료 (v1.19.0) |
+| 테스트 자동 발견 | `npm test`의 수동 파일 나열을 제거하고 `*.test.js`를 자동 수집 | 구현 완료 (v1.19.0) |
+| 문서 단일화 | 버전·배포 대상·PRD non-goals 불일치를 정리하고 “현재 운영 기준” 문서를 단일 출처로 지정 | 구현 완료 (v1.19.0) |
+| E2E 매트릭스 확대 | 낚시·타자 외 듣기·말하기·짝 맞추기·철자·받아쓰기·교사 탭까지 시작/복귀 스모크 확대 | 구현 완료 (v1.19.0) |
 | 배포 전 프리뷰 E2E | Vercel preview 배포에 대해 핵심 활동 스모크 실행 | 후보 |
 | 빌드 크기 예산 | 초기 로드와 활동별 청크 크기 기준을 정하고 초과 시 경고 | 후보 |
 | 장애 대응 런북 | 권한 오류, Firebase 장애, 음성 API 실패별 복구 절차 문서화 | 후보 |
