@@ -36,6 +36,9 @@ jobs:
       - name: Run browser smoke
         run: npm run test:smoke
 
+      - name: Run game component smoke
+        run: npm run test:games
+
   firestore-rules:
     runs-on: ubuntu-latest
 

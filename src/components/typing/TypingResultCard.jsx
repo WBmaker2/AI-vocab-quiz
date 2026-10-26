@@ -3,6 +3,7 @@ import { saveStudentProgress, saveTypingLeaderboardScore } from "../../lib/fireb
 import { GameLeaderboardPanel } from "../GameLeaderboardPanel.jsx";
 import { StudentProgressPanel } from "../StudentProgressPanel.jsx";
 import { createCombinedStudentResultStatus, saveCombinedStudentResult } from "../../utils/studentResultSave.js";
+import { formatElapsedSeconds } from "../../utils/quiz.js";
 import { formatAverageSeconds } from "../../utils/wordTyping.js";
 
 
@@ -209,7 +210,7 @@ export function TypingResultCard({
           </article>
           <article className="word-typing-summary-card">
             <span>걸린 시간</span>
-            <strong>{formatAverageSeconds(elapsedSeconds)}</strong>
+            <strong>{formatElapsedSeconds(elapsedSeconds)}</strong>
           </article>
           <article className="word-typing-summary-card">
             <span>힌트 사용</span>

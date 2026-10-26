@@ -1,6 +1,29 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateFishingScore } from "./wordFishing.js";
+import {
+  calculateFishingScore,
+  createFishingRound,
+  FISHING_MAX_ROUNDS,
+  FISHING_ROUND_DURATION_MS,
+  FISHING_ROUND_DURATION_SECONDS,
+} from "./wordFishing.js";
+
+test("fishing round constants stay aligned", () => {
+  assert.equal(FISHING_MAX_ROUNDS, 10);
+  assert.equal(FISHING_ROUND_DURATION_SECONDS, FISHING_ROUND_DURATION_MS / 1000);
+});
+
+test("createFishingRound builds a bounded round with the answer included", () => {
+  const items = Array.from({ length: 8 }, (_, index) => ({
+    id: `item-${index}`,
+    word: `word-${index}`,
+    meaning: `뜻-${index}`,
+  }));
+  const round = createFishingRound(items, [], 6);
+
+  assert.equal(round.candidates.length, 6);
+  assert.ok(round.candidates.some((candidate) => candidate.id === round.answer.id));
+});
 
 test("faster correct fishing answers earn more points within the same round", () => {
   const veryFast = calculateFishingScore({ isCorrect: true, reactionMs: 1500 });

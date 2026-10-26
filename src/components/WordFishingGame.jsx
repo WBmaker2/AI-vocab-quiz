@@ -6,15 +6,15 @@ import { formatElapsedSeconds } from "../utils/quiz.js";
 import {
   calculateFishingScore,
   createFishingRound,
+  FISHING_MAX_ROUNDS,
   FISHING_ROUND_DURATION_MS,
+  FISHING_ROUND_DURATION_SECONDS,
   formatAverageReactionTime,
   normalizeFishingItems,
 } from "../utils/wordFishing.js";
 
 const ROUND_DURATION_MS = FISHING_ROUND_DURATION_MS;
-const ROUND_DURATION_SECONDS = ROUND_DURATION_MS / 1000;
 const TRANSITION_DELAY_MS = 900;
-const MAX_ROUNDS = 10;
 
 
 export function WordFishingGame({
@@ -28,7 +28,7 @@ export function WordFishingGame({
   onBack,
 }) {
   const fishingItems = useMemo(() => normalizeFishingItems(items), [items]);
-  const totalRounds = Math.min(MAX_ROUNDS, fishingItems.length);
+  const totalRounds = Math.min(FISHING_MAX_ROUNDS, fishingItems.length);
   const canStart = fishingItems.length >= 2;
   const [phase, setPhase] = useState("ready");
   const [roundIndex, setRoundIndex] = useState(0);
@@ -38,7 +38,7 @@ export function WordFishingGame({
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
   const [missCount, setMissCount] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(ROUND_DURATION_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(FISHING_ROUND_DURATION_SECONDS);
   const [feedbackMessage, setFeedbackMessage] = useState(
     "영어를 듣고 뜻 카드를 눌러보세요.",
   );
@@ -67,7 +67,7 @@ export function WordFishingGame({
     setCorrectCount(0);
     setWrongCount(0);
     setMissCount(0);
-    setTimeLeft(ROUND_DURATION_SECONDS);
+    setTimeLeft(FISHING_ROUND_DURATION_SECONDS);
     setFeedbackMessage("영어를 듣고 뜻 카드를 눌러보세요.");
     setFeedbackTone("idle");
     setSelectedCandidateId("");
@@ -102,7 +102,7 @@ export function WordFishingGame({
         ? current
         : [...current, nextRound.answer.id],
     );
-    setTimeLeft(ROUND_DURATION_SECONDS);
+    setTimeLeft(FISHING_ROUND_DURATION_SECONDS);
     setFeedbackMessage("영어를 듣고 맞는 뜻 카드를 낚아채 보세요.");
     setFeedbackTone("idle");
     setSelectedCandidateId("");
@@ -206,7 +206,7 @@ export function WordFishingGame({
     roundStartRef.current = Date.now();
     roundLockRef.current = false;
     const deadline = Date.now() + ROUND_DURATION_MS;
-    setTimeLeft(ROUND_DURATION_SECONDS);
+    setTimeLeft(FISHING_ROUND_DURATION_SECONDS);
 
     const intervalId = window.setInterval(() => {
       const remainingMs = Math.max(0, deadline - Date.now());

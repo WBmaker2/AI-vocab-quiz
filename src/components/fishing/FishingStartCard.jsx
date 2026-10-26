@@ -1,3 +1,8 @@
+import {
+  FISHING_MAX_ROUNDS,
+  FISHING_ROUND_DURATION_SECONDS,
+} from "../../utils/wordFishing.js";
+
 export function FishingStartCard({ canStart, ttsSupported, itemCount, onStart, onBack }) {
   return (
     <section className="workspace-panel word-fishing-shell">
@@ -17,7 +22,7 @@ export function FishingStartCard({ canStart, ttsSupported, itemCount, onStart, o
         <p className="question-copy">
           한 라운드마다 카드 6장이 물고기처럼 떠다닙니다. 영어 단어를 듣고,
           맞는 뜻 카드 하나를 빠르게 누를수록 더 높은 점수를 얻을 수 있어요.
-          총 10문제, 문제당 {ROUND_DURATION_SECONDS}초입니다.
+          최대 {FISHING_MAX_ROUNDS}문제, 문제당 {FISHING_ROUND_DURATION_SECONDS}초입니다.
         </p>
 
         <div className="word-fishing-rule-grid">
@@ -31,11 +36,11 @@ export function FishingStartCard({ canStart, ttsSupported, itemCount, onStart, o
           </article>
           <article className="word-fishing-rule-card">
             <span>문제 수</span>
-            <strong>{Math.min(MAX_ROUNDS, itemCount)}문제</strong>
+            <strong>{Math.min(FISHING_MAX_ROUNDS, itemCount)}문제</strong>
           </article>
           <article className="word-fishing-rule-card">
             <span>제한 시간</span>
-            <strong>{ROUND_DURATION_SECONDS}초</strong>
+            <strong>{FISHING_ROUND_DURATION_SECONDS}초</strong>
           </article>
         </div>
 

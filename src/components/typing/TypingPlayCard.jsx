@@ -39,7 +39,7 @@ export function TypingPlayCard({ isReviewPhase, onBack, reviewIndex, reviewItems
             </div>
             <div>
               <span>남은 기회</span>
-              <strong>{Math.max(ATTEMPT_LIMIT - attemptCount, 0)}번</strong>
+              <strong>{Math.max(attemptLimit - attemptCount, 0)}번</strong>
             </div>
           </article>
 

@@ -459,34 +459,36 @@ export function WordTypingGame({
     );
   }
 
-      <TypingPlayCard
-        isReviewPhase={isReviewPhase}
-        onBack={onBack}
-        reviewIndex={reviewIndex}
-        reviewItems={reviewItems}
-        reviewScore={reviewScore}
-        questionIndex={questionIndex}
-        questions={questions}
-        score={score}
-        combo={combo}
-        attemptCount={attemptCount}
-        attemptLimit={ATTEMPT_LIMIT}
-        bestCombo={bestCombo}
-        reviewProgressValue={reviewProgressValue}
-        progressValue={progressValue}
-        activeQuestion={activeQuestion}
-        speech={speech}
-        speakCurrentWord={speakCurrentWord}
-        inputRef={inputRef}
-        currentInput={currentInput}
-        setCurrentInput={setCurrentInput}
-        transitionLockedRef={transitionLockedRef}
-        handleSubmit={handleSubmit}
-        handleShowHint={handleShowHint}
-        hintUsed={hintUsed}
-        feedbackTone={feedbackTone}
-        feedbackMessage={feedbackMessage}
-        completedCount={completedCount}
-        averageSeconds={averageSeconds}
-      />
+  return (
+    <TypingPlayCard
+      isReviewPhase={isReviewPhase}
+      onBack={onBack}
+      reviewIndex={reviewIndex}
+      reviewItems={reviewItems}
+      reviewScore={reviewScore}
+      questionIndex={questionIndex}
+      questions={questions}
+      score={score}
+      combo={combo}
+      attemptCount={attemptCount}
+      attemptLimit={ATTEMPT_LIMIT}
+      bestCombo={bestCombo}
+      reviewProgressValue={reviewProgressValue}
+      progressValue={progressValue}
+      activeQuestion={activeQuestion}
+      speech={speech}
+      speakCurrentWord={speakCurrentWord}
+      inputRef={inputRef}
+      currentInput={currentInput}
+      setCurrentInput={setCurrentInput}
+      transitionLockedRef={transitionLockedRef}
+      handleSubmit={handleSubmit}
+      handleShowHint={handleShowHint}
+      hintUsed={hintUsed}
+      feedbackTone={feedbackTone}
+      feedbackMessage={feedbackMessage}
+      completedCount={completedCount}
+      averageSeconds={averageSeconds}
+    />
+  );
 }
