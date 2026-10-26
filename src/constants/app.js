@@ -40,6 +40,15 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.19.0",
+    date: "2026-10-26",
+    summary: [
+      "활동 중 오류가 생겨도 앱 전체가 멈추지 않도록 활동별 복구 화면을 추가하고, 권한·네트워크 오류를 한국어 안내와 다시 시도 버튼으로 바꿨습니다.",
+      "듣기·말하기·짝 맞추기·낚시·철자·타자·받아쓰기·빙고·교사 탭까지 자동 확인하는 테스트를 넓히고, 정적 검사와 오류 수집 기반을 추가했습니다.",
+      "운영·배포·검증 기준을 한 문서로 정리하고 CI 검사 순서를 정비했습니다.",
+    ],
+  },
+  {
     version: "v1.18.2",
     date: "2026-10-26",
     summary: [

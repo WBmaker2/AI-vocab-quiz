@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { AppErrorBoundary } from "./components/AppErrorBoundary.jsx";
 import { BrowserSupportNotice } from "./components/BrowserSupportNotice.jsx";
 import { ModeSelector } from "./components/ModeSelector.jsx";
 import { UpdateHistoryModal } from "./components/UpdateHistoryModal.jsx";
@@ -282,6 +283,12 @@ function App() {
           role="region"
           aria-label={chromeLayout.focusLabel}
           data-view={view}
+        >
+        <AppErrorBoundary
+          key={view}
+          view={view}
+          eyebrow={chromeLayout.focusLabel}
+          onHome={() => navigateTo(APP_VIEWS.HOME)}
         >
         <Suspense
           fallback={
@@ -665,6 +672,7 @@ function App() {
           />
         ) : null}
         </Suspense>
+        </AppErrorBoundary>
         </div>
       </main>
 

@@ -3,6 +3,7 @@ import { saveStudentProgress, saveTypingLeaderboardScore } from "../../lib/fireb
 import { GameLeaderboardPanel } from "../GameLeaderboardPanel.jsx";
 import { StudentProgressPanel } from "../StudentProgressPanel.jsx";
 import { createCombinedStudentResultStatus, saveCombinedStudentResult } from "../../utils/studentResultSave.js";
+import { formatAppError } from "../../utils/appError.js";
 import { formatElapsedSeconds } from "../../utils/quiz.js";
 import { formatAverageSeconds } from "../../utils/wordTyping.js";
 
@@ -160,7 +161,9 @@ export function TypingResultCard({
         }),
       );
     } catch (error) {
-      setProgressionError(error?.message || "기록을 저장하지 못했습니다.");
+      setProgressionError(
+        formatAppError(error, "기록을 저장하지 못했습니다."),
+      );
     } finally {
       setProgressionLoading(false);
     }

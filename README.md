@@ -22,7 +22,9 @@ new personal record. Public leaderboard records remain shared.
 ## Verification
 
 - `npm test`
+- `npm run lint`
 - `npm run test:rules`
+- `npm run test:activities`
 - `npm run build`
 - `npm run test:smoke`
 - `npm audit --omit=dev`
@@ -33,12 +35,11 @@ Spreadsheet bulk import accepts modern `.xlsx` files only. Re-save legacy
 
 ## Deployment
 
-Firebase Hosting is the current production target after the same-origin
-authentication migration.
+The current operating baseline is [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
-- Firebase Hosting live URL: `https://talking-vocab-quiz.web.app`
-- Firebase workflow: code change -> `npm run build:firebase` -> git commit -> git push -> `firebase deploy --only hosting`
-- Vercel fallback: `https://talking-vacab-quiz.vercel.app`
+- **Vercel production** is the primary live environment: `https://talking-vacab-quiz.vercel.app`
+- Firebase Hosting remains a secondary path: `https://talking-vocab-quiz.web.app`
+- Firestore rules are deployed separately from the frontend.
 - Shared vocabulary storage uses Firebase so teachers and students can work across different devices
 
 Before every deployment, add a concise entry to `src/constants/app.js` and a

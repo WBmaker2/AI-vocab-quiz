@@ -1,11 +1,22 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
+import { AppErrorBoundary } from "./components/AppErrorBoundary.jsx";
+import { initObservability } from "./lib/observability.js";
 import "./styles/global.css";
 import "./styles/wordSpelling.css";
 
+void initObservability();
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <AppErrorBoundary
+      eyebrow="App Error"
+      title="앱을 불러오지 못했습니다"
+      onRetry={() => window.location.reload()}
+      onHome={() => window.location.assign("/")}
+    >
+      <App />
+    </AppErrorBoundary>
   </React.StrictMode>,
 );

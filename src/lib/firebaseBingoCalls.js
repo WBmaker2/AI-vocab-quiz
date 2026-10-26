@@ -2,6 +2,7 @@ import { db, ensureFirebase } from "./firebaseCore.js";
 import { runTransaction, serverTimestamp, Timestamp } from "firebase/firestore";
 import { canMarkBingoCell, computeBingoLines, createBingoWordId, normalizeBingoText, selectNextBingoWord } from "../utils/bingo.js";
 import { createBingoPlayerRef, createBingoSessionRef, normalizeBingoPlayerDocument, normalizeBingoSessionDocument } from "./firebaseBingo.js";
+import { mergeBingoCompletedLineKeys } from "../utils/bingoPlayer.js";
 
 
 export async function callBingoWord({

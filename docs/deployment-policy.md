@@ -1,5 +1,7 @@
 # Deployment Policy
 
+> Current operating baseline: [`docs/OPERATIONS.md`](OPERATIONS.md).
+
 ## Canonical Deployment Target
 
 This project uses **Vercel** as the default and preferred deployment platform.
@@ -15,7 +17,7 @@ For normal project updates, use this order:
 1. Make the code change
 2. Add the user-visible update to `src/constants/app.js`
 3. Add or update the dated note in `docs/changes/`
-4. Run `npm test`, `npm run test:rules`, `npm run build`, `npm run test:smoke`, and `npm audit --omit=dev`
+4. Run `npm test`, `npm run lint`, `npm run test:rules`, `npm run test:activities`, `npm run build`, `npm run test:smoke`, and `npm audit --omit=dev`
 5. Commit the change to Git
 6. Push to the remote repository
 7. Deploy to Vercel

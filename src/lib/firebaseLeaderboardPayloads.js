@@ -1,5 +1,5 @@
-import { normalizeLeaderboardScope, normalizeLeaderboardText } from "./firebaseLeaderboardValidation.js";
-import { normalizeStudentNameKey } from "../utils/leaderboard.js";
+import { normalizeLeaderboardScope, normalizeLeaderboardText, validateFishingLeaderboardResult, validateMatchingLeaderboardResult, validateTypingLeaderboardResult } from "./firebaseLeaderboardValidation.js";
+import { createMatchingLeaderboardScopeKey, normalizeStudentNameKey } from "../utils/leaderboard.js";
 import { doc, serverTimestamp } from "firebase/firestore";
 
 export function createMatchingLeaderboardPayload({

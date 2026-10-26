@@ -4,7 +4,7 @@ import {
   signInWithPopup,
   signOut,
 } from "firebase/auth";
-import { auth, ensureFirebase } from "./firebaseCore.js";
+import { auth, authPersistenceReady, ensureFirebase } from "./firebaseCore.js";
 import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 
 export function normalizeSchoolName(value) {

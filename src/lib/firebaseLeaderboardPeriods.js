@@ -1,5 +1,6 @@
 import { createFishingLeaderboardPayload, createMatchingLeaderboardPayload, createTypingLeaderboardPayload, pickBetterTypingLeaderboardEntry, shouldReplaceElapsedLeaderboardEntry } from "./firebaseLeaderboardPayloads.js";
 import { normalizeLeaderboardScope } from "./firebaseLeaderboardValidation.js";
+import { createMatchingLeaderboardScopeKey } from "../utils/leaderboard.js";
 import { ensureFirebase } from "./firebaseCore.js";
 import { collection, doc, getDocs, query, runTransaction, serverTimestamp } from "firebase/firestore";
 

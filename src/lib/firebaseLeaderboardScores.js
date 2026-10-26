@@ -1,7 +1,7 @@
 import { fetchFishingLeaderboardPeriod, fetchMatchingLeaderboardPeriod, fetchTypingLeaderboardPeriod, upsertFishingLeaderboardPeriod, upsertMatchingLeaderboardPeriod, upsertTypingLeaderboardPeriod } from "./firebaseLeaderboardPeriods.js";
 import { normalizeLeaderboardScope, normalizeLeaderboardText, validateFishingLeaderboardResult, validateMatchingLeaderboardResult, validateTypingLeaderboardResult } from "./firebaseLeaderboardValidation.js";
 import { spellingLeaderboardApi } from "./firebaseTeacherLeaderboardAdmin.js";
-import { LEADERBOARD_PERIOD_DEFINITIONS, createLeaderboardPeriodKeys, normalizeStudentName } from "../utils/leaderboard.js";
+import { LEADERBOARD_PERIOD_DEFINITIONS, createLeaderboardPeriodKeys, createMatchingLeaderboardGradeScope, normalizeStudentName } from "../utils/leaderboard.js";
 import { ensureFirebase } from "./firebaseCore.js";
 
 export async function fetchMatchingLeaderboards({

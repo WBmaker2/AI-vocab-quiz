@@ -3738,3 +3738,45 @@ button:disabled {
 .vocab-card-head {
   align-items: center;
 }
+
+.error-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(185, 62, 62, 0.28);
+  border-radius: 18px;
+  background: rgba(255, 240, 240, 0.9);
+  color: #7f1d1d;
+}
+
+.error-notice-copy {
+  flex: 1 1 16rem;
+}
+
+.error-notice-copy strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.error-notice-copy p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.error-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.app-error-fallback {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.app-error-fallback h2 {
+  margin: 0;
+}

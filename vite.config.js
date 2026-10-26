@@ -35,6 +35,14 @@ export default defineConfig({
             return "spreadsheet";
           }
 
+          if (normalizedId.includes("/node_modules/@sentry/")) {
+            return "sentry";
+          }
+
+          if (normalizedId.includes("/node_modules/web-vitals/")) {
+            return "observability";
+          }
+
           return "vendor";
         },
       },

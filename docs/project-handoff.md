@@ -244,10 +244,11 @@
 
 ## 8. 현재 버전 기준 핵심 상태
 
-- 현재 코드 버전: **v1.12.2**
+- 현재 코드 버전: **v1.19.0**
 - 현재 라이브 배포: **Vercel production**
 - 현재 라이브 주소: <https://talking-vacab-quiz.vercel.app>
 - Firebase Hosting 라이브 주소: <https://talking-vocab-quiz.web.app>
+- 운영·배포·검증 기준: [`docs/OPERATIONS.md`](OPERATIONS.md) (최우선)
 
 ### 8.0.2 2026-08-12 Firebase Hosting 마이그레이션 및 배포
 

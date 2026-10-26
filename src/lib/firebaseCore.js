@@ -58,7 +58,7 @@ async function initializeAuthPersistence(firebaseAuth) {
   }
 }
 
-const authPersistenceReady = auth
+export const authPersistenceReady = auth
   ? initializeAuthPersistence(auth)
   : Promise.resolve("disabled");
 

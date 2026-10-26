@@ -1,5 +1,7 @@
 # Talking Vocab Quiz PRD
 
+> **문서 상태:** 이 문서는 초기 MVP PRD입니다. 이후 인증·Firebase 저장·리더보드·빙고·다중 활동이 추가되어 현재 범위와 다를 수 있습니다. 현재 운영 기준은 [`docs/OPERATIONS.md`](OPERATIONS.md)를 따릅니다.
+
 ## 1. Product Summary
 
 Talking Vocab Quiz is a classroom web app for elementary English lessons. Teachers create a vocabulary set for the day, and students practice through listening and speaking quiz flows powered by browser-native speech features.

@@ -1,8 +1,8 @@
 import { createFishingLeaderboardEntryRef, createFishingLeaderboardWritePayload, createMatchingLeaderboardEntryRef, createMatchingLeaderboardWritePayload } from "./firebaseLeaderboardPayloads.js";
 import { renameTeacherSpellingLeaderboardStudent, renameTeacherTypingLeaderboardStudent } from "./firebaseTeacherLeaderboardAdmin.js";
-import { fetchSpellingLeaderboards } from "./firebaseLeaderboardScores.js";
+import { fetchFishingLeaderboards, fetchMatchingLeaderboards, fetchSpellingLeaderboards, fetchTypingLeaderboards } from "./firebaseLeaderboardScores.js";
 import { normalizeLeaderboardScope } from "./firebaseLeaderboardValidation.js";
-import { LEADERBOARD_PERIOD_DEFINITIONS, createLeaderboardPeriodKeys, normalizeStudentName, normalizeStudentNameKey, pickBetterMatchingLeaderboardEntry } from "../utils/leaderboard.js";
+import { LEADERBOARD_PERIOD_DEFINITIONS, createLeaderboardPeriodKeys, createMatchingLeaderboardGradeScope, normalizeStudentName, normalizeStudentNameKey, pickBetterMatchingLeaderboardEntry } from "../utils/leaderboard.js";
 import { normalizeActivityLeaderboardType } from "../utils/activityLeaderboard.js";
 import { ensureFirebase } from "./firebaseCore.js";
 import { runTransaction } from "firebase/firestore";

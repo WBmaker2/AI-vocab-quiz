@@ -11,6 +11,7 @@ import {
   selectNextBingoWord,
 } from "../utils/bingo.js";
 import { createBingoBoard } from "../utils/bingoSetup.js";
+import { normalizeBingoRank } from "../utils/bingoPlayer.js";
 import { db, ensureFirebase } from "./firebaseCore.js";
 
 export function createBingoSessionRef(firestore, sessionId) {

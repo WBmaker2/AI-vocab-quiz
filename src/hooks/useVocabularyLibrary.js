@@ -12,6 +12,7 @@ import {
   syncTeacherVocabularyMetadata,
   upsertTeacherProfile,
 } from "../lib/firebase.js";
+import { formatAppError } from "../utils/appError.js";
 import { useStudentSetLoader } from "./student/useStudentSetLoader.js";
 import { useTeacherBingoPreparation } from "./teacher/useTeacherBingoPreparation.js";
 import { useTeacherLeaderboards } from "./teacher/useTeacherLeaderboards.js";
@@ -28,11 +29,7 @@ const EMPTY_ONBOARDING = {
 };
 
 function normalizeErrorMessage(error, fallback) {
-  if (!error) {
-    return fallback;
-  }
-
-  return error.message || fallback;
+  return formatAppError(error, fallback);
 }
 
 export function useVocabularyLibrary() {

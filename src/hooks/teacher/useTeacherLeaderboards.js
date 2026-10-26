@@ -5,17 +5,14 @@ import {
   isFirebaseConfigured,
   renameTeacherActivityLeaderboardStudent,
 } from "../../lib/firebase.js";
+import { formatAppError } from "../../utils/appError.js";
 import {
   getTeacherActivityLeaderboardDefinition,
   summarizeTeacherLeaderboardOutcome,
 } from "../../utils/teacherLeaderboards.js";
 
 function defaultFormatErrorMessage(error, fallback) {
-  if (!error) {
-    return fallback;
-  }
-
-  return error.message || fallback;
+  return formatAppError(error, fallback);
 }
 
 function getFirstLeaderboardTab(boards, currentTab) {

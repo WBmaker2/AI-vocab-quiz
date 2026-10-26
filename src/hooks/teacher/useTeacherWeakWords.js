@@ -3,6 +3,7 @@ import {
   clearWordMissReports,
   listWordMissReports,
 } from "../../lib/firebase.js";
+import { formatAppError } from "../../utils/appError.js";
 import {
   aggregateWordMissReports,
   filterWordMissReports,
@@ -43,7 +44,9 @@ export function useTeacherWeakWords({ schoolId, grade = "", activityType = "", e
           return;
         }
 
-        setError(fetchError?.message || "약점 단어를 불러오지 못했습니다.");
+        setError(
+          formatAppError(fetchError, "약점 단어를 불러오지 못했습니다."),
+        );
         setLoading(false);
       });
 
@@ -70,7 +73,9 @@ export function useTeacherWeakWords({ schoolId, grade = "", activityType = "", e
       setRefreshVersion((current) => current + 1);
       return true;
     } catch (clearError) {
-      setError(clearError?.message || "약점 기록을 비우지 못했습니다.");
+      setError(
+        formatAppError(clearError, "약점 기록을 비우지 못했습니다."),
+      );
       return false;
     } finally {
       setLoading(false);

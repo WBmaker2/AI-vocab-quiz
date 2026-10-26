@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { saveMatchingLeaderboardScore, saveStudentProgress } from "../../lib/firebase.js";
 import { GameLeaderboardPanel } from "../GameLeaderboardPanel.jsx";
 import { StudentProgressPanel } from "../StudentProgressPanel.jsx";
+import { formatAppError } from "../../utils/appError.js";
 import { formatElapsedSeconds } from "../../utils/quiz.js";
 import { createCombinedStudentResultStatus, saveCombinedStudentResult } from "../../utils/studentResultSave.js";
 
@@ -127,7 +128,9 @@ export function MatchingSummary({
         }),
       );
     } catch (error) {
-      setProgressionError(error?.message || "기록을 저장하지 못했습니다.");
+      setProgressionError(
+        formatAppError(error, "기록을 저장하지 못했습니다."),
+      );
     } finally {
       setProgressionLoading(false);
     }

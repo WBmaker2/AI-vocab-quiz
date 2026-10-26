@@ -1,4 +1,10 @@
 export function TeacherProfileSection({ expanded, profile, onboarding, onCancelProfileEditor, onSaveProfileEditor, onDeleteTeacherProfile, onDeleteSchoolProfile, onOpenProfileEditor }) {
+  const handleOpenProfileEditor = onOpenProfileEditor;
+  const handleCancelProfileEditor = onCancelProfileEditor;
+  const handleSaveProfileEditor = onSaveProfileEditor;
+  const handleDeleteTeacherProfile = onDeleteTeacherProfile;
+  const handleDeleteSchoolProfile = onDeleteSchoolProfile;
+
   if (!expanded) {
     return (
       <article className="teacher-profile-strip">

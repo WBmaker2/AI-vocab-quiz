@@ -1,7 +1,14 @@
 import { db, ensureFirebase } from "./firebaseCore.js";
-import { serverTimestamp } from "firebase/firestore";
+import { runTransaction, serverTimestamp } from "firebase/firestore";
 import { normalizeBingoText } from "../utils/bingo.js";
-import { createEmptyBingoBoardCells } from "../utils/bingoSetup.js";
+import { createEmptyBingoBoardCells, finalizeBingoBoardPlacements } from "../utils/bingoSetup.js";
+import {
+  createBingoPlayerRef,
+  createBingoSessionRef,
+  normalizeBingoPlayerDocument,
+  normalizeBingoSessionDocument,
+  normalizeBingoSessionItems,
+} from "./firebaseBingo.js";
 
 
 export function normalizeBingoBoardSetupDraft(boardCells, boardSize, availableWords = []) {

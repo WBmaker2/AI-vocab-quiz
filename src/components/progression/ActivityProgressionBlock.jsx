@@ -1,3 +1,4 @@
+import { ErrorNotice } from "../ErrorNotice.jsx";
 import { StudentProgressPanel } from "../StudentProgressPanel.jsx";
 
 export function ActivityProgressionBlock({
@@ -52,7 +53,17 @@ export function ActivityProgressionBlock({
           <p className="matching-leaderboard-status">{progressionStatus}</p>
         ) : null}
         {progressionError ? (
-          <p className="matching-leaderboard-error">{progressionError}</p>
+          <ErrorNotice
+            title="개인 기록을 저장하지 못했습니다"
+            message={progressionError}
+            onRetry={
+              !progressionLoading &&
+              !hasSavedProgress &&
+              String(studentNameDraft ?? "").trim()
+                ? () => void onSaveProgress()
+                : undefined
+            }
+          />
         ) : null}
         <StudentProgressPanel
           comparison={progressionComparison}

@@ -1,9 +1,25 @@
 import { normalizeLeaderboardScope, normalizeLeaderboardText } from "./firebaseLeaderboardValidation.js";
 import { BADGE_IDS } from "../constants/badges.js";
-import { normalizeStudentName, normalizeStudentNameKey } from "../utils/leaderboard.js";
-import { isStudentProfileCapabilityToken } from "../utils/studentProfileCapability.js";
+import { normalizeStudentNameKey } from "../utils/leaderboard.js";
+import {
+  buildProgressSummary,
+  compareListeningProgress,
+  compareMatchingProgress,
+  compareSpeakingProgress,
+  compareTypingProgress,
+  createStudentProfileId,
+  evaluateEarnedBadges,
+  normalizeStudentProfileName,
+  toNonNegativeInteger,
+  toNonNegativeNumber,
+} from "../utils/studentProgress.js";
+import {
+  findStudentProfileCapability,
+  getOrCreateStudentProfileCapability,
+  isStudentProfileCapabilityToken,
+} from "../utils/studentProfileCapability.js";
 import { ensureFirebase } from "./firebaseCore.js";
-import { getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 
 export const STUDENT_PROGRESS_ACTIVITY_TYPES = new Set([
   "listening",

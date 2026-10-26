@@ -1,29 +1,42 @@
 {
   "name": "talking-vocab-quiz",
   "private": true,
-  "version": "1.18.2",
+  "version": "1.19.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build --configLoader runner",
     "build:firebase": "node scripts/build-firebase.mjs",
     "preview": "vite preview",
-    "test": "node --test src/utils/sessionReview.test.js src/utils/quiz.test.js src/utils/listeningQuiz.test.js src/utils/normalize.test.js src/utils/speakingAcceptance.test.js src/components/speaking/speakingMessages.test.js src/utils/wordEmoji.test.js src/utils/offlineSpeech.test.js src/utils/wordMissStats.test.js src/utils/dictation.test.js src/utils/speechVoice.test.js src/utils/speechGrammar.test.js src/utils/microphoneLevel.test.js src/utils/wordFishing.test.js src/utils/speakingAttempts.test.js src/utils/wordTyping.test.js src/utils/wordSpelling.test.js src/utils/activityLeaderboard.test.js src/utils/bingoPlayer.test.js src/utils/studentProfileCapability.test.js src/utils/studentResultSave.test.js src/utils/xlsxImport.test.js src/lib/firebase.test.js src/utils/teacherLeaderboards.test.js src/utils/teacherBingoPreparation.test.js src/utils/studentSetLoader.test.js src/utils/studentRecentSelection.test.js src/utils/teacherSetManager.test.js src/utils/appChrome.test.js src/components/teacher/teacherLeaderboardView.test.js src/components/teacher/teacherBingoView.test.js src/components/teacher/teacherBulkView.test.js src/components/teacher/teacherManageView.test.js src/components/teacher/teacherWorkspaceView.test.js tests/firestore.rules.test.js",
+    "test": "node scripts/run_unit_tests.mjs",
     "test:rules": "node scripts/run_firestore_rules_tests.mjs",
     "test:smoke": "node scripts/playwright_smoke.js",
-    "test:games": "node scripts/game_component_smoke.mjs"
+    "test:games": "node scripts/game_component_smoke.mjs",
+    "test:activities": "node scripts/game_component_smoke.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "@sentry/react": "^10.76.2",
     "firebase": "^12.16.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "read-excel-file": "^9.3.1"
+    "read-excel-file": "^9.3.1",
+    "web-vitals": "^5.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@firebase/rules-unit-testing": "^5.0.1",
     "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "firebase-tools": "^15.23.0",
+    "globals": "^16.5.0",
     "playwright": "^1.61.1",
     "vite": "^7.3.6"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6"
   }
 }

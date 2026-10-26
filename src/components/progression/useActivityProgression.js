@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { saveStudentProgress } from "../../lib/firebase.js";
+import { formatAppError } from "../../utils/appError.js";
 
 export function useActivityProgression({
   remoteConfigured,
@@ -75,7 +76,9 @@ export function useActivityProgression({
         `${cleanStudentName} 학생의 ${activityNoun} 성장 기록을 저장했습니다.`,
       );
     } catch (error) {
-      setProgressionError(error?.message || "개인 기록을 저장하지 못했습니다.");
+      setProgressionError(
+        formatAppError(error, "개인 기록을 저장하지 못했습니다."),
+      );
     } finally {
       setProgressionLoading(false);
     }

@@ -1,7 +1,7 @@
 import { createFishingLeaderboardEntryRef, createMatchingLeaderboardEntryRef, createTypingLeaderboardEntryRef, createTypingLeaderboardWritePayload, pickBetterTypingLeaderboardEntry } from "./firebaseLeaderboardPayloads.js";
 import { normalizeLeaderboardScope } from "./firebaseLeaderboardValidation.js";
 import { createSpellingLeaderboardApi } from "./spellingLeaderboard.js";
-import { LEADERBOARD_PERIOD_DEFINITIONS, createLeaderboardPeriodKeys, normalizeStudentName, normalizeStudentNameKey } from "../utils/leaderboard.js";
+import { LEADERBOARD_PERIOD_DEFINITIONS, createLeaderboardPeriodKeys, createMatchingLeaderboardGradeScope, normalizeStudentName, normalizeStudentNameKey } from "../utils/leaderboard.js";
 import { normalizeActivityLeaderboardType } from "../utils/activityLeaderboard.js";
 import { ensureFirebase } from "./firebaseCore.js";
 import { runTransaction } from "firebase/firestore";
