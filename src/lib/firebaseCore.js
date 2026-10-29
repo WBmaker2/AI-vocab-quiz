@@ -60,9 +60,20 @@ async function initializeAuthPersistence(firebaseAuth) {
   }
 }
 
-export const authPersistenceReady = (auth
+const authPersistenceReadyPromise = auth
   ? initializeAuthPersistence(auth)
-  : Promise.resolve("disabled"));
+  : Promise.resolve("disabled");
+
+try {
+  if (typeof globalThis !== "undefined") {
+    globalThis.__FIREBASE_CORE__ = globalThis.__FIREBASE_CORE__ || {};
+    globalThis.__FIREBASE_CORE__.authPersistenceReady = authPersistenceReadyPromise;
+  }
+} catch {
+  // ignore
+}
+
+export { authPersistenceReadyPromise as authPersistenceReady };
 
 export function ensureFirebase() {
   if (!auth || !db) {

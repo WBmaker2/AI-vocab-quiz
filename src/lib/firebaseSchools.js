@@ -5,7 +5,6 @@ import {
   signOut,
 } from "firebase/auth";
 import { auth, ensureFirebase } from "./firebaseCore.js";
-import * as firebaseCore from "./firebaseCore.js";
 import { collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import {
   createSchoolSearchRange,
@@ -41,16 +40,30 @@ export function subscribeToAuthChanges(callback) {
   return onAuthStateChanged(auth, callback);
 }
 
-export async function signInWithGoogle() {
-  const { auth: firebaseAuth } = ensureFirebase();
+async function waitForAuthPersistenceReady() {
   try {
-    const ready = firebaseCore?.authPersistenceReady;
+    const mod = await import("./firebaseCore.js");
+    const ready = mod && ("authPersistenceReady" in mod) ? mod["authPersistenceReady"] : undefined;
     if (ready && typeof ready.then === "function") {
-      await ready;
+      await Promise.resolve(ready).catch(() => {});
+      return;
+    }
+    if (typeof globalThis !== "undefined") {
+      const g = globalThis;
+      const gr = g.firebaseCore || g.__FIREBASE_CORE__ || null;
+      const r2 = gr && ("authPersistenceReady" in gr) ? gr["authPersistenceReady"] : undefined;
+      if (r2 && typeof r2.then === "function") {
+        await Promise.resolve(r2).catch(() => {});
+      }
     }
   } catch {
     // Ignore persistence readiness failures and attempt sign-in anyway.
   }
+}
+
+export async function signInWithGoogle() {
+  const { auth: firebaseAuth } = ensureFirebase();
+  await waitForAuthPersistenceReady();
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
   await signInWithPopup(firebaseAuth, provider);
