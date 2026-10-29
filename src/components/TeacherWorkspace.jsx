@@ -250,17 +250,17 @@ export function TeacherWorkspace({
   }
 
   function handleOpenProfileEditor() {
-    onboarding.resetToProfile();
+    onboarding?.resetToProfile?.();
     setProfileEditorOpen(true);
   }
 
   function handleCancelProfileEditor() {
-    onboarding.resetToProfile();
+    onboarding?.resetToProfile?.();
     setProfileEditorOpen(false);
   }
 
   async function handleSaveProfileEditor() {
-    const saved = await onboarding.save();
+    const saved = await onboarding?.save?.();
     if (saved) {
       setProfileEditorOpen(false);
     }
@@ -275,7 +275,7 @@ export function TeacherWorkspace({
       return;
     }
 
-    const deleted = await onboarding.deleteTeacher();
+    const deleted = await onboarding?.deleteTeacher?.();
     if (deleted) {
       setProfileEditorOpen(false);
       resetForm();
@@ -291,7 +291,7 @@ export function TeacherWorkspace({
       return;
     }
 
-    const deleted = await onboarding.deleteSchool();
+    const deleted = await onboarding?.deleteSchool?.();
     if (deleted) {
       setProfileEditorOpen(false);
       resetForm();
@@ -305,7 +305,7 @@ export function TeacherWorkspace({
   const summaryChips = buildTeacherWorkspaceSummaryChips({
     total: stats.total,
     withExamples: stats.withExamples,
-    published,
+    published: Boolean(published),
   });
 
   if (!remoteConfigured) {
@@ -339,7 +339,7 @@ export function TeacherWorkspace({
           <p className="mode-label">Teacher Mode</p>
           <h2>내 단어 세트 관리</h2>
           <p className="inline-hint">
-            {profile.schoolName} · {profile.teacherName}
+            {profile?.schoolName ?? ""} · {profile?.teacherName ?? ""}
           </p>
         </div>
         <div className="toolbar-row">
@@ -352,7 +352,7 @@ export function TeacherWorkspace({
         </div>
       </div>
 
-      <TeacherProfileSection expanded={profilePanelMode === "expanded"} profile={profile} onboarding={onboarding} onCancelProfileEditor={handleCancelProfileEditor} onSaveProfileEditor={handleSaveProfileEditor} onDeleteTeacherProfile={handleDeleteTeacherProfile} onDeleteSchoolProfile={handleDeleteSchoolProfile} onOpenProfileEditor={handleOpenProfileEditor} />
+      {profile ? <TeacherProfileSection expanded={profilePanelMode === "expanded"} profile={profile} onboarding={onboarding} onCancelProfileEditor={handleCancelProfileEditor} onSaveProfileEditor={handleSaveProfileEditor} onDeleteTeacherProfile={handleDeleteTeacherProfile} onDeleteSchoolProfile={handleDeleteSchoolProfile} onOpenProfileEditor={handleOpenProfileEditor} /> : null}
 
       <div className="teacher-workspace-tabs-wrap">
         <div className="teacher-summary-chips" aria-label="현재 단어 세트 요약">
