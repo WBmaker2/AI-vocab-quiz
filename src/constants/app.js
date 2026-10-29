@@ -41,6 +41,14 @@ const assertAppUpdatesOrdered = (updates) => {
 export const APP_UPDATES = [
   {
     version: "v1.19.1",
+    date: "2026-10-29",
+    summary: [
+      "교사 관리 화면에서 Google 로그인 버튼 클릭 시 authPersistenceReady 참조 오류를 방어적으로 처리해 로그인 흐름이 정상 동작하도록 수정했습니다.",
+      "교사 워크스페이스와 프로필 섹션에 null-safe 처리를 추가해 프로필 정보가 없을 때도 빈 화면 대신 안전하게 렌더링됩니다.",
+    ],
+  },
+  {
+    version: "v1.19.1",
     date: "2026-10-27",
     summary: [
       "학교 검색이 전체 공개 단어 세트를 매번 읽지 않고 학교 목록 인덱스에서 찾도록 바꿔 검색이 빨라지고 읽기 비용이 줄었습니다.",
