@@ -42,7 +42,13 @@ export function subscribeToAuthChanges(callback) {
 
 export async function signInWithGoogle() {
   const { auth: firebaseAuth } = ensureFirebase();
-  await authPersistenceReady;
+  try {
+    if (authPersistenceReady) {
+      await authPersistenceReady;
+    }
+  } catch {
+    // Ignore persistence readiness failures and attempt sign-in anyway.
+  }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
   await signInWithPopup(firebaseAuth, provider);
