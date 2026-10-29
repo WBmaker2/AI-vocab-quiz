@@ -4,7 +4,8 @@ import {
   signInWithPopup,
   signOut,
 } from "firebase/auth";
-import { auth, authPersistenceReady, ensureFirebase } from "./firebaseCore.js";
+import { auth, ensureFirebase } from "./firebaseCore.js";
+import * as firebaseCore from "./firebaseCore.js";
 import { collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import {
   createSchoolSearchRange,
@@ -43,8 +44,9 @@ export function subscribeToAuthChanges(callback) {
 export async function signInWithGoogle() {
   const { auth: firebaseAuth } = ensureFirebase();
   try {
-    if (authPersistenceReady) {
-      await authPersistenceReady;
+    const ready = firebaseCore?.authPersistenceReady;
+    if (ready && typeof ready.then === "function") {
+      await ready;
     }
   } catch {
     // Ignore persistence readiness failures and attempt sign-in anyway.

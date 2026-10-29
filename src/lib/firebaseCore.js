@@ -60,9 +60,9 @@ async function initializeAuthPersistence(firebaseAuth) {
   }
 }
 
-export const authPersistenceReady = auth
+export const authPersistenceReady = (auth
   ? initializeAuthPersistence(auth)
-  : Promise.resolve("disabled");
+  : Promise.resolve("disabled"));
 
 export function ensureFirebase() {
   if (!auth || !db) {
