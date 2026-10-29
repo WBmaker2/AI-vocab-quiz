@@ -1,7 +1,7 @@
 # 운영 기준 문서
 
-- 최종 갱신: 2026-10-27
-- 현재 버전: `v1.19.1`
+- 최종 갱신: 2026-10-29
+- 현재 버전: `v1.19.2`
 - 라이브 주소: <https://talking-vacab-quiz.vercel.app>
 - Firebase 프로젝트: `talking-vocab-quiz`
 
