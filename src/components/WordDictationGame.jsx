@@ -3,6 +3,7 @@ import { ProgressBar } from "./ProgressBar.jsx";
 import { ResultSummary } from "./ResultSummary.jsx";
 import { ScoreBoard } from "./ScoreBoard.jsx";
 import { SpeechRateToggle } from "./SpeechRateToggle.jsx";
+import { SpeechVoiceWarning } from "./SpeechVoiceWarning.jsx";
 import { WordImage } from "./WordImage.jsx";
 import { createDictationSequence, gradeDictationAnswer } from "../utils/dictation.js";
 import {
@@ -85,10 +86,16 @@ export function WordDictationGame({
     speech.speak(targetQuestion.word, { lang: "en-US" });
   }
 
+  const voicesReady = speech.voicesReady ?? true;
+
   useEffect(() => {
     const targetQuestion = isReviewPlaying ? reviewQuestion : question;
 
     if (!targetQuestion || isComplete || isReviewComplete) {
+      return;
+    }
+
+    if (!voicesReady) {
       return;
     }
 
@@ -100,7 +107,7 @@ export function WordDictationGame({
 
     announcedQuestionIdRef.current = announcementKey;
     announceQuestion(targetQuestion);
-  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion]);
+  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion, voicesReady]);
 
   useEffect(() => {
     if (status !== "correct" || !question) {
@@ -253,6 +260,8 @@ export function WordDictationGame({
         </div>
 
         <SpeechRateToggle speech={speech} studentGrade={studentGrade} />
+
+        <SpeechVoiceWarning speech={speech} />
 
         <p className="question-copy">뜻: {targetQuestion?.meaning ?? ""}</p>
         <WordImage item={targetQuestion} />

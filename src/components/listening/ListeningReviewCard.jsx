@@ -1,6 +1,7 @@
 import { ProgressBar } from "../ProgressBar.jsx";
 import { ScoreBoard } from "../ScoreBoard.jsx";
 import { SpeechRateToggle } from "../SpeechRateToggle.jsx";
+import { SpeechVoiceWarning } from "../SpeechVoiceWarning.jsx";
 import { WordImage } from "../WordImage.jsx";
 import { getFeedbackMessage } from "./listeningMessages.js";
 
@@ -47,6 +48,8 @@ export function ListeningReviewCard({
           </div>
 
           <SpeechRateToggle speech={speech} studentGrade={studentGrade} />
+
+          <SpeechVoiceWarning speech={speech} />
 
           <p className="question-copy">
             방금 틀린 문제만 다시 모았습니다. 이번에는 뜻을 천천히 골라보세요.

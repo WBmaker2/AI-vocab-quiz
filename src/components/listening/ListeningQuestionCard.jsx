@@ -1,6 +1,7 @@
 import { ProgressBar } from "../ProgressBar.jsx";
 import { ScoreBoard } from "../ScoreBoard.jsx";
 import { SpeechRateToggle } from "../SpeechRateToggle.jsx";
+import { SpeechVoiceWarning } from "../SpeechVoiceWarning.jsx";
 import { WordImage } from "../WordImage.jsx";
 import { getFeedbackMessage } from "./listeningMessages.js";
 
@@ -47,6 +48,8 @@ export function ListeningQuestionCard({
           </div>
 
           <SpeechRateToggle speech={speech} studentGrade={studentGrade} />
+
+          <SpeechVoiceWarning speech={speech} />
 
           <p className="question-copy">
             영어 단어를 듣고 가장 알맞은 뜻을 선택하세요.

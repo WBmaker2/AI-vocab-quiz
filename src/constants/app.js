@@ -40,6 +40,14 @@ const assertAppUpdatesOrdered = (updates) => {
 // package.json is release metadata for tooling and is not read by the UI.
 export const APP_UPDATES = [
   {
+    version: "v1.19.3",
+    date: "2026-11-05",
+    summary: [
+      "듣기·받아쓰기에서 영어 음성이 준비되기 전에 자동 재생되던 문제를 고쳐 첫 문제부터 같은 영어 음성으로 들리게 했습니다.",
+      "기기에 영어 음성이 없을 때는 한국어 음성으로 들릴 수 있다는 안내와 다시 듣기 방법을 바로 보여줍니다.",
+    ],
+  },
+  {
     version: "v1.19.2",
     date: "2026-10-29",
     summary: [

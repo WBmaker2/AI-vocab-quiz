@@ -63,6 +63,14 @@ export function saveStoredVoiceURI(voiceURI) {
   writeStorage(SPEECH_VOICE_STORAGE_KEY, String(voiceURI));
 }
 
+export function isEnglishVoice(voice) {
+  return /^en/i.test(String(voice?.lang ?? ""));
+}
+
+export function hasEnglishVoice(voices) {
+  return Array.isArray(voices) && voices.some(isEnglishVoice);
+}
+
 function scoreSpeechVoice(voice) {
   const lang = String(voice?.lang ?? "");
   const name = String(voice?.name ?? "");

@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  hasEnglishVoice,
+  isEnglishVoice,
   isSpeechRatePreset,
   pickPreferredSpeechVoice,
   resolvePreferredSpeechVoice,
@@ -31,6 +33,16 @@ test("returns null when no English voice exists", () => {
     pickPreferredSpeechVoice([{ name: "Yuna", lang: "ko-KR", voiceURI: "yuna" }]),
     null,
   );
+});
+
+test("detects english voices", () => {
+  assert.equal(isEnglishVoice({ lang: "en-US" }), true);
+  assert.equal(isEnglishVoice({ lang: "en-GB" }), true);
+  assert.equal(isEnglishVoice({ lang: "ko-KR" }), false);
+  assert.equal(isEnglishVoice(null), false);
+  assert.equal(hasEnglishVoice([{ lang: "ko-KR" }]), false);
+  assert.equal(hasEnglishVoice([{ lang: "en-GB" }]), true);
+  assert.equal(hasEnglishVoice([]), false);
 });
 
 test("prefers the stored voice URI when it is still available", () => {

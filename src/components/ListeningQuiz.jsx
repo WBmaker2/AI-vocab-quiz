@@ -134,10 +134,16 @@ export function ListeningQuiz({
     });
   }
 
+  const voicesReady = speech.voicesReady ?? true;
+
   useEffect(() => {
     const targetQuestion = isReviewPlaying ? reviewQuestion : question;
 
     if (!targetQuestion || isComplete || isReviewComplete) {
+      return;
+    }
+
+    if (!voicesReady) {
       return;
     }
 
@@ -149,7 +155,7 @@ export function ListeningQuiz({
 
     announcedQuestionIdRef.current = announcementKey;
     announceQuestion(targetQuestion);
-  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion]);
+  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion, voicesReady]);
 
   const { warmup } = speech ?? {};
 
