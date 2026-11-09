@@ -1,5 +1,10 @@
-export function SpeechVoiceWarning({ speech }) {
+export function SpeechVoiceWarning({ speech, pronunciation }) {
   if (!speech) {
+    return null;
+  }
+
+  // 원어민 MP3로 재생 중이면 기기 음성 경고가 필요 없다.
+  if (pronunciation?.lastSource === "mp3") {
     return null;
   }
 
@@ -20,8 +25,27 @@ export function SpeechVoiceWarning({ speech }) {
     );
   }
 
-  if (speech.hasEnglishVoice && !speech.speakError) {
+  if (speech.hasEnglishVoice && !speech.speakError && !pronunciation?.lastError) {
     return null;
+  }
+
+  if (pronunciation?.lastSource === "mp3" || !speech.hasEnglishVoice) {
+    // MP3 우선 모드에서는 안내 문구만 간단히 보여준다.
+    if (pronunciation?.lastSource === "mp3") {
+      return null;
+    }
+  }
+
+  if (!speech.hasEnglishVoice && pronunciation) {
+    return (
+      <article className="notice-card" role="note">
+        <strong>원어민 음원으로 들려주는 중이에요</strong>
+        <p>
+          기기에 영어 음성이 없어도 원어민 MP3로 먼저 들려줍니다. 잘 안 들리면
+          다시 듣기 버튼을 눌러주세요.
+        </p>
+      </article>
+    );
   }
 
   return (

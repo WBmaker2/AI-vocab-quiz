@@ -1,5 +1,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { createListeningQuestions } from "../utils/quiz.js";
+import { usePronunciation } from "../hooks/usePronunciation.js";
+import { SoundGateCard } from "./SoundGateCard.jsx";
 import { useMissReporting } from "./progression/useMissReporting.js";
 import { ListeningQuestionCard } from "./listening/ListeningQuestionCard.jsx";
 import {
@@ -67,6 +69,9 @@ export function ListeningQuiz({
   const [reviewSelectedAnswer, setReviewSelectedAnswer] = useState("");
   const [reviewStatus, setReviewStatus] = useState("idle");
   const [reviewSummary, setReviewSummary] = useState(null);
+  const [soundUnlocked, setSoundUnlocked] = useState(false);
+  const [gateError, setGateError] = useState("");
+  const pronunciation = usePronunciation(speech);
 
   useEffect(() => {
     setQuestions(createListeningQuestions(items));
@@ -86,7 +91,27 @@ export function ListeningQuiz({
     setReviewSelectedAnswer("");
     setReviewStatus("idle");
     setReviewSummary(null);
+    setSoundUnlocked(false);
+    setGateError("");
   }, [items, resetProgression]);
+
+  async function handleSoundGateStart() {
+    setGateError("");
+
+    try {
+      await pronunciation.unlock();
+    } catch {
+      // 잠금 해제 실패해도 예열은 시도한다.
+    }
+
+    const words = questions.map((item) => item?.word).filter(Boolean);
+
+    // 예열은 백그라운드로 돌리고 게이트는 즉시 통과시켜 1번 재생 지연을 막는다.
+    void pronunciation.preloadWords(words).catch(() => {});
+
+    setSoundUnlocked(true);
+    announcedQuestionIdRef.current = "";
+  }
 
   const totalQuestions = questions.length;
   const question = questions[questionIndex];
@@ -114,9 +139,9 @@ export function ListeningQuiz({
       return;
     }
 
-    speech.speak(announcementWord, {
-      lang: "en-US",
-    });
+    // 원어민 MP3 우선, 실패 시 TTS 폴백. 성공 여부와 무관하게 1회만 표시해
+    // 무한 반복을 막고, 실패 시에는 다시 듣기 버튼으로 복구한다.
+    void pronunciation.playWord(announcementWord, { rate: speech.rate });
   });
 
   function handleReplayQuestion(targetQuestion) {
@@ -129,21 +154,17 @@ export function ListeningQuiz({
       return;
     }
 
-    speech.speak(announcementWord, {
-      lang: "en-US",
-    });
+    void pronunciation.playWord(announcementWord, { rate: speech.rate });
   }
 
-  const voicesReady = speech.voicesReady ?? true;
-
   useEffect(() => {
-    const targetQuestion = isReviewPlaying ? reviewQuestion : question;
-
-    if (!targetQuestion || isComplete || isReviewComplete) {
+    if (!soundUnlocked) {
       return;
     }
 
-    if (!voicesReady) {
+    const targetQuestion = isReviewPlaying ? reviewQuestion : question;
+
+    if (!targetQuestion || isComplete || isReviewComplete) {
       return;
     }
 
@@ -155,13 +176,7 @@ export function ListeningQuiz({
 
     announcedQuestionIdRef.current = announcementKey;
     announceQuestion(targetQuestion);
-  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion, voicesReady]);
-
-  const { warmup } = speech ?? {};
-
-  useEffect(() => {
-    warmup?.();
-  }, [warmup]);
+  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion, soundUnlocked]);
 
   useEffect(() => {
     if (status !== "correct" || !question) {
@@ -328,6 +343,19 @@ export function ListeningQuiz({
     return <ListeningEmptyNotice onBack={onBack} />;
   }
 
+  if (!soundUnlocked) {
+    return (
+      <SoundGateCard
+        title="듣기 게임 소리 준비"
+        itemCount={totalQuestions}
+        preparing={pronunciation.preparing}
+        error={gateError}
+        onStart={handleSoundGateStart}
+        onBack={onBack}
+      />
+    );
+  }
+
   if (isReviewComplete) {
     return (
       <ListeningReviewCompleteScreen
@@ -360,6 +388,7 @@ export function ListeningQuiz({
           reviewSelectedAnswer={reviewSelectedAnswer}
           reviewStatus={reviewStatus}
           speech={speech}
+          pronunciation={pronunciation}
           studentGrade={studentGrade}
           onReplay={() => handleReplayQuestion(reviewQuestion)}
           onSelectReviewChoice={handleSelectReviewChoice}
@@ -402,6 +431,7 @@ export function ListeningQuiz({
         selectedAnswer={selectedAnswer}
         status={status}
         speech={speech}
+        pronunciation={pronunciation}
         studentGrade={studentGrade}
         onReplay={() => handleReplayQuestion(question)}
         onSelectChoice={handleSelectChoice}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePronunciation } from "../hooks/usePronunciation.js";
 import {
   advanceMatchingBoard,
   calculateMatchingScore,
@@ -34,6 +35,12 @@ export function WordMatchingGame({
   const [isComplete, setIsComplete] = useState(items.length > 0 && createMatchingGameState(items).totalPairs === 0);
   const completionCelebratedRef = useRef(false);
   const matchTimeoutsRef = useRef(new Map());
+  const pronunciation = usePronunciation(speech);
+  const preloadMatchingWords = pronunciation.preloadWords;
+
+  useEffect(() => {
+    void preloadMatchingWords(items.map((item) => item?.word));
+  }, [items, preloadMatchingWords]);
 
   function clearPendingMatchTimeouts() {
     matchTimeoutsRef.current.forEach((timeoutId) => {
@@ -248,8 +255,7 @@ export function WordMatchingGame({
       return;
     }
 
-    speech.speak(card.word, {
-      lang: "en-US",
+    void pronunciation.playWord(card.word, {
       rate: 0.9,
     });
     setSelectedWordSlotId((current) =>

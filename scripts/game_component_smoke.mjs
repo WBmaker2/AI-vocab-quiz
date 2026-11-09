@@ -140,6 +140,7 @@ async function run() {
         name: "listening",
         activity: "listening",
         action: async (page) => {
+          await page.getByRole("button", { name: "소리 켜고 시작하기" }).click();
           await page.getByRole("heading", { name: "듣고 뜻 고르기" }).waitFor({
             state: "visible",
             timeout: REQUIRED_UI_TIMEOUT_MS,
@@ -161,6 +162,7 @@ async function run() {
         name: "speaking",
         activity: "speaking",
         action: async (page) => {
+          await page.getByRole("button", { name: "소리 켜고 시작하기" }).click();
           await page.getByRole("heading", {
             name: "화면의 단어를 보고 영어로 말해보세요",
           }).waitFor({
@@ -207,6 +209,7 @@ async function run() {
         name: "dictation",
         activity: "dictation",
         action: async (page) => {
+          await page.getByRole("button", { name: "소리 켜고 시작하기" }).click();
           await page.getByRole("heading", { name: "듣고 쓰기" }).waitFor({
             state: "visible",
             timeout: REQUIRED_UI_TIMEOUT_MS,

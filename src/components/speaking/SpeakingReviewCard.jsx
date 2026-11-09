@@ -13,6 +13,7 @@ export function SpeakingReviewCard({
   reviewAttemptTranscript,
   reviewGuidance,
   speech,
+  pronunciation,
   recognition,
   canAdvanceReview,
   onReplayWord,
@@ -20,6 +21,7 @@ export function SpeakingReviewCard({
   onResetReviewAttempt,
   onNextReviewQuestion,
 }) {
+  const isSpeaking = Boolean(speech?.speaking || pronunciation?.playing);
   return (
     <div className="quiz-grid">
       <div className="quiz-main">
@@ -40,11 +42,11 @@ export function SpeakingReviewCard({
               <h3>헷갈렸던 단어를 다시 보고 말해보세요</h3>
             </div>
             <button
-              className="secondary-button"
+              className="secondary-button gi-pulse"
               onClick={onReplayWord}
               disabled={!speech.supported}
             >
-              {speech.speaking ? "읽는 중..." : "원어민 발음 듣기"}
+              {isSpeaking ? "읽는 중..." : "원어민 발음 듣기"}
             </button>
           </div>
 

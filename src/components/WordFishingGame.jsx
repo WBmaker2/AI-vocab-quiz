@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { usePronunciation } from "../hooks/usePronunciation.js";
 import { FishingStartCard } from "./fishing/FishingStartCard.jsx";
 import { FishingResultCard } from "./fishing/FishingResultCard.jsx";
 import {
@@ -50,6 +51,8 @@ export function WordFishingGame({
   const announcementRef = useRef("");
   const transitionTimerRef = useRef(null);
   const completionCelebratedRef = useRef(false);
+  const [starting, setStarting] = useState(false);
+  const pronunciation = usePronunciation(speech);
   const cancelSpeech = speech?.cancel;
 
   useEffect(() => {
@@ -180,8 +183,7 @@ export function WordFishingGame({
       return;
     }
 
-    speech.speak(round.answer.word, {
-      lang: "en-US",
+    void pronunciation.playWord(round.answer.word, {
       rate: 0.88,
     });
   });
@@ -233,12 +235,22 @@ export function WordFishingGame({
     void celebration?.playCompletion?.();
   }, [celebration, phase]);
 
-  function handleStart() {
-    if (!canStart) {
+  async function handleStart() {
+    if (!canStart || starting) {
       return;
     }
 
+    setStarting(true);
     speech.cancel();
+
+    try {
+      await pronunciation.unlock();
+    } catch {
+      // 무시
+    }
+
+    void pronunciation.preloadWords(fishingItems.map((item) => item?.word)).catch(() => {});
+
     completionCelebratedRef.current = false;
     setScore(0);
     setCorrectCount(0);
@@ -249,6 +261,7 @@ export function WordFishingGame({
     setUsedWordIds([]);
     setPhase("playing");
     queueRound([], 0);
+    setStarting(false);
   }
 
   function handleRetry() {
@@ -280,6 +293,7 @@ export function WordFishingGame({
         canStart={canStart}
         ttsSupported={speech.supported}
         itemCount={fishingItems.length}
+        preparing={starting || pronunciation.preparing}
         onStart={handleStart}
         onBack={onBack}
       />
@@ -347,9 +361,8 @@ export function WordFishingGame({
                 <h3>지금 읽은 영어 단어</h3>
               </div>
               <button
-                className="secondary-button"
-                onClick={() => round && speech.speak(round.answer.word, {
-                  lang: "en-US",
+                className="secondary-button gi-pulse"
+                onClick={() => round && pronunciation.playWord(round.answer.word, {
                   rate: 0.88,
                 })}
                 disabled={!round || !speech.supported}

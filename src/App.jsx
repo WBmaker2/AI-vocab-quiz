@@ -11,6 +11,10 @@ import { isSpeechRecognitionSupported } from "./hooks/useSpeechRecognition.js";
 import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis.js";
 import { useVocabularyLibrary } from "./hooks/useVocabularyLibrary.js";
 import { getAppChromeLayout } from "./utils/appChrome.js";
+import {
+  fetchPronunciationUrl,
+  playPronunciationUrl,
+} from "./utils/pronunciationAudio.js";
 
 function lazyNamed(importer, exportName) {
   return lazy(() =>
@@ -153,9 +157,21 @@ function App() {
     studentBingo.session?.callSequence?.[studentBingo.session.callSequence.length - 1] ??
     null;
 
-  function speakBingoWord(word) {
+  async function speakBingoWord(word) {
     if (!word) {
       return;
+    }
+
+    // 빙고 호출도 원어민 MP3 우선, 실패 시 기존 TTS 폴백.
+    try {
+      const url = await fetchPronunciationUrl(word);
+
+      if (url) {
+        await playPronunciationUrl(url);
+        return;
+      }
+    } catch {
+      // MP3 실패는 TTS 폴백으로 이어진다.
     }
 
     speechSynthesis.speak(word, {

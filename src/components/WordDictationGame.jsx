@@ -1,4 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { usePronunciation } from "../hooks/usePronunciation.js";
+import { SoundGateCard } from "./SoundGateCard.jsx";
 import { ProgressBar } from "./ProgressBar.jsx";
 import { ResultSummary } from "./ResultSummary.jsx";
 import { ScoreBoard } from "./ScoreBoard.jsx";
@@ -35,8 +37,10 @@ export function WordDictationGame({
   const [reviewDraft, setReviewDraft] = useState("");
   const [reviewStatus, setReviewStatus] = useState("idle");
   const [reviewSummary, setReviewSummary] = useState(null);
+  const [soundUnlocked, setSoundUnlocked] = useState(false);
+  const [gateError, setGateError] = useState("");
   const announcedQuestionIdRef = useRef("");
-  const { warmup } = speech ?? {};
+  const pronunciation = usePronunciation(speech);
 
   useEffect(() => {
     setQuestions(createDictationSequence(items));
@@ -54,12 +58,26 @@ export function WordDictationGame({
     setReviewDraft("");
     setReviewStatus("idle");
     setReviewSummary(null);
+    setSoundUnlocked(false);
+    setGateError("");
     announcedQuestionIdRef.current = "";
   }, [items]);
 
-  useEffect(() => {
-    warmup?.();
-  }, [warmup]);
+  async function handleSoundGateStart() {
+    setGateError("");
+
+    try {
+      await pronunciation.unlock();
+    } catch {
+      // 무시하고 예열 계속
+    }
+
+    // 예열은 백그라운드로 돌리고 게이트는 즉시 통과시킨다.
+    void pronunciation.preloadWords(questions.map((item) => item?.word)).catch(() => {});
+
+    setSoundUnlocked(true);
+    announcedQuestionIdRef.current = "";
+  }
 
   const totalQuestions = questions.length;
   const question = questions[questionIndex];
@@ -75,7 +93,7 @@ export function WordDictationGame({
       return;
     }
 
-    speech.speak(targetQuestion.word, { lang: "en-US" });
+    void pronunciation.playWord(targetQuestion.word, { rate: speech.rate });
   });
 
   function handleReplayQuestion(targetQuestion) {
@@ -83,19 +101,17 @@ export function WordDictationGame({
       return;
     }
 
-    speech.speak(targetQuestion.word, { lang: "en-US" });
+    void pronunciation.playWord(targetQuestion.word, { rate: speech.rate });
   }
 
-  const voicesReady = speech.voicesReady ?? true;
-
   useEffect(() => {
-    const targetQuestion = isReviewPlaying ? reviewQuestion : question;
-
-    if (!targetQuestion || isComplete || isReviewComplete) {
+    if (!soundUnlocked) {
       return;
     }
 
-    if (!voicesReady) {
+    const targetQuestion = isReviewPlaying ? reviewQuestion : question;
+
+    if (!targetQuestion || isComplete || isReviewComplete) {
       return;
     }
 
@@ -107,7 +123,7 @@ export function WordDictationGame({
 
     announcedQuestionIdRef.current = announcementKey;
     announceQuestion(targetQuestion);
-  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion, voicesReady]);
+  }, [isComplete, isReviewComplete, isReviewPlaying, question, reviewQuestion, soundUnlocked]);
 
   useEffect(() => {
     if (status !== "correct" || !question) {
@@ -255,13 +271,13 @@ export function WordDictationGame({
             onClick={onReplay}
             disabled={!speech.supported}
           >
-            {speech.speaking ? "읽는 중..." : replayLabel}
+            {speech.speaking || pronunciation.playing ? "읽는 중..." : replayLabel}
           </button>
         </div>
 
         <SpeechRateToggle speech={speech} studentGrade={studentGrade} />
 
-        <SpeechVoiceWarning speech={speech} />
+        <SpeechVoiceWarning speech={speech} pronunciation={pronunciation} />
 
         <p className="question-copy">뜻: {targetQuestion?.meaning ?? ""}</p>
         <WordImage item={targetQuestion} />
@@ -318,6 +334,19 @@ export function WordDictationGame({
           </div>
         </article>
       </section>
+    );
+  }
+
+  if (!soundUnlocked) {
+    return (
+      <SoundGateCard
+        title="받아쓰기 소리 준비"
+        itemCount={totalQuestions}
+        preparing={pronunciation.preparing}
+        error={gateError}
+        onStart={handleSoundGateStart}
+        onBack={onBack}
+      />
     );
   }
 

@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { usePronunciation } from "../hooks/usePronunciation.js";
 import { ResultSummary } from "./ResultSummary.jsx";
 import {
   buildSessionReviewItems,
@@ -48,6 +49,8 @@ export function WordTypingGame({
   const completionCelebratedRef = useRef(false);
   const announcedQuestionIdRef = useRef("");
   const transitionLockedRef = useRef(false);
+  const [starting, setStarting] = useState(false);
+  const pronunciation = usePronunciation(speech);
   const cancelSpeech = speech?.cancel;
 
   const [phase, setPhase] = useState("ready");
@@ -137,8 +140,7 @@ export function WordTypingGame({
       return;
     }
 
-    speech.speak(activeQuestion.word, {
-      lang: "en-US",
+    void pronunciation.playWord(activeQuestion.word, {
       rate: 0.88,
     });
   }
@@ -218,17 +220,30 @@ export function WordTypingGame({
     void celebration?.playCompletion?.();
   }, [celebration, phase]);
 
-  function startGame() {
-    if (!canStart || !speech.supported) {
+  async function startGame() {
+    if (!canStart || !speech.supported || starting) {
       return;
     }
 
+    setStarting(true);
     speech.cancel();
+
+    try {
+      await pronunciation.unlock();
+    } catch {
+      // 잠금 해제 실패해도 계속 진행 (TTS 폴백)
+    }
+
+    const shuffled = shuffleItems(typingItems);
+
+    // 예열은 백그라운드로 돌리고 게임은 즉시 시작한다.
+    void pronunciation.preloadWords(shuffled.map((item) => item?.word)).catch(() => {});
+
     window.clearTimeout(transitionTimerRef.current);
     transitionLockedRef.current = false;
     announcedQuestionIdRef.current = "";
     completionCelebratedRef.current = false;
-    setQuestions(shuffleItems(typingItems));
+    setQuestions(shuffled);
     setQuestionIndex(0);
     setAttemptCount(0);
     setScore(0);
@@ -248,6 +263,7 @@ export function WordTypingGame({
     setReviewSummary(null);
     setReviewHintUsedIds([]);
     setPhase("playing");
+    setStarting(false);
   }
 
   function handleShowHint() {
@@ -380,6 +396,7 @@ export function WordTypingGame({
         canStart={canStart}
         ttsSupported={speech.supported}
         itemCount={typingItems.length}
+        preparing={starting || pronunciation.preparing}
         onStart={startGame}
         onBack={onBack}
       />

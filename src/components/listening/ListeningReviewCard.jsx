@@ -14,11 +14,13 @@ export function ListeningReviewCard({
   reviewSelectedAnswer,
   reviewStatus,
   speech,
+  pronunciation,
   studentGrade,
   onReplay,
   onSelectReviewChoice,
   onNextReviewQuestion,
 }) {
+  const isSpeaking = Boolean(speech?.speaking || pronunciation?.playing);
   return (
     <div className="quiz-grid">
       <div className="quiz-main">
@@ -43,13 +45,13 @@ export function ListeningReviewCard({
               onClick={onReplay}
               disabled={!speech.supported}
             >
-              {speech.speaking ? "읽는 중..." : "다시 듣기"}
+              {isSpeaking ? "읽는 중..." : "다시 듣기"}
             </button>
           </div>
 
           <SpeechRateToggle speech={speech} studentGrade={studentGrade} />
 
-          <SpeechVoiceWarning speech={speech} />
+          <SpeechVoiceWarning speech={speech} pronunciation={pronunciation} />
 
           <p className="question-copy">
             방금 틀린 문제만 다시 모았습니다. 이번에는 뜻을 천천히 골라보세요.

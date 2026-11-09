@@ -25,9 +25,18 @@ const speech = {
   supported: true,
   speaking: false,
   cancel() {},
-  speak() {},
-  warmup() {},
+  speak() {
+    return true;
+  },
+  speakAsync: async () => "ended",
+  ensureVoicesReady: async () => [],
+  warmup() {
+    return true;
+  },
   voices: [],
+  voicesReady: true,
+  hasEnglishVoice: true,
+  speakError: "",
   voiceLabel: "",
   rate: 0.9,
   ratePreset: "standard",

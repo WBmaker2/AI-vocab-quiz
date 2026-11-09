@@ -91,6 +91,80 @@ export function useSpeechSynthesis() {
     saveStoredRatePreset(preset);
   }, []);
 
+  const ensureVoicesReady = useCallback((timeoutMs = 2500) => {
+    const synthesis = synthesisRef.current;
+
+    if (!synthesis || typeof synthesis.getVoices !== "function") {
+      setVoicesReady(true);
+      return Promise.resolve([]);
+    }
+
+    const current = synthesis.getVoices();
+
+    if (current.length > 0) {
+      voicesRef.current = current;
+      setVoices(current);
+      setVoicesReady(true);
+      const resolved = resolvePreferredSpeechVoice(current);
+
+      if (resolved) {
+        preferredVoiceURIRef.current = resolved.voiceURI;
+        setPreferredVoiceURI(resolved.voiceURI);
+        saveStoredVoiceURI(resolved.voiceURI);
+      }
+
+      return Promise.resolve(current);
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+
+      const finish = (voices) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        const list = Array.isArray(voices) ? voices : [];
+
+        if (list.length > 0) {
+          voicesRef.current = list;
+          setVoices(list);
+          const resolved = resolvePreferredSpeechVoice(list);
+
+          if (resolved) {
+            preferredVoiceURIRef.current = resolved.voiceURI;
+            setPreferredVoiceURI(resolved.voiceURI);
+            saveStoredVoiceURI(resolved.voiceURI);
+          }
+        }
+
+        setVoicesReady(true);
+        resolve(list);
+      };
+
+      const previousHandler = synthesis.onvoiceschanged;
+
+      synthesis.onvoiceschanged = () => {
+        try {
+          previousHandler?.();
+        } catch {
+          // 기존 핸들러 실패 무시
+        }
+
+        finish(synthesis.getVoices());
+      };
+
+      window.setTimeout(() => {
+        try {
+          finish(synthesis.getVoices());
+        } catch {
+          finish([]);
+        }
+      }, timeoutMs);
+    });
+  }, []);
+
   const warmup = useCallback(() => {
     const synthesis = synthesisRef.current;
 
@@ -99,15 +173,139 @@ export function useSpeechSynthesis() {
     }
 
     try {
-      const utterance = new SpeechSynthesisUtterance("hello");
-      utterance.lang = "en-US";
-      utterance.volume = 0;
-      utterance.rate = 1;
-      synthesis.speak(utterance);
-      return true;
+      synthesis.resume?.();
     } catch {
-      return false;
+      // resume 실패 무시
     }
+
+    try {
+      const loaded = synthesis.getVoices?.() ?? [];
+
+      if (loaded.length > 0) {
+        voicesRef.current = loaded;
+        setVoices(loaded);
+        setVoicesReady(true);
+      }
+    } catch {
+      // 목록 조회 실패 무시
+    }
+
+    return true;
+  }, []);
+
+  const speakAsync = useCallback((text, options = {}) => {
+    const synthesis = synthesisRef.current;
+
+    if (!synthesis || !text) {
+      return Promise.reject(new Error("tts-unsupported"));
+    }
+
+    setSpeakError("");
+
+    return new Promise((resolve, reject) => {
+      const startPlayback = () => {
+        if (synthesis.paused) {
+          try {
+            synthesis.resume();
+          } catch {
+            // resume 실패 무시
+          }
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = options.lang ?? "en-US";
+        utterance.volume = options.volume ?? 1;
+        utterance.rate = options.rate ?? resolveSpeechRate(ratePresetRef.current);
+        utterance.pitch = options.pitch ?? 1;
+
+        const availableVoices = voicesRef.current;
+        let preferredVoice = null;
+
+        if (options.voiceURI) {
+          preferredVoice =
+            availableVoices.find((voice) => voice.voiceURI === options.voiceURI) ?? null;
+        } else {
+          preferredVoice =
+            availableVoices.find(
+              (voice) => voice.voiceURI === preferredVoiceURIRef.current,
+            ) ?? resolvePreferredSpeechVoice(availableVoices);
+        }
+
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
+        }
+
+        let settled = false;
+
+        utterance.onstart = () => {
+          setSpeaking(true);
+        };
+
+        utterance.onend = () => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+          setSpeaking(false);
+          options.onEnd?.();
+          resolve("ended");
+        };
+
+        utterance.onerror = (event) => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+          setSpeaking(false);
+          const code = event?.error ?? "error";
+          setSpeakError(String(code));
+          options.onError?.(event);
+          reject(new Error(`tts-${String(code)}`));
+        };
+
+        try {
+          synthesis.speak(utterance);
+        } catch (error) {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+          setSpeaking(false);
+          setSpeakError("speak-failed");
+          reject(error instanceof Error ? error : new Error("speak-failed"));
+          return;
+        }
+
+        window.setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            setSpeaking(false);
+            setSpeakError("speak-timeout");
+            options.onError?.(new Error("speak-timeout"));
+            reject(new Error("tts-speak-timeout"));
+          }
+        }, options.timeoutMs ?? 12000);
+      };
+
+      try {
+        synthesis.cancel();
+      } catch {
+        // cancel 실패 무시
+      }
+
+      // Chrome 잘림 버그 방지: cancel 직후 즉시 speak하면 잘리므로 100ms 대기
+      window.setTimeout(() => {
+        try {
+          startPlayback();
+        } catch (error) {
+          setSpeaking(false);
+          reject(error instanceof Error ? error : new Error("speak-failed"));
+        }
+      }, 100);
+    });
   }, []);
 
   const speak = useCallback((text, options = {}) => {
@@ -191,6 +389,8 @@ export function useSpeechSynthesis() {
       supported: Boolean(synthesisRef.current),
       speaking,
       speak,
+      speakAsync,
+      ensureVoicesReady,
       cancel,
       voices,
       voicesReady,
@@ -203,6 +403,6 @@ export function useSpeechSynthesis() {
       hasStoredRatePreset,
       warmup,
     }),
-    [cancel, hasEnglishVoiceValue, hasStoredRatePreset, ratePreset, setRatePreset, speak, speakError, speaking, voiceLabel, voices, voicesReady, warmup],
+    [cancel, ensureVoicesReady, hasEnglishVoiceValue, hasStoredRatePreset, ratePreset, setRatePreset, speak, speakAsync, speakError, speaking, voiceLabel, voices, voicesReady, warmup],
   );
 }

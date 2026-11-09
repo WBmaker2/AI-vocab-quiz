@@ -3,7 +3,7 @@ import {
   FISHING_ROUND_DURATION_SECONDS,
 } from "../../utils/wordFishing.js";
 
-export function FishingStartCard({ canStart, ttsSupported, itemCount, onStart, onBack }) {
+export function FishingStartCard({ canStart, ttsSupported, itemCount, preparing, onStart, onBack }) {
   return (
     <section className="workspace-panel word-fishing-shell">
       <div className="section-heading">
@@ -57,11 +57,11 @@ export function FishingStartCard({ canStart, ttsSupported, itemCount, onStart, o
 
         <div className="toolbar-row">
           <button
-            className={`primary-button${canStart && ttsSupported ? " gi-pulse" : ""}`}
+            className={`primary-button${canStart && ttsSupported && !preparing ? " gi-pulse" : ""}`}
             onClick={onStart}
-            disabled={!canStart || !ttsSupported}
+            disabled={!canStart || !ttsSupported || preparing}
           >
-            게임 시작
+            {preparing ? "원어민 음원 준비 중..." : "소리 켜고 게임 시작"}
           </button>
           <button className="ghost-button" onClick={onBack}>
             홈으로

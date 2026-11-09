@@ -14,11 +14,13 @@ export function ListeningQuestionCard({
   selectedAnswer,
   status,
   speech,
+  pronunciation,
   studentGrade,
   onReplay,
   onSelectChoice,
   onNext,
 }) {
+  const isSpeaking = Boolean(speech?.speaking || pronunciation?.playing);
   return (
     <div className="quiz-grid">
       <div className="quiz-main">
@@ -43,13 +45,13 @@ export function ListeningQuestionCard({
               onClick={onReplay}
               disabled={!speech.supported}
             >
-              {speech.speaking ? "읽는 중..." : "다시 듣기"}
+              {isSpeaking ? "읽는 중..." : "다시 듣기"}
             </button>
           </div>
 
           <SpeechRateToggle speech={speech} studentGrade={studentGrade} />
 
-          <SpeechVoiceWarning speech={speech} />
+          <SpeechVoiceWarning speech={speech} pronunciation={pronunciation} />
 
           <p className="question-copy">
             영어 단어를 듣고 가장 알맞은 뜻을 선택하세요.

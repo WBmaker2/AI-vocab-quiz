@@ -1,4 +1,6 @@
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { usePronunciation } from "../hooks/usePronunciation.js";
+import { SoundGateCard } from "./SoundGateCard.jsx";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition.js";
 import { useMissReporting } from "./progression/useMissReporting.js";
 import { SpeakingQuestionCard } from "./speaking/SpeakingQuestionCard.jsx";
@@ -87,6 +89,9 @@ export function SpeakingQuiz({
   const [reviewFailedAttempts, setReviewFailedAttempts] = useState(0);
   const [reviewBlockingError, setReviewBlockingError] = useState("");
   const [reviewSummary, setReviewSummary] = useState(null);
+  const [soundUnlocked, setSoundUnlocked] = useState(false);
+  const [gateError, setGateError] = useState("");
+  const pronunciation = usePronunciation(speech);
 
   function resetQuestionFailureState() {
     setFailedAttempts(0);
@@ -122,13 +127,24 @@ export function SpeakingQuiz({
 
   useEffect(() => {
     resetSpeakingGame();
+    setSoundUnlocked(false);
+    setGateError("");
   }, [items, resetProgression]);
 
-  const { warmup } = speech ?? {};
+  async function handleSoundGateStart() {
+    setGateError("");
 
-  useEffect(() => {
-    warmup?.();
-  }, [warmup]);
+    try {
+      await pronunciation.unlock();
+    } catch {
+      // 잠금 해제 실패해도 예열은 시도한다.
+    }
+
+    // 예열은 백그라운드로 돌리고 게이트는 즉시 통과시킨다.
+    void pronunciation.preloadWords(questions.map((item) => item?.word)).catch(() => {});
+
+    setSoundUnlocked(true);
+  }
 
   const totalQuestions = questions.length;
   const question = questions[questionIndex];
@@ -249,9 +265,7 @@ export function SpeakingQuiz({
       return;
     }
 
-    speech.speak(targetQuestion.word, {
-      lang: "en-US",
-    });
+    void pronunciation.playWord(targetQuestion.word, { rate: speech.rate });
   }
 
   function handleNext() {
@@ -376,6 +390,20 @@ export function SpeakingQuiz({
     return <SpeakingEmptyNotice onBack={onBack} />;
   }
 
+  if (!soundUnlocked) {
+    return (
+      <SoundGateCard
+        title="말하기 연습 소리 준비"
+        description="시작 버튼을 한 번 누르면 원어민 발음 음원을 미리 받아와 연습 내내 끊김 없이 들려줍니다. 마이크는 다음 화면에서 켭니다."
+        itemCount={totalQuestions}
+        preparing={pronunciation.preparing}
+        error={gateError}
+        onStart={handleSoundGateStart}
+        onBack={onBack}
+      />
+    );
+  }
+
   if (!recognition.supported) {
     return (
       <>
@@ -419,6 +447,7 @@ export function SpeakingQuiz({
           reviewAttemptTranscript={reviewAttemptTranscript}
           reviewGuidance={reviewGuidance}
           speech={speech}
+          pronunciation={pronunciation}
           recognition={recognition}
           canAdvanceReview={canAdvanceReview}
           onReplayWord={handleReplayWord}
@@ -461,6 +490,7 @@ export function SpeakingQuiz({
         status={status}
         question={question}
         speech={speech}
+        pronunciation={pronunciation}
         studentGrade={studentGrade}
         recognition={recognition}
         attemptTranscript={attemptTranscript}
